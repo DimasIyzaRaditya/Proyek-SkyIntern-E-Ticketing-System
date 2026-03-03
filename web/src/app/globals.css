@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fbff;
+  --foreground: #0f172a;
 }
 
 @theme inline {
@@ -12,15 +12,108 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
+  overscroll-behavior-x: none;
+}
+
+* {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@keyframes panelPop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.965);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.popup-panel-animate {
+  animation: panelPop 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-origin: top center;
+  will-change: transform, opacity, filter;
+}
+
+@keyframes panelClose {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    filter: blur(1px);
+  }
+}
+
+.popup-panel-close-animate {
+  animation: panelClose 170ms ease-in forwards;
+  transform-origin: top center;
+  will-change: transform, opacity, filter;
+}
+
+.nav-link-animate {
+  transition: color 200ms ease, transform 200ms ease;
+}
+
+.nav-link-animate:hover {
+  transform: translateY(-1px);
+}
+
+.nav-btn-animate {
+  transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+}
+
+.nav-btn-animate:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+}
+
+.nav-btn-animate:active {
+  transform: translateY(0) scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup-panel-animate {
+    animation: none;
+  }
+
+  .popup-panel-close-animate {
+    animation: none;
+  }
+
+  .nav-link-animate,
+  .nav-btn-animate {
+    transition: none;
+  }
+
+  .nav-link-animate:hover,
+  .nav-btn-animate:hover,
+  .nav-btn-animate:active {
+    transform: none;
+    box-shadow: none;
+  }
 }
