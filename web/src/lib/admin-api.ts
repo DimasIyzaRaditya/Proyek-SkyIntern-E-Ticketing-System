@@ -87,24 +87,58 @@ export const getAdminAirlines = async () => {
   return response.airlines;
 };
 
-export const createAdminAirline = async (payload: { code: string; name: string; country: string }) => {
-  const response = await apiRequest<{ airline: AdminAirline }>("/api/admin/airlines", {
+export const createAdminAirline = async (payload: { code: string; name: string; country: string; logo?: File }) => {
+  const { getAuthToken } = await import("@/lib/auth");
+  const { API_BASE_URL } = await import("@/lib/api-client");
+  const token = getAuthToken();
+  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+
+  const formData = new FormData();
+  formData.append("code", payload.code);
+  formData.append("name", payload.name);
+  formData.append("country", payload.country);
+  if (payload.logo) formData.append("logo", payload.logo);
+
+  const response = await fetch(`${API_BASE_URL}/api/admin/airlines`, {
     method: "POST",
-    auth: true,
-    body: payload,
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
   });
 
-  return response.airline;
+  if (!response.ok) {
+    const errData = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new Error(errData.message ?? "Gagal membuat maskapai.");
+  }
+
+  const data = (await response.json()) as { airline: AdminAirline };
+  return data.airline;
 };
 
-export const updateAdminAirline = async (id: number, payload: { code: string; name: string; country: string }) => {
-  const response = await apiRequest<{ airline: AdminAirline }>(`/api/admin/airlines/${id}`, {
+export const updateAdminAirline = async (id: number, payload: { code: string; name: string; country: string; logo?: File }) => {
+  const { getAuthToken } = await import("@/lib/auth");
+  const { API_BASE_URL } = await import("@/lib/api-client");
+  const token = getAuthToken();
+  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+
+  const formData = new FormData();
+  formData.append("code", payload.code);
+  formData.append("name", payload.name);
+  formData.append("country", payload.country);
+  if (payload.logo) formData.append("logo", payload.logo);
+
+  const response = await fetch(`${API_BASE_URL}/api/admin/airlines/${id}`, {
     method: "PUT",
-    auth: true,
-    body: payload,
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
   });
 
-  return response.airline;
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new Error(data.message ?? "Gagal mengupdate maskapai.");
+  }
+
+  const data = (await response.json()) as { airline: AdminAirline };
+  return data.airline;
 };
 
 export const deleteAdminAirline = async (id: number) => {
