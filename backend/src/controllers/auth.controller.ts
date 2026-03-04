@@ -224,3 +224,84 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" })
   }
 }
+
+export const deleteAccount = async (req: AuthRequest, res: Response) => {
+  try {
+    const email = req.params.email as string
+    const userId = req.user?.id
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    if (user.email !== email) {
+      return res.status(403).json({ message: "Email does not match your account" })
+    }
+
+    await prisma.user.delete({
+      where: { id: userId }
+    })
+
+    res.json({ message: "Account deleted successfully" })
+  } catch (error) {
+    console.error("Delete account error:", error)
+    res.status(500).json({ message: "Internal server error" })
+  }
+}
+
+export const getAllUsers = async (req: AuthRequest, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        avatarUrl: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: "desc" }
+    })
+
+    res.json({ users })
+  } catch (error) {
+    console.error("Get all users error:", error)
+    res.status(500).json({ message: "Internal server error" })
+  }
+}
+
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const email = req.params.email as string
+
+    const user = await prisma.user.findUnique({
+      where: { email }
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    if (user.role === "ADMIN") {
+      return res.status(403).json({ message: "Cannot delete admin account" })
+    }
+
+    await prisma.user.delete({
+      where: { email }
+    })
+
+    res.json({ message: "User deleted successfully" })
+  } catch (error) {
+    console.error("Delete user error:", error)
+    res.status(500).json({ message: "Internal server error" })
+  }
+}

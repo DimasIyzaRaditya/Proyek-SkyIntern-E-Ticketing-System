@@ -8,6 +8,29 @@ export const createFlightSeats = async (req: AuthRequest, res: Response) => {
   try {
     const { flightId, seats } = req.body
 
+    // Validate flightId
+    if (!flightId) {
+      return res.status(400).json({ message: "flightId is required" })
+    }
+
+    const parsedFlightId = parseInt(flightId)
+    if (isNaN(parsedFlightId)) {
+      return res.status(400).json({ message: "flightId must be a valid number" })
+    }
+
+    // Validate seats array
+    if (!seats || !Array.isArray(seats) || seats.length === 0) {
+      return res.status(400).json({ message: "seats array is required and must not be empty" })
+    }
+
+    // Check if flight exists
+    const flight = await prisma.flight.findUnique({
+      where: { id: parsedFlightId }
+    })
+    if (!flight) {
+      return res.status(404).json({ message: "Flight not found" })
+    }
+
     // seats: [{ seatNumber, seatClass, isExitRow, additionalPrice }]
     
     const createdSeats = []
@@ -34,7 +57,7 @@ export const createFlightSeats = async (req: AuthRequest, res: Response) => {
       // Create flight seat
       const flightSeat = await prisma.flightSeat.create({
         data: {
-          flightId,
+          flightId: parsedFlightId,
           seatId: seat.id,
           additionalPrice: seatData.additionalPrice || 0
         },
@@ -122,6 +145,24 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
   try {
     const { flightId } = req.body
 
+    // Validate flightId
+    if (!flightId) {
+      return res.status(400).json({ message: "flightId is required" })
+    }
+
+    const parsedFlightId = parseInt(flightId)
+    if (isNaN(parsedFlightId)) {
+      return res.status(400).json({ message: "flightId must be a valid number" })
+    }
+
+    // Check if flight exists
+    const flight = await prisma.flight.findUnique({
+      where: { id: parsedFlightId }
+    })
+    if (!flight) {
+      return res.status(404).json({ message: "Flight not found" })
+    }
+
     const economyRows = 30
     const businessRows = 6
     const seatsPerRow = 6
@@ -178,7 +219,7 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
 
       const flightSeat = await prisma.flightSeat.create({
         data: {
-          flightId,
+          flightId: parsedFlightId,
           seatId: seat.id,
           additionalPrice: seatData.additionalPrice
         },

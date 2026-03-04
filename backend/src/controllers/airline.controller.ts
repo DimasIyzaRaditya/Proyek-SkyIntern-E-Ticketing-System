@@ -165,3 +165,43 @@ export const deleteAirline = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Internal server error" })
   }
 }
+
+export const removeAirlineLogo = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const airline = await prisma.airline.findUnique({
+      where: { id: parseInt(id as string) }
+    })
+
+    if (!airline) {
+      return res.status(404).json({ message: "Airline not found" })
+    }
+
+    if (!airline.logo) {
+      return res.status(400).json({ message: "Airline does not have a logo" })
+    }
+
+    // Try to delete from MinIO (best-effort, file might already be missing)
+    try {
+      const urlPath = new URL(airline.logo).pathname
+      const objectName = urlPath.replace(/^\/[^\/]+\//, "")
+      if (objectName) await deleteFile(objectName)
+    } catch (deleteError) {
+      console.warn("Could not delete logo from MinIO (file may already be missing):", deleteError)
+    }
+
+    const updated = await prisma.airline.update({
+      where: { id: parseInt(id as string) },
+      data: { logo: null }
+    })
+
+    res.json({
+      message: "Logo removed successfully",
+      airline: updated
+    })
+  } catch (error: any) {
+    console.error("Remove airline logo error:", error)
+    res.status(500).json({ message: "Internal server error" })
+  }
+}

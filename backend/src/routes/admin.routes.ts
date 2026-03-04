@@ -6,6 +6,7 @@ import * as airlineController from "../controllers/airline.controller"
 import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
 import * as bookingController from "../controllers/booking.controller"
+import { getAllUsers, deleteUser } from "../controllers/auth.controller"
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -96,10 +97,153 @@ router.delete("/airports/:id", airportController.deleteAirport)
  *         description: Airline created
  */
 router.post("/airlines", upload.single("logo"), airlineController.createAirline)
+/**
+ * @swagger
+ * /api/admin/airlines:
+ *   get:
+ *     summary: Get all airlines
+ *     tags: [Admin - Airlines]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of airlines
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 airlines:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       code:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       country:
+ *                         type: string
+ *                       logo:
+ *                         type: string
+ *                         nullable: true
+ *                         description: URL logo di MinIO
+ */
 router.get("/airlines", airlineController.getAllAirlines)
+/**
+ * @swagger
+ * /api/admin/airlines/{id}:
+ *   get:
+ *     summary: Get airline by ID
+ *     tags: [Admin - Airlines]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID maskapai
+ *     responses:
+ *       200:
+ *         description: Data maskapai
+ *       404:
+ *         description: Airline not found
+ */
 router.get("/airlines/:id", airlineController.getAirline)
+/**
+ * @swagger
+ * /api/admin/airlines/{id}:
+ *   put:
+ *     summary: Update airline
+ *     tags: [Admin - Airlines]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - name
+ *               - country
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: GA
+ *               name:
+ *                 type: string
+ *                 example: Garuda Indonesia
+ *               country:
+ *                 type: string
+ *                 example: Indonesia
+ *               logo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Upload file gambar logo (opsional, kosongkan jika tidak diubah)
+ *     responses:
+ *       200:
+ *         description: Airline updated
+ */
 router.put("/airlines/:id", upload.single("logo"), airlineController.updateAirline)
+/**
+ * @swagger
+ * /api/admin/airlines/{id}:
+ *   delete:
+ *     summary: Delete airline
+ *     tags: [Admin - Airlines]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID maskapai yang akan dihapus
+ *     responses:
+ *       200:
+ *         description: Airline deleted successfully
+ *       404:
+ *         description: Airline not found
+ */
 router.delete("/airlines/:id", airlineController.deleteAirline)
+/**
+ * @swagger
+ * /api/admin/airlines/{id}/logo:
+ *   delete:
+ *     summary: Remove airline logo
+ *     description: Menghapus logo maskapai dari MinIO dan set logo menjadi null di database. Gunakan ini jika file logo sudah terhapus dari MinIO agar URL tidak broken.
+ *     tags: [Admin - Airlines]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID maskapai
+ *     responses:
+ *       200:
+ *         description: Logo removed successfully
+ *       400:
+ *         description: Airline does not have a logo
+ *       404:
+ *         description: Airline not found
+ */
+router.delete("/airlines/:id/logo", airlineController.removeAirlineLogo)
 
 // Flight Management
 /**
@@ -129,11 +273,14 @@ router.delete("/airlines/:id", airlineController.deleteAirline)
  *                 type: string
  *                 example: GA123
  *               airlineId:
- *                 type: string
+ *                 type: integer
+ *                 example: 1
  *               originId:
- *                 type: string
+ *                 type: integer
+ *                 example: 1
  *               destinationId:
- *                 type: string
+ *                 type: integer
+ *                 example: 2
  *               departureTime:
  *                 type: string
  *                 format: date-time
@@ -185,7 +332,8 @@ router.delete("/flights/:id", flightController.deleteFlight)
  *               - seats
  *             properties:
  *               flightId:
- *                 type: string
+ *                 type: integer
+ *                 example: 1
  *               seats:
  *                 type: array
  *                 items:
@@ -226,7 +374,8 @@ router.put("/seats/:id", seatController.updateFlightSeat)
  *               - flightId
  *             properties:
  *               flightId:
- *                 type: string
+ *                 type: integer
+ *                 example: 1
  *     responses:
  *       201:
  *         description: Seats generated
@@ -235,5 +384,71 @@ router.post("/seats/generate", seatController.generateStandardSeats)
 
 // Booking & Transaction Management
 router.get("/bookings", bookingController.getAllBookingsAdmin)
+
+// User Management
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Get all users
+ *     tags: [Admin - Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       phone:
+ *                         type: string
+ *                         nullable: true
+ *                       role:
+ *                         type: string
+ *                         enum: [ADMIN, USER]
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ */
+router.get("/users", getAllUsers)
+
+/**
+ * @swagger
+ * /api/admin/users/{email}:
+ *   delete:
+ *     summary: Delete user account by email
+ *     tags: [Admin - Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Email user yang akan dihapus
+ *         example: user@example.com
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       403:
+ *         description: Cannot delete admin account
+ *       404:
+ *         description: User not found
+ */
+router.delete("/users/:email", deleteUser)
 
 export default router

@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { register, login, verifyToken, getProfile, updateProfile, forgotPassword, resetPassword } from "../controllers/auth.controller"
+import { register, login, verifyToken, getProfile, updateProfile, forgotPassword, resetPassword, deleteAccount } from "../controllers/auth.controller"
 import { authenticate } from "../middleware/auth.middleware"
 
 const router = Router()
@@ -230,5 +230,34 @@ router.post("/forgot-password", forgotPassword)
  *         description: Password reset successfully
  */
 router.post("/reset-password", resetPassword)
+
+/**
+ * @swagger
+ * /api/auth/account/{email}:
+ *   delete:
+ *     summary: Delete own account
+ *     description: Hapus akun sendiri. Email di parameter harus cocok dengan akun yang sedang login.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Email akun yang akan dihapus
+ *         example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Account deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Email does not match your account
+ *       404:
+ *         description: User not found
+ */
+router.delete("/account/:email", authenticate, deleteAccount)
 
 export default router

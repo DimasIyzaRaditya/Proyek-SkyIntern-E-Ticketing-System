@@ -21,6 +21,37 @@ export const createFlight = async (req: AuthRequest, res: Response) => {
       rules
     } = req.body
 
+    // Validate required fields
+    if (!flightNumber || !airlineId || !originId || !destinationId || !departureTime || !arrivalTime || !basePrice) {
+      return res.status(400).json({ message: "Missing required fields" })
+    }
+
+    // Convert string IDs to integers
+    const parsedAirlineId = parseInt(airlineId)
+    const parsedOriginId = parseInt(originId)
+    const parsedDestinationId = parseInt(destinationId)
+
+    if (isNaN(parsedAirlineId) || isNaN(parsedOriginId) || isNaN(parsedDestinationId)) {
+      return res.status(400).json({ message: "airlineId, originId, and destinationId must be valid numbers" })
+    }
+
+    // Validate that airline, origin, and destination exist
+    const [airline, origin, destination] = await Promise.all([
+      prisma.airline.findUnique({ where: { id: parsedAirlineId } }),
+      prisma.airport.findUnique({ where: { id: parsedOriginId } }),
+      prisma.airport.findUnique({ where: { id: parsedDestinationId } })
+    ])
+
+    if (!airline) {
+      return res.status(404).json({ message: "Airline not found" })
+    }
+    if (!origin) {
+      return res.status(404).json({ message: "Origin airport not found" })
+    }
+    if (!destination) {
+      return res.status(404).json({ message: "Destination airport not found" })
+    }
+
     // Calculate duration in minutes
     const departure = new Date(departureTime)
     const arrival = new Date(arrivalTime)
@@ -29,9 +60,9 @@ export const createFlight = async (req: AuthRequest, res: Response) => {
     const flight = await prisma.flight.create({
       data: {
         flightNumber,
-        airlineId,
-        originId,
-        destinationId,
+        airlineId: parsedAirlineId,
+        originId: parsedOriginId,
+        destinationId: parsedDestinationId,
         departureTime: departure,
         arrivalTime: arrival,
         duration,
@@ -104,6 +135,15 @@ export const updateFlight = async (req: AuthRequest, res: Response) => {
       status
     } = req.body
 
+    // Convert string IDs to integers if provided
+    const parsedAirlineId = airlineId ? parseInt(airlineId) : undefined
+    const parsedOriginId = originId ? parseInt(originId) : undefined
+    const parsedDestinationId = destinationId ? parseInt(destinationId) : undefined
+
+    if ((airlineId && isNaN(parsedAirlineId!)) || (originId && isNaN(parsedOriginId!)) || (destinationId && isNaN(parsedDestinationId!))) {
+      return res.status(400).json({ message: "airlineId, originId, and destinationId must be valid numbers" })
+    }
+
     const departure = new Date(departureTime)
     const arrival = new Date(arrivalTime)
     const duration = Math.floor((arrival.getTime() - departure.getTime()) / 60000)
@@ -112,9 +152,9 @@ export const updateFlight = async (req: AuthRequest, res: Response) => {
       where: { id: parseInt(id as string) },
       data: {
         flightNumber,
-        airlineId,
-        originId,
-        destinationId,
+        airlineId: parsedAirlineId,
+        originId: parsedOriginId,
+        destinationId: parsedDestinationId,
         departureTime: departure,
         arrivalTime: arrival,
         duration,
