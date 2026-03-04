@@ -1,18 +1,69 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
-import { transactionSamples, type TransactionItem, formatRupiah } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/currency";
+import { getAdminBookings, type AdminBooking } from "@/lib/admin-api";
+
+type TransactionStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
+
+type TransactionItem = {
+  id: string;
+  customer: string;
+  flight: string;
+  amount: number;
+  status: TransactionStatus;
+  bookingCode: string;
+  createdAt: string;
+};
+
+const mapStatus = (item: AdminBooking): TransactionStatus => {
+  if (item.status === "CANCELLED" || item.status === "EXPIRED") return "Cancelled";
+  if (item.ticket) return "Issued";
+  if (item.status === "PAID") return "Paid";
+  return "Pending";
+};
 
 export default function AdminTransactionsPage() {
-  const [statusFilter, setStatusFilter] = useState<"All" | "Pending" | "Paid" | "Issued">("All");
+  const [statusFilter, setStatusFilter] = useState<"All" | "Pending" | "Paid" | "Issued" | "Cancelled">("All");
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionItem | null>(null);
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const loadTransactions = async () => {
+      setLoading(true);
+      setMessage("");
+
+      try {
+        const bookings = await getAdminBookings();
+        const mapped: TransactionItem[] = bookings.map((item) => ({
+          id: String(item.id),
+          customer: item.user.name,
+          flight: item.flight.flightNumber,
+          amount: item.totalPrice,
+          status: mapStatus(item),
+          bookingCode: item.bookingCode,
+          createdAt: item.createdAt,
+        }));
+
+        setTransactions(mapped);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Gagal memuat data transaksi.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadTransactions();
+  }, []);
 
   const filteredTransactions = useMemo(() => {
-    if (statusFilter === "All") return transactionSamples;
-    return transactionSamples.filter((item) => item.status === statusFilter);
-  }, [statusFilter]);
+    if (statusFilter === "All") return transactions;
+    return transactions.filter((item) => item.status === statusFilter);
+  }, [statusFilter, transactions]);
 
   return (
     <AdminShell title="Transaction Management" description="Tabel transaksi lengkap dengan filter status dan view detail.">
@@ -21,15 +72,17 @@ export default function AdminTransactionsPage() {
           <p className="text-sm font-semibold text-slate-700">Filter by Status</p>
           <select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as "All" | "Pending" | "Paid" | "Issued")}
+            onChange={(event) => setStatusFilter(event.target.value as "All" | "Pending" | "Paid" | "Issued" | "Cancelled")}
             className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm"
           >
             <option value="All">All</option>
             <option value="Pending">Pending</option>
             <option value="Paid">Paid</option>
             <option value="Issued">Issued</option>
+            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
+        {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -44,14 +97,18 @@ export default function AdminTransactionsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map((item) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-4 text-center text-slate-500">Memuat data transaksi...</td>
+                </tr>
+              ) : filteredTransactions.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3 font-semibold">{item.id}</td>
                   <td className="p-3">{item.customer}</td>
                   <td className="p-3">{item.flight}</td>
                   <td className="p-3">{formatRupiah(item.amount)}</td>
                   <td className="p-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.status === "Issued" ? "bg-emerald-100 text-emerald-700" : item.status === "Paid" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.status === "Issued" ? "bg-emerald-100 text-emerald-700" : item.status === "Paid" ? "bg-blue-100 text-blue-700" : item.status === "Cancelled" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
                       {item.status}
                     </span>
                   </td>
@@ -72,8 +129,10 @@ export default function AdminTransactionsPage() {
           <h3 className="text-lg font-bold text-slate-900">Detail Transaksi</h3>
           <div className="mt-2 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
             <p><span className="font-semibold">ID:</span> {selectedTransaction.id}</p>
+            <p><span className="font-semibold">Booking Code:</span> {selectedTransaction.bookingCode}</p>
             <p><span className="font-semibold">Customer:</span> {selectedTransaction.customer}</p>
             <p><span className="font-semibold">Flight:</span> {selectedTransaction.flight}</p>
+            <p><span className="font-semibold">Created:</span> {new Date(selectedTransaction.createdAt).toLocaleString("id-ID")}</p>
             <p><span className="font-semibold">Amount:</span> {formatRupiah(selectedTransaction.amount)}</p>
             <p><span className="font-semibold">Status:</span> {selectedTransaction.status}</p>
           </div>

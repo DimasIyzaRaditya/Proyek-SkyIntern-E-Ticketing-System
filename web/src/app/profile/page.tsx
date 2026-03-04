@@ -1,27 +1,79 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { type ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import { clearSession, getRegisteredUser, getUserSession, isAuthenticated } from "@/lib/auth";
+import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
+import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [fullName, setFullName] = useState(() => getUserSession()?.fullName ?? "User SkyIntern");
-  const [phoneNumber, setPhoneNumber] = useState(() => getRegisteredUser()?.phoneNumber ?? "081234567890");
+  const [phoneNumber, setPhoneNumber] = useState(() => getUserSession()?.phoneNumber ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(() => getUserSession()?.avatarUrl ?? "");
   const [city, setCity] = useState("Jakarta");
-  const [email] = useState(() => getUserSession()?.email ?? "user@skyintern.com");
+  const [email, setEmail] = useState(() => getUserSession()?.email ?? "user@skyintern.com");
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
   const authenticated = isAuthenticated();
 
   useEffect(() => {
     if (!authenticated) {
       router.replace("/auth/login?redirect=/profile");
+      return;
     }
+
+    const loadProfile = async () => {
+      try {
+        const profile = await getProfileFromApi();
+        setFullName(profile.fullName);
+        setPhoneNumber(profile.phoneNumber ?? "");
+        setAvatarUrl(profile.avatarUrl ?? "");
+        setEmail(profile.email);
+        setUserSession(profile);
+      } catch {
+        clearSession();
+        router.replace("/auth/login?redirect=/profile");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadProfile();
   }, [authenticated, router]);
 
-  if (!authenticated) {
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("File harus berupa gambar.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) return;
+
+      try {
+        const profile = await updateProfileFromApi({ avatarUrl: result });
+        setUserSession(profile);
+        setAvatarUrl(profile.avatarUrl ?? "");
+        setSaved(true);
+        setMessage("Foto profil berhasil diperbarui.");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Gagal upload foto profil.");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (!authenticated || loading) {
     return (
       <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
         <MainNav />
@@ -44,13 +96,23 @@ export default function ProfilePage() {
             <p className="mt-1 text-sm text-slate-600">Kelola akun, lihat statistik perjalanan, dan update data pribadi Anda.</p>
 
             <div className="mt-6 flex items-center gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl text-white">
-                👤
+              <div className="h-20 w-20 overflow-hidden rounded-full border border-blue-200 bg-white">
+                {avatarUrl ? (
+                  <Image src={avatarUrl} alt="Foto profil" width={80} height={80} className="h-full w-full object-cover" unoptimized />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-2xl">👤</div>
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xl font-black text-slate-900">{fullName}</p>
                 <p className="text-sm text-slate-600">{email}</p>
                 <p className="text-xs font-semibold text-blue-600">SkyIntern Silver Member</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="mt-2 block text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:font-semibold file:text-white hover:file:bg-blue-700"
+                />
               </div>
             </div>
 
@@ -92,10 +154,29 @@ export default function ProfilePage() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
-                onClick={() => setSaved(true)}
+                onClick={async () => {
+                  setSaving(true);
+                  setMessage("");
+                  setSaved(false);
+
+                  try {
+                    const profile = await updateProfileFromApi({
+                      name: fullName.trim(),
+                      phone: phoneNumber.trim(),
+                    });
+                    setUserSession(profile);
+                    setAvatarUrl(profile.avatarUrl ?? "");
+                    setSaved(true);
+                  } catch (error) {
+                    setMessage(error instanceof Error ? error.message : "Gagal menyimpan profil.");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
                 className="rounded-2xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
               >
-                Save Profile
+                {saving ? "Menyimpan..." : "Save Profile"}
               </button>
               <button
                 onClick={() => {
@@ -111,6 +192,11 @@ export default function ProfilePage() {
             {saved && (
               <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 Profil berhasil disimpan.
+              </div>
+            )}
+            {message && (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {message}
               </div>
             )}
           </section>

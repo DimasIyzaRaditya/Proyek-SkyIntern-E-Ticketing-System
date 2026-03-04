@@ -14,12 +14,6 @@ enum Role {
   USER
 }
 
-enum Country {
-  INDONESIA
-  SINGAPORE
-  MALAYSIA
-}
-
 enum SeatClass {
   ECONOMY
   BUSINESS
@@ -67,6 +61,7 @@ model User {
   email         String    @unique @db.VarChar(100)
   password      String    @db.VarChar(255) // bcrypt safe
   phone         String?   @db.VarChar(20)
+  avatarUrl     String?   @db.Text
   role          Role      @default(USER)
   resetToken    String?   @db.VarChar(255)
   resetExpire   DateTime?
@@ -79,7 +74,7 @@ model Airport {
   id               Int       @id @default(autoincrement())
   name             String    @db.VarChar(100)
   city             String    @db.VarChar(100)
-  country          Country
+  country          String    @db.VarChar(100)
   timezone         String?   @db.VarChar(50)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -91,6 +86,7 @@ model Airline {
   id        Int      @id @default(autoincrement())
   code      String   @unique @db.VarChar(10)
   name      String   @db.VarChar(100)
+  country   String   @default("Unknown") @db.VarChar(100)
   logo      String?  @db.VarChar(255)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

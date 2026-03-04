@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import { flights, formatRupiah } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/currency";
+import { type FlightCardItem, searchFlightsFromApi } from "@/lib/flight-api";
 
 type FlightInfoTab = "details" | "fare" | "refund" | "reschedule" | "promos";
 
@@ -26,6 +27,9 @@ export default function SearchResultsPage() {
   const searchParams = useSearchParams();
   const [sortBy, setSortBy] = useState<"price-low" | "price-high" | "duration" | "departure">("price-low");
   const [activeTabs, setActiveTabs] = useState<Record<string, FlightInfoTab>>({});
+  const [sortedFlights, setSortedFlights] = useState<FlightCardItem[]>([]);
+  const [isLoadingFlights, setIsLoadingFlights] = useState(true);
+  const [flightError, setFlightError] = useState<string | null>(null);
 
   const origin = searchParams.get("origin") ?? "CGK - Jakarta";
   const destination = searchParams.get("destination") ?? "DPS - Denpasar";
@@ -34,25 +38,40 @@ export default function SearchResultsPage() {
   const adult = searchParams.get("adult") ?? "1";
   const child = searchParams.get("child") ?? "0";
 
-  const sortedFlights = useMemo(() => {
-    const originCode = extractAirportCode(origin);
-    const destinationCode = extractAirportCode(destination);
+  useEffect(() => {
+    let isMounted = true;
 
-    const filtered = flights.filter(
-      (item) =>
-        item.origin.split(" - ")[0] === originCode &&
-        item.destination.split(" - ")[0] === destinationCode,
-    );
+    const loadFlights = async () => {
+      try {
+        setIsLoadingFlights(true);
+        setFlightError(null);
+        const data = await searchFlightsFromApi({
+          origin,
+          destination,
+          departureDate,
+          adult,
+          child,
+          sortBy,
+        });
+        if (!isMounted) return;
+        setSortedFlights(data);
+      } catch (error) {
+        if (!isMounted) return;
+        setSortedFlights([]);
+        setFlightError(error instanceof Error ? error.message : "Terjadi kesalahan saat mengambil flight.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingFlights(false);
+        }
+      }
+    };
 
-    const base = filtered.length ? filtered : flights;
+    loadFlights();
 
-    return [...base].sort((a, b) => {
-      if (sortBy === "price-low") return a.price - b.price;
-      if (sortBy === "price-high") return b.price - a.price;
-      if (sortBy === "duration") return Number.parseInt(a.duration, 10) - Number.parseInt(b.duration, 10);
-      return a.departureTime.localeCompare(b.departureTime);
-    });
-  }, [origin, destination, sortBy]);
+    return () => {
+      isMounted = false;
+    };
+  }, [adult, child, departureDate, destination, origin, sortBy]);
 
   const getActiveTab = (flightId: string): FlightInfoTab => activeTabs[flightId] ?? "details";
 
@@ -110,10 +129,24 @@ export default function SearchResultsPage() {
           </aside>
 
           <section className="space-y-4">
+            {isLoadingFlights && (
+              <div className="rounded-2xl border border-blue-100 bg-white p-4 text-sm text-slate-600">Memuat data penerbangan dari backend...</div>
+            )}
+
+            {flightError && !isLoadingFlights && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{flightError}</div>
+            )}
+
+            {!isLoadingFlights && !flightError && sortedFlights.length === 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                Tidak ada flight yang cocok untuk rute dan tanggal yang dipilih.
+              </div>
+            )}
+
             {sortedFlights.map((flight) => {
               const query = new URLSearchParams({ origin, destination, departureDate, returnDate, adult, child });
-              const stopCount = Number(flight.id.replace("FL", "")) % 2 === 0 ? "Direct" : "1 stop";
-              const promoBadge = Number(flight.id.replace("FL", "")) % 3 === 0;
+              const stopCount = Number(flight.id) % 2 === 0 ? "Direct" : "1 stop";
+              const promoBadge = Number(flight.id) % 3 === 0;
 
               return (
                 <article key={flight.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

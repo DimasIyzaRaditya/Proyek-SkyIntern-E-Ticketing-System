@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
-import { bookingSamples } from "@/lib/mock-data";
 import { isAuthenticated } from "@/lib/auth";
+import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 type TabKey = "Upcoming" | "Completed" | "Cancelled";
 type BookingStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
@@ -31,21 +31,20 @@ const getTabByStatus = (status: BookingStatus): TabKey => {
   return "Upcoming";
 };
 
-const getNextStatus = (status: BookingStatus): BookingStatus => {
-  if (status === "Pending") return "Paid";
-  if (status === "Paid") return "Issued";
-  return status;
-};
-
-const seededBookings: BookingView[] = bookingSamples.map((item) => ({
-  ...item,
-  tab: getTabByStatus(item.status),
-}));
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 
 export default function MyBookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("Upcoming");
+  const [liveBookings, setLiveBookings] = useState<BookingView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
   const authenticated = isAuthenticated();
 
   const dynamicBooking = useMemo<BookingView | null>(() => {
@@ -70,56 +69,63 @@ export default function MyBookingsPage() {
     };
   }, [searchParams]);
 
-  const baseBookings = useMemo(() => {
-    const merged = dynamicBooking ? [dynamicBooking, ...seededBookings] : seededBookings;
-    const uniqueBookings = new Map<string, BookingView>();
-
-    for (const booking of merged) {
-      uniqueBookings.set(booking.id, {
-        ...booking,
-        tab: getTabByStatus(booking.status),
-      });
-    }
-
-    return Array.from(uniqueBookings.values());
-  }, [dynamicBooking]);
-
-  const [liveBookings, setLiveBookings] = useState<BookingView[]>(baseBookings);
-
   useEffect(() => {
     if (!authenticated) {
       const redirect = encodeURIComponent(`/bookings?${searchParams.toString()}`);
       router.replace(`/auth/login?redirect=${redirect}`);
+      return;
     }
+
+    const loadBookings = async () => {
+      setLoading(true);
+      setMessage("");
+
+      try {
+        const bookings = await getMyBookingsFromApi();
+        const mapped: BookingView[] = bookings.map((item) => {
+          const passenger = item.passengers[0]
+            ? `${item.passengers[0].firstName} ${item.passengers[0].lastName}`.trim()
+            : "Passenger";
+
+          let status: BookingStatus = "Pending";
+          if (item.status === "CANCELLED" || item.status === "EXPIRED") {
+            status = "Cancelled";
+          } else if (item.ticket) {
+            status = "Issued";
+          } else if (item.status === "PAID") {
+            status = "Paid";
+          }
+
+          return {
+            id: String(item.id),
+            airline: item.flight.airline.name,
+            route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
+            date: formatDate(item.flight.departureTime),
+            status,
+            seat: "-",
+            passenger,
+            flightNumber: item.flight.flightNumber,
+            pdfUrl: item.ticket?.pdfUrl ?? "",
+            tab: getTabByStatus(status),
+          };
+        });
+
+        const merged = dynamicBooking ? [dynamicBooking, ...mapped] : mapped;
+        const uniqueBookings = new Map<string, BookingView>();
+        for (const booking of merged) {
+          uniqueBookings.set(booking.id, booking);
+        }
+
+        setLiveBookings(Array.from(uniqueBookings.values()));
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Gagal memuat data booking.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadBookings();
   }, [authenticated, router, searchParams]);
-
-  useEffect(() => {
-    setLiveBookings(baseBookings);
-  }, [baseBookings]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setLiveBookings((prev) => {
-        const targetIndex = prev.findIndex(
-          (booking) => booking.status !== "Issued" && booking.status !== "Cancelled",
-        );
-
-        if (targetIndex === -1) return prev;
-
-        const next = [...prev];
-        const updatedStatus = getNextStatus(next[targetIndex].status);
-        next[targetIndex] = {
-          ...next[targetIndex],
-          status: updatedStatus,
-          tab: getTabByStatus(updatedStatus),
-        };
-
-        return next;
-      });
-    }, 6000);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   const bookingList = useMemo(
     () => liveBookings.filter((item) => item.tab === activeTab),
@@ -148,9 +154,7 @@ export default function MyBookingsPage() {
         <h1 className="inline-flex items-center gap-2 text-3xl font-black text-slate-900">
           <Ticket className="h-7 w-7 text-blue-700" /> My Bookings Page
         </h1>
-        <p className="mt-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm text-slate-600">
-          Note: status booking akan update otomatis setiap beberapa detik dari Pending → Paid → Issued (simulasi real-time).
-        </p>
+        {message && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{message}</p>}
 
         <div className="mt-5 flex flex-wrap gap-2">
           {(["Upcoming", "Completed", "Cancelled"] as const).map((tab) => (
@@ -169,7 +173,11 @@ export default function MyBookingsPage() {
         </div>
 
         <section className="mt-6 space-y-4">
-          {bookingList.length === 0 ? (
+          {loading ? (
+            <div className="rounded-2xl border border-blue-100 bg-white p-8 text-center text-sm text-slate-500">
+              Memuat booking...
+            </div>
+          ) : bookingList.length === 0 ? (
             <div className="rounded-2xl border border-blue-100 bg-white p-8 text-center text-sm text-slate-500">
               Tidak ada booking pada tab {activeTab}.
             </div>
@@ -206,12 +214,18 @@ export default function MyBookingsPage() {
                         <CheckCircle2 className="h-3.5 w-3.5" /> {booking.status}
                       </span>
                       <div>
-                        <Link
-                          href={`/bookings/e-ticket?${query.toString()}`}
-                          className="mt-3 inline-block rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                        >
-                          View E-Ticket
-                        </Link>
+                        {booking.pdfUrl ? (
+                          <Link
+                            href={`/bookings/e-ticket?${query.toString()}`}
+                            className="mt-3 inline-block rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                          >
+                            View E-Ticket
+                          </Link>
+                        ) : (
+                          <span className="mt-3 inline-block rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-500">
+                            E-Ticket belum tersedia
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

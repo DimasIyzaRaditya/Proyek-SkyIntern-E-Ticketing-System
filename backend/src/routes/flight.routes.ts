@@ -1,6 +1,7 @@
 import { Router } from "express"
 import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
+import * as airportController from "../controllers/airport.controller"
 import { authenticate } from "../middleware/auth.middleware"
 
 const router = Router()
@@ -52,6 +53,8 @@ const router = Router()
  *         description: Flights retrieved successfully
  */
 router.get("/search", flightController.searchFlights)
+
+router.get("/airports", airportController.getPublicAirportOptions)
 
 /**
  * @swagger

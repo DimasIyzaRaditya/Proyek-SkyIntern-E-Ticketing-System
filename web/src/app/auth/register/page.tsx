@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, Phone, User } from "lucide-react";
 import MainNav from "@/components/MainNav";
-import { saveRegisteredUser } from "@/lib/auth";
+import { registerWithApi, loginWithApi } from "@/lib/auth-api";
+import { setUserSession } from "@/lib/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -17,15 +18,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!fullName || !email || !phoneNumber || !password || !confirmPassword) {
       setMessage("Semua field wajib diisi.");
-      return;
-    }
-
-    if (!email.toLowerCase().endsWith("@gmail.com")) {
-      setMessage("Gunakan akun Gmail (contoh: nama@gmail.com).");
       return;
     }
 
@@ -39,17 +36,39 @@ export default function RegisterPage() {
       return;
     }
 
-    saveRegisteredUser({
-      fullName,
-      email: email.toLowerCase(),
-      phoneNumber,
-      password,
-    });
+    setLoading(true);
+    setMessage("");
 
-    setMessage("Registrasi berhasil. Silakan login menggunakan email dan password yang barusan didaftarkan.");
-    setTimeout(() => {
-      router.push("/auth/login");
-    }, 700);
+    try {
+      await registerWithApi({
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      const session = await loginWithApi({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      setUserSession(
+        {
+          id: session.user.id,
+          fullName: session.user.fullName,
+          email: session.user.email,
+          phoneNumber: session.user.phoneNumber,
+          role: session.user.role,
+        },
+        session.token,
+      );
+
+      setMessage("Registrasi berhasil. Mengarahkan...");
+      router.push(session.user.role === "admin" ? "/admin" : "/dashboard");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Registrasi gagal. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -124,7 +143,7 @@ export default function RegisterPage() {
                 </button>
               </div>
             </div>
-            <button onClick={handleRegister} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700">Register</button>
+            <button disabled={loading} onClick={handleRegister} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Register"}</button>
           </form>
 
           {message && <p className="mt-4 text-center text-sm font-medium text-blue-700">{message}</p>}

@@ -263,6 +263,49 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
   }
 }
 
+// Admin: Get All Bookings
+export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
+  try {
+    const { status } = req.query
+
+    const where: any = {}
+    if (status) {
+      where.status = status as string
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        flight: {
+          include: {
+            airline: true,
+            origin: true,
+            destination: true
+          }
+        },
+        passengers: true,
+        payment: true,
+        ticket: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    })
+
+    res.json({ bookings })
+  } catch (error) {
+    console.error("Get all bookings admin error:", error)
+    res.status(500).json({ message: "Internal server error" })
+  }
+}
+
 // Get Booking Detail
 export const getBookingDetail = async (req: AuthRequest, res: Response) => {
   try {

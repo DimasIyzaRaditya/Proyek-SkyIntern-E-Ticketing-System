@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import { flights, formatRupiah } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/currency";
+import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
 
 export default function FlightDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+  const [flight, setFlight] = useState<FlightCardItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const flight = useMemo(() => flights.find((item) => item.id === params.id), [params.id]);
   const origin = searchParams.get("origin") ?? "CGK - Jakarta";
   const destination = searchParams.get("destination") ?? "DPS - Denpasar";
   const departureDate = searchParams.get("departureDate") ?? "2026-03-15";
@@ -18,12 +21,51 @@ export default function FlightDetailPage() {
   const adult = searchParams.get("adult") ?? "1";
   const child = searchParams.get("child") ?? "0";
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFlightDetail = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage(null);
+        const data = await getFlightDetailFromApi(params.id);
+        if (!isMounted) return;
+        setFlight(data);
+      } catch (error) {
+        if (!isMounted) return;
+        setFlight(null);
+        setErrorMessage(error instanceof Error ? error.message : "Gagal memuat detail flight.");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadFlightDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
+        <MainNav />
+        <main className="mx-auto max-w-4xl px-6 py-12">
+          <div className="rounded-3xl border border-blue-200 bg-white p-8 text-center text-slate-700">Memuat detail flight dari backend...</div>
+        </main>
+      </div>
+    );
+  }
+
   if (!flight) {
     return (
       <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
         <MainNav />
         <main className="mx-auto max-w-4xl px-6 py-12">
-          <div className="rounded-3xl border border-red-200 bg-white p-8 text-center text-red-700">Flight tidak ditemukan.</div>
+          <div className="rounded-3xl border border-red-200 bg-white p-8 text-center text-red-700">{errorMessage ?? "Flight tidak ditemukan."}</div>
         </main>
       </div>
     );
@@ -31,6 +73,9 @@ export default function FlightDetailPage() {
 
   const query = new URLSearchParams({
     flightId: flight.id,
+    airlineName: flight.airline,
+    flightNumber: flight.flightNumber,
+    price: String(flight.price),
     origin,
     destination,
     departureDate,

@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import { flights, formatRupiah } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/currency";
 import { isAuthenticated } from "@/lib/auth";
+import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
 
 const occupiedSeats = new Set(["2B", "3F", "5D", "7A", "8C", "10F"]);
 const systemBlockedSeats = new Set(["4C", "6E"]);
@@ -13,10 +14,13 @@ const specialSeats = new Set(["1A", "1B", "1C", "1D", "12A", "12F"]);
 export default function SeatSelectionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const flightId = searchParams.get("flightId") ?? "FL001";
+  const flightId = searchParams.get("flightId") ?? "";
   const authenticated = isAuthenticated();
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [flight, setFlight] = useState<FlightCardItem | null>(null);
+  const [isLoadingFlight, setIsLoadingFlight] = useState(true);
+  const [flightError, setFlightError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authenticated) {
@@ -25,7 +29,54 @@ export default function SeatSelectionPage() {
     }
   }, [authenticated, router, searchParams]);
 
-  const flight = useMemo(() => flights.find((item) => item.id === flightId) ?? flights[0], [flightId]);
+  const fallbackFlight = useMemo<FlightCardItem>(() => ({
+    id: flightId || "-",
+    flightNumber: (searchParams.get("flightNumber") ?? flightId) || "-",
+    airline: searchParams.get("airlineName") ?? "Airline",
+    logo: "✈️",
+    aircraft: "Aircraft",
+    origin: searchParams.get("origin") ?? "Origin",
+    destination: searchParams.get("destination") ?? "Destination",
+    departureTime: "-",
+    arrivalTime: "-",
+    duration: "-",
+    price: Number(searchParams.get("price") ?? "0"),
+    facilities: ["Cabin Bag 7kg"],
+  }), [flightId, searchParams]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFlight = async () => {
+      if (!flightId) {
+        setFlight(fallbackFlight);
+        setIsLoadingFlight(false);
+        return;
+      }
+
+      try {
+        setIsLoadingFlight(true);
+        setFlightError(null);
+        const data = await getFlightDetailFromApi(flightId);
+        if (!isMounted) return;
+        setFlight(data);
+      } catch (error) {
+        if (!isMounted) return;
+        setFlight(fallbackFlight);
+        setFlightError(error instanceof Error ? error.message : "Gagal memuat data flight dari backend.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingFlight(false);
+        }
+      }
+    };
+
+    loadFlight();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackFlight, flightId]);
 
   const toggleSeat = (seat: string) => {
     if (occupiedSeats.has(seat) || systemBlockedSeats.has(seat)) return;
@@ -60,13 +111,29 @@ export default function SeatSelectionPage() {
     );
   }
 
+  if (isLoadingFlight) {
+    return (
+      <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
+        <MainNav />
+        <main className="mx-auto max-w-7xl px-6 py-10">
+          <section className="rounded-3xl border border-blue-100 bg-white p-8 text-sm text-slate-600 shadow-lg">
+            Memuat data penerbangan dari backend...
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  const activeFlight = flight ?? fallbackFlight;
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
       <main className="mx-auto max-w-7xl px-6 py-10">
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
           <h1 className="text-3xl font-black text-slate-900">Seat Selection Page</h1>
-          <p className="mt-1 text-sm text-slate-600">{flight.airline} • {flight.id} • Pilih kursi yang tersedia.</p>
+          <p className="mt-1 text-sm text-slate-600">{activeFlight.airline} • {activeFlight.flightNumber} • Pilih kursi yang tersedia.</p>
+          {flightError && <p className="mt-2 text-xs text-amber-700">{flightError}</p>}
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
             <div>

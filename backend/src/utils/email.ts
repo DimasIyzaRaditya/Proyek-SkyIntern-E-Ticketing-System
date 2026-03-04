@@ -22,7 +22,7 @@ export const sendResetPasswordEmail = async (
       return
     }
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
+    const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`
 
     await transporter.sendMail({
       from: process.env.SMTP_FROM || "noreply@skyintern.com",

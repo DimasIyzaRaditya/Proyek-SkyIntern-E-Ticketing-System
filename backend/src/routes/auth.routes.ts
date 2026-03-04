@@ -172,6 +172,9 @@ router.get("/profile", authenticate, getProfile)
  *                 type: string
  *               phone:
  *                 type: string
+ *               avatarUrl:
+ *                 type: string
+ *                 nullable: true
  *     responses:
  *       200:
  *         description: Profile updated successfully

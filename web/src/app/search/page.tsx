@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, CalendarDays, Plane, PlaneLanding, PlaneTakeoff, Search, Users } from "lucide-react";
+import { ArrowUpDown, CalendarDays, ChevronLeft, ChevronRight, Plane, PlaneLanding, PlaneTakeoff, Search, Users } from "lucide-react";
 import MainNav from "@/components/MainNav";
-import airportsJson from "airports-json";
+import { getAirportOptionsFromApi } from "@/lib/airport-api";
+
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -41,19 +42,6 @@ type RecentSearchItem = {
 
 const RECENT_SEARCHES_KEY = "skyintern_recent_searches";
 
-type AirportRaw = {
-  iata_code?: string;
-  municipality?: string;
-  name?: string;
-  iso_country?: string;
-  scheduled_service?: string;
-};
-
-type CountryRaw = {
-  code?: string;
-  name?: string;
-};
-
 type AirportOption = {
   code: string;
   city: string;
@@ -65,52 +53,8 @@ type AirportOption = {
   searchText: string;
 };
 
-const parsedAirportsData = airportsJson as {
-  airports?: AirportRaw[];
-  countries?: CountryRaw[];
-};
-
-const countryNameByCode = new Map(
-  (parsedAirportsData.countries ?? [])
-    .filter((country) => country.code && country.name)
-    .map((country) => [country.code as string, country.name as string]),
-);
-
-const worldAirportOptions: AirportOption[] = (parsedAirportsData.airports ?? [])
-  .filter((airport) => {
-    const iata = airport.iata_code?.trim();
-    return Boolean(iata && iata.length === 3 && airport.municipality?.trim());
-  })
-  .map((airport) => {
-    const code = airport.iata_code!.trim().toUpperCase();
-    const city = airport.municipality!.trim();
-    const country = countryNameByCode.get(airport.iso_country ?? "") ?? (airport.iso_country ?? "Unknown Country");
-    const airportName = airport.name?.trim() || "Airport";
-    const label = `${city}, ${country} (${code})`;
-
-    return {
-      code,
-      city,
-      country,
-      airportName,
-      label,
-      compactLabel: `${city} (${code})`,
-      secondaryLabel: `${airportName} • ${city}, ${country}`,
-      searchText: `${city} ${country} ${airportName} ${code}`.toLowerCase(),
-    };
-  })
-  .sort((first, second) => first.city.localeCompare(second.city));
-
-const popularAirportCodes = ["CGK", "DPS", "SUB", "SIN", "BKK", "KUL", "HND", "NRT", "LHR", "DXB"];
-
-const popularAirportOptions = popularAirportCodes
-  .map((code) => worldAirportOptions.find((item) => item.code === code))
-  .filter((item): item is AirportOption => Boolean(item));
-
-const defaultOriginLabel =
-  worldAirportOptions.find((item) => item.code === "CGK")?.label ?? "Jakarta, Indonesia (CGK)";
-const defaultDestinationLabel =
-  worldAirportOptions.find((item) => item.code === "DPS")?.label ?? "Denpasar, Indonesia (DPS)";
+const defaultOriginLabel = "Jakarta, Indonesia (CGK)";
+const defaultDestinationLabel = "Denpasar, Indonesia (DPS)";
 
 const loadRecentSearches = (): RecentSearchItem[] => {
   if (typeof window === "undefined") return [];
@@ -205,7 +149,7 @@ const createMonthCells = (monthDate: Date, startDate: Date, endDate: Date) => {
     });
   }
 
-  while (cells.length % 7 !== 0) {
+  while (cells.length < 42) {
     cells.push({
       key: `blank-end-${monthDate.getMonth()}-${cells.length}`,
       day: null,
@@ -225,6 +169,8 @@ export default function SearchPage() {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
   const [origin, setOrigin] = useState(defaultOriginLabel);
   const [destination, setDestination] = useState(defaultDestinationLabel);
   const [departureDate, setDepartureDate] = useState("2026-03-04");
@@ -237,14 +183,16 @@ export default function SearchPage() {
   const [isSelectingReturn, setIsSelectingReturn] = useState(false);
   const [airportMode, setAirportMode] = useState<AirportMode>("origin");
   const [datePanelTab, setDatePanelTab] = useState<DatePanelTab>("calendar");
+  const [calendarOffset, setCalendarOffset] = useState(0);
   const [airportKeyword, setAirportKeyword] = useState("");
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(loadRecentSearches);
+  const [airportMaster, setAirportMaster] = useState<AirportOption[]>([]);
 
   const { leftMonth, rightMonth, leftMonthCells, rightMonthCells } = useMemo(() => {
     const checkInDate = parseDate(departureDate);
     const checkOutDate = parseDate(returnDate);
     const rangeEndDate = checkOutDate < checkInDate ? checkInDate : checkOutDate;
-    const nextLeftMonth = new Date(checkInDate.getFullYear(), checkInDate.getMonth(), 1);
+    const nextLeftMonth = new Date(checkInDate.getFullYear(), checkInDate.getMonth() + calendarOffset, 1);
     const nextRightMonth = new Date(nextLeftMonth.getFullYear(), nextLeftMonth.getMonth() + 1, 1);
 
     return {
@@ -253,7 +201,7 @@ export default function SearchPage() {
       leftMonthCells: createMonthCells(nextLeftMonth, checkInDate, rangeEndDate),
       rightMonthCells: createMonthCells(nextRightMonth, checkInDate, rangeEndDate),
     };
-  }, [departureDate, returnDate]);
+  }, [calendarOffset, departureDate, returnDate]);
 
   const fareMap = useMemo(() => {
     // NOTE: Fare map dipakai untuk visual "lowest fare" dan mode Price Table.
@@ -279,18 +227,28 @@ export default function SearchPage() {
   );
 
   const airportByLabel = useMemo(
-    () => new Map(worldAirportOptions.map((item) => [item.label, item])),
-    [],
+    () => new Map(airportMaster.map((item) => [item.label, item])),
+    [airportMaster],
   );
+
+  const popularAirportOptions = useMemo(() => {
+    const popularCodes = ["CGK", "DPS", "SUB", "SIN", "KNO", "YIA"];
+    const fromCodes = popularCodes
+      .map((code) => airportMaster.find((item) => item.code === code))
+      .filter((item): item is AirportOption => Boolean(item));
+
+    if (fromCodes.length > 0) return fromCodes;
+    return airportMaster.slice(0, 10);
+  }, [airportMaster]);
 
   const airportOptions = useMemo(() => {
     const keyword = airportKeyword.trim().toLowerCase();
     if (!keyword) return popularAirportOptions;
 
-    return worldAirportOptions
+    return airportMaster
       .filter((item) => item.searchText.includes(keyword))
       .slice(0, 150);
-  }, [airportKeyword]);
+  }, [airportKeyword, airportMaster, popularAirportOptions]);
 
   const recentAirportOptions = useMemo(() => {
     const options = recentSearches
@@ -305,6 +263,46 @@ export default function SearchPage() {
 
   const originView = airportByLabel.get(origin);
   const destinationView = airportByLabel.get(destination);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAirportOptions = async () => {
+      try {
+        const airports = await getAirportOptionsFromApi();
+        if (!isMounted) return;
+
+        const mapped = airports
+          .map((item) => ({
+            code: item.code,
+            city: item.city,
+            country: item.country,
+            airportName: item.airportName,
+            label: item.label,
+            compactLabel: `${item.city} (${item.code})`,
+            secondaryLabel: `${item.airportName} • ${item.city}, ${item.country}`,
+            searchText: `${item.city} ${item.country} ${item.airportName} ${item.code}`.toLowerCase(),
+          }))
+          .sort((first, second) => first.city.localeCompare(second.city));
+
+        setAirportMaster(mapped);
+
+        const nextOrigin = mapped.find((item) => item.code === "CGK")?.label ?? mapped[0]?.label;
+        const nextDestination = mapped.find((item) => item.code === "DPS")?.label ?? mapped[1]?.label ?? mapped[0]?.label;
+
+        if (nextOrigin) setOrigin(nextOrigin);
+        if (nextDestination) setDestination(nextDestination);
+      } catch {
+        // Fallback: keep default labels when API is unavailable.
+      }
+    };
+
+    void loadAirportOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const saveRecentSearches = (items: RecentSearchItem[]) => {
     setRecentSearches(items);
@@ -423,6 +421,41 @@ export default function SearchPage() {
     setActivePanel(panel);
   };
 
+  const slideToPreviousMonth = useCallback(() => {
+    setCalendarOffset((prev) => prev - 1);
+  }, []);
+
+  const slideToNextMonth = useCallback(() => {
+    setCalendarOffset((prev) => prev + 1);
+  }, []);
+
+  const handleCalendarTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const firstTouch = event.touches[0];
+    if (!firstTouch) return;
+    touchStartXRef.current = firstTouch.clientX;
+    touchStartYRef.current = firstTouch.clientY;
+  };
+
+  const handleCalendarTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const firstTouch = event.changedTouches[0];
+    if (!firstTouch || touchStartXRef.current === null || touchStartYRef.current === null) return;
+
+    const deltaX = firstTouch.clientX - touchStartXRef.current;
+    const deltaY = firstTouch.clientY - touchStartYRef.current;
+
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+    if (deltaX < 0) {
+      slideToNextMonth();
+      return;
+    }
+
+    slideToPreviousMonth();
+  };
+
   useEffect(() => {
     const onOutsideClick = (event: MouseEvent) => {
       if (!wrapperRef.current?.contains(event.target as Node)) {
@@ -496,6 +529,7 @@ export default function SearchPage() {
                     setIsSelectingReturn(false);
                     openPanel("date");
                     setDatePanelTab("calendar");
+                    setCalendarOffset(0);
                   }}
                   className="inline-flex w-full items-center gap-2 border-b border-slate-200 px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50 md:border-b-0 md:border-r"
                 >
@@ -737,7 +771,32 @@ export default function SearchPage() {
                 </div>
 
                 {datePanelTab === "calendar" ? (
-                  <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                  <>
+                    <div className="mt-4 flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-slate-500 sm:text-sm">Geser kiri/kanan untuk pindah bulan</p>
+                      <div className="flex items-center gap-2">
+                      <button
+                        onClick={slideToPreviousMonth}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100"
+                        aria-label="Previous month"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={slideToNextMonth}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100"
+                        aria-label="Next month"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      </div>
+                    </div>
+
+                    <div
+                      onTouchStart={handleCalendarTouchStart}
+                      onTouchEnd={handleCalendarTouchEnd}
+                      className="mt-3 grid select-none gap-4 touch-pan-y xl:grid-cols-2"
+                    >
                     {[
                       { month: leftMonth, cells: leftMonthCells },
                       { month: rightMonth, cells: rightMonthCells },
@@ -799,7 +858,8 @@ export default function SearchPage() {
                         </div>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  </>
                 ) : (
                   <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
                     {/* NOTE: Mode Price Table menampilkan tanggal termurah duluan agar user cepat ambil keputusan. */}

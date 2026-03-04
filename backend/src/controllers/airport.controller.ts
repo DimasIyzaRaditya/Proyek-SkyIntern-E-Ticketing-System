@@ -1,6 +1,30 @@
 import { Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
+import { Request } from "express"
+
+const airportCodeAliases: Array<{ keyword: string; code: string }> = [
+  { keyword: "soekarno", code: "CGK" },
+  { keyword: "ngurah", code: "DPS" },
+  { keyword: "juanda", code: "SUB" },
+  { keyword: "changi", code: "SIN" },
+  { keyword: "kualanamu", code: "KNO" },
+  { keyword: "yogyakarta", code: "YIA" },
+  { keyword: "sepinggan", code: "BPN" },
+  { keyword: "sultan hasanuddin", code: "UPG" }
+]
+
+const deriveAirportCode = (airport: { id: number; name: string; city: string }) => {
+  const normalized = `${airport.name} ${airport.city}`.toLowerCase()
+  const alias = airportCodeAliases.find((item) => normalized.includes(item.keyword))
+  if (alias) return alias.code
+
+  const onlyLetters = airport.city.replace(/[^a-zA-Z]/g, "").toUpperCase()
+  const cityCode = onlyLetters.slice(0, 3)
+  if (cityCode.length === 3) return cityCode
+
+  return `APT${airport.id}`
+}
 
 // Airport Management
 export const createAirport = async (req: AuthRequest, res: Response) => {
@@ -33,6 +57,32 @@ export const getAllAirports = async (req: AuthRequest, res: Response) => {
     res.json({ airports })
   } catch (error) {
     console.error("Get all airports error:", error)
+    res.status(500).json({ message: "Internal server error" })
+  }
+}
+
+export const getPublicAirportOptions = async (req: Request, res: Response) => {
+  try {
+    const airports = await prisma.airport.findMany({
+      orderBy: { city: "asc" }
+    })
+
+    const options = airports.map((airport) => {
+      const code = deriveAirportCode(airport)
+
+      return {
+        id: airport.id,
+        code,
+        city: airport.city,
+        country: airport.country,
+        airportName: airport.name,
+        label: `${airport.city}, ${airport.country} (${code})`
+      }
+    })
+
+    res.json({ airports: options })
+  } catch (error) {
+    console.error("Get public airport options error:", error)
     res.status(500).json({ message: "Internal server error" })
   }
 }

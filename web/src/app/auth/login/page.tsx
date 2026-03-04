@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import MainNav from "@/components/MainNav";
-import { getRegisteredUser, setAdminSession, setUserSession } from "@/lib/auth";
+import { setUserSession } from "@/lib/auth";
+import { loginWithApi } from "@/lib/auth-api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,49 +15,43 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const ADMIN_USERNAME = "admin@skyintern.com";
-  const ADMIN_PASSWORD = "Admin123!";
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       setMessage("Isi email dan password terlebih dahulu.");
       return;
     }
 
-    const redirectTarget = searchParams.get("redirect") ?? "/search";
+    const redirectTarget = searchParams.get("redirect") ?? "/dashboard";
 
-    if (email === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      setAdminSession();
-      setMessage("Login admin berhasil. Mengarahkan ke dashboard...");
-      router.push("/admin");
-      return;
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const session = await loginWithApi({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      setUserSession(
+        {
+          id: session.user.id,
+          fullName: session.user.fullName,
+          email: session.user.email,
+          phoneNumber: session.user.phoneNumber,
+          role: session.user.role,
+        },
+        session.token,
+      );
+
+      setMessage("Login berhasil. Mengarahkan...");
+      router.push(session.user.role === "admin" ? "/admin" : redirectTarget);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Login gagal. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
     }
-
-    if (!email.trim().toLowerCase().endsWith("@gmail.com")) {
-      setMessage("Untuk customer, login menggunakan akun Gmail yang didaftarkan.");
-      return;
-    }
-
-    const registeredUser = getRegisteredUser();
-
-    if (!registeredUser) {
-      setMessage("Akun belum terdaftar. Silakan register terlebih dahulu.");
-      return;
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail !== registeredUser.email || password !== registeredUser.password) {
-      setMessage("Email atau password tidak sesuai dengan data registrasi.");
-      return;
-    }
-
-    setUserSession({
-      fullName: registeredUser.fullName,
-      email: registeredUser.email,
-    });
-    setMessage("Login berhasil. Mengarahkan...");
-    router.push(redirectTarget);
   };
 
   return (
@@ -104,14 +99,8 @@ export default function LoginPage() {
               <Link href="/auth/forgot-password" className="font-semibold text-blue-600 hover:text-blue-700">Forgot Password?</Link>
             </div>
 
-            <button onClick={handleLogin} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700">Login</button>
+            <button disabled={loading} onClick={handleLogin} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Login"}</button>
           </form>
-
-          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-slate-600">
-            <p className="font-semibold text-blue-700">Demo Admin Credential</p>
-            <p>Username: admin@skyintern.com</p>
-            <p>Password: Admin123!</p>
-          </div>
 
           {message && <p className="mt-3 text-center text-sm font-medium text-blue-700">{message}</p>}
 

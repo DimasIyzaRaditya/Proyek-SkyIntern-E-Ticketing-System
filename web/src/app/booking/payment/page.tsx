@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import { flights, formatRupiah } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/currency";
 import { isAuthenticated } from "@/lib/auth";
+import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
 
 const extractAirportCode = (value: string) => {
   const match = value.match(/\(([A-Z]{3})\)$/);
@@ -21,16 +22,68 @@ export default function PaymentSummaryPage() {
   const [countdown, setCountdown] = useState(15 * 60);
   const [paid, setPaid] = useState(false);
   const [gatewaySimulated, setGatewaySimulated] = useState(false);
+  const [flight, setFlight] = useState<FlightCardItem | null>(null);
+  const [isLoadingFlight, setIsLoadingFlight] = useState(true);
+  const [flightError, setFlightError] = useState<string | null>(null);
   const authenticated = isAuthenticated();
 
-  const flightId = searchParams.get("flightId") ?? "FL001";
+  const flightId = searchParams.get("flightId") ?? "";
   const adult = Number(searchParams.get("adult") ?? "1");
   const child = Number(searchParams.get("child") ?? "0");
   const extraPrice = Number(searchParams.get("extraPrice") ?? "0");
 
-  const flight = useMemo(() => flights.find((item) => item.id === flightId) ?? flights[0], [flightId]);
+  const fallbackFlight = useMemo<FlightCardItem>(() => ({
+    id: flightId || "-",
+    flightNumber: (searchParams.get("flightNumber") ?? flightId) || "-",
+    airline: searchParams.get("airlineName") ?? "Airline",
+    logo: "✈️",
+    aircraft: "Aircraft",
+    origin: searchParams.get("origin") ?? "Origin",
+    destination: searchParams.get("destination") ?? "Destination",
+    departureTime: "-",
+    arrivalTime: "-",
+    duration: "-",
+    price: Number(searchParams.get("price") ?? "0"),
+    facilities: ["Cabin Bag 7kg"],
+  }), [flightId, searchParams]);
 
-  const ticketPrice = flight.price * adult + Math.round(flight.price * 0.75 * child);
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFlight = async () => {
+      if (!flightId) {
+        setFlight(fallbackFlight);
+        setIsLoadingFlight(false);
+        return;
+      }
+
+      try {
+        setIsLoadingFlight(true);
+        setFlightError(null);
+        const data = await getFlightDetailFromApi(flightId);
+        if (!isMounted) return;
+        setFlight(data);
+      } catch (error) {
+        if (!isMounted) return;
+        setFlight(fallbackFlight);
+        setFlightError(error instanceof Error ? error.message : "Gagal memuat data flight dari backend.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingFlight(false);
+        }
+      }
+    };
+
+    loadFlight();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackFlight, flightId]);
+
+  const activeFlight = flight ?? fallbackFlight;
+
+  const ticketPrice = activeFlight.price * adult + Math.round(activeFlight.price * 0.75 * child);
   const tax = Math.round(ticketPrice * 0.1);
   const adminFee = 12000;
   const totalPrice = ticketPrice + tax + adminFee + extraPrice;
@@ -70,8 +123,8 @@ export default function PaymentSummaryPage() {
     const destination = extractAirportCode(searchParams.get("destination") ?? "Denpasar, Indonesia (DPS)");
 
     const query = new URLSearchParams({
-      flightNumber: flight.id,
-      airline: flight.airline,
+      flightNumber: activeFlight.flightNumber,
+      airline: activeFlight.airline,
       origin,
       destination,
       departureDate: searchParams.get("departureDate") ?? "2026-03-15",
@@ -92,6 +145,19 @@ export default function PaymentSummaryPage() {
     );
   }
 
+  if (isLoadingFlight) {
+    return (
+      <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
+        <MainNav />
+        <main className="mx-auto max-w-3xl px-6 py-12">
+          <section className="rounded-3xl border border-blue-100 bg-white p-8 text-sm text-slate-600 shadow-lg">
+            Memuat ringkasan penerbangan dari backend...
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
@@ -103,6 +169,7 @@ export default function PaymentSummaryPage() {
           </div>
 
           <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+            {flightError && <p className="text-xs text-amber-700">{flightError}</p>}
             <div className="flex justify-between text-sm"><span>Ticket Price</span><span>{formatRupiah(ticketPrice)}</span></div>
             <div className="flex justify-between text-sm"><span>Tax</span><span>{formatRupiah(tax)}</span></div>
             <div className="flex justify-between text-sm"><span>Admin Fee</span><span>{formatRupiah(adminFee)}</span></div>

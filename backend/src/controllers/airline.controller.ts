@@ -5,8 +5,12 @@ import { uploadFile, deleteFile } from "../utils/minio"
 
 export const createAirline = async (req: AuthRequest, res: Response) => {
   try {
-    const { code, name } = req.body
+    const { code, name, country } = req.body
     const file = req.file
+
+    if (!code || !name || !country) {
+      return res.status(400).json({ message: "Code, name, and country are required" })
+    }
 
     let logoUrl: string | undefined
 
@@ -19,6 +23,7 @@ export const createAirline = async (req: AuthRequest, res: Response) => {
       data: {
         code,
         name,
+        country,
         logo: logoUrl
       }
     })
@@ -71,8 +76,12 @@ export const getAirline = async (req: AuthRequest, res: Response) => {
 export const updateAirline = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
-    const { code, name } = req.body
+    const { code, name, country } = req.body
     const file = req.file
+
+    if (!code || !name || !country) {
+      return res.status(400).json({ message: "Code, name, and country are required" })
+    }
 
     const existingAirline = await prisma.airline.findUnique({
       where: { id: parseInt(id as string) }
@@ -107,6 +116,7 @@ export const updateAirline = async (req: AuthRequest, res: Response) => {
       data: {
         code,
         name,
+        country,
         logo: logoUrl
       }
     })

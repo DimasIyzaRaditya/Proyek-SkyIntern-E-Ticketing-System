@@ -5,6 +5,7 @@ import * as airportController from "../controllers/airport.controller"
 import * as airlineController from "../controllers/airline.controller"
 import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
+import * as bookingController from "../controllers/booking.controller"
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -76,6 +77,7 @@ router.delete("/airports/:id", airportController.deleteAirport)
  *             required:
  *               - code
  *               - name
+ *               - country
  *             properties:
  *               code:
  *                 type: string
@@ -83,6 +85,9 @@ router.delete("/airports/:id", airportController.deleteAirport)
  *               name:
  *                 type: string
  *                 example: Garuda Indonesia
+ *               country:
+ *                 type: string
+ *                 example: Indonesia
  *               logo:
  *                 type: string
  *                 format: binary
@@ -227,5 +232,8 @@ router.put("/seats/:id", seatController.updateFlightSeat)
  *         description: Seats generated
  */
 router.post("/seats/generate", seatController.generateStandardSeats)
+
+// Booking & Transaction Management
+router.get("/bookings", bookingController.getAllBookingsAdmin)
 
 export default router

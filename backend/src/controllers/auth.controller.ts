@@ -105,6 +105,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         name: true,
         email: true,
         phone: true,
+        avatarUrl: true,
         role: true,
         createdAt: true
       }
@@ -123,16 +124,22 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, phone } = req.body
+    const { name, phone, avatarUrl } = req.body
+
+    const data: any = {}
+    if (typeof name === "string") data.name = name
+    if (typeof phone === "string") data.phone = phone
+    if (avatarUrl === null || typeof avatarUrl === "string") data.avatarUrl = avatarUrl
 
     const user = await prisma.user.update({
       where: { id: req.user?.id },
-      data: { name, phone },
+      data,
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
+        avatarUrl: true,
         role: true
       }
     })
