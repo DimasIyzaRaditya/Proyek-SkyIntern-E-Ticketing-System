@@ -1,5 +1,9 @@
+﻿// Utilitas penyimpanan file menggunakan MinIO (S3-compatible object storage).
+// Menginisialisasi bucket "skyintern" saat server start, serta menyediakan
+// fungsi uploadFile, getFileUrl, dan deleteFile untuk mengelola file (logo maskapai, dll.).
 import { Client } from "minio"
 
+// Instance MinIO client yang terhubung ke object storage server
 export const minioClient = new Client({
   endPoint: process.env.MINIO_ENDPOINT || "localhost",
   port: parseInt(process.env.MINIO_PORT || "9000"),
@@ -8,11 +12,11 @@ export const minioClient = new Client({
   secretKey: process.env.MINIO_SECRET_KEY || "minioadmin"
 })
 
-const BUCKET_NAME = "skyintern"
+const BUCKET_NAME = "skyintern" // Nama bucket penyimpanan semua file aplikasi
 
 export const initializeBucket = async () => {
   try {
-    const exists = await minioClient.bucketExists(BUCKET_NAME)
+    const exists = await minioClient.bucketExists(BUCKET_NAME) // Cek apakah bucket sudah ada di MinIO
     if (!exists) {
       await minioClient.makeBucket(BUCKET_NAME, "us-east-1")
       console.log(`✅ MinIO bucket "${BUCKET_NAME}" created successfully`)
@@ -42,7 +46,7 @@ export const uploadFile = async (
     return `${process.env.MINIO_URL || "http://localhost:9000"}/${BUCKET_NAME}/${fileName}`
   } catch (error: any) {
     if (error.code === "ECONNREFUSED") {
-      throw new Error("MinIO server not running. File upload is disabled.")
+      throw new Error("Server MinIO tidak berjalan. Fitur upload file dinonaktifkan.")
     }
     throw error
   }

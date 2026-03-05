@@ -1,3 +1,5 @@
+// Entry point aplikasi. Menginisialisasi Express server, mengonfigurasi CORS,
+// mendaftarkan semua route API, menyiapkan dokumentasi Swagger, dan menjalankan server.
 import "dotenv/config"
 import express from "express"
 import cors from "cors"
@@ -9,7 +11,7 @@ import bookingRoutes from "./routes/booking.routes"
 import swaggerSpec from "./config/swagger"
 import { initializeBucket } from "./utils/minio"
 
-const app = express()
+const app = express() // Instance utama aplikasi Express
 
 // Initialize Minio bucket
 initializeBucket().catch(console.error)

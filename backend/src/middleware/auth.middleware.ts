@@ -1,3 +1,6 @@
+﻿// Middleware autentikasi JWT. Fungsi `authenticate` memvalidasi Bearer token dari header
+// Authorization dan menyisipkan data user ke request. Fungsi `isAdmin` memastikan user
+// memiliki role ADMIN sebelum mengakses route admin.
 import { Request, Response, NextFunction } from "express"
 import jwt from "jsonwebtoken"
 
@@ -15,14 +18,14 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
-    const authHeader = req.headers.authorization
+    const authHeader = req.headers.authorization // Header Authorization dari request HTTP
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token provided" })
+      return res.status(401).json({ message: "Token tidak ditemukan" })
     }
 
-    const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
+    const token = authHeader.substring(7) // JWT token setelah menghapus prefix "Bearer "
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any // Hasil decode JWT berisi id, email, role
 
     req.user = {
       id: Number(decoded.id),
@@ -33,9 +36,9 @@ export const authenticate = async (
     next()
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Token expired" })
+      return res.status(401).json({ message: "Token telah kedaluwarsa" })
     }
-    return res.status(401).json({ message: "Invalid token" })
+    return res.status(401).json({ message: "Token tidak valid" })
   }
 }
 
@@ -45,7 +48,7 @@ export const isAdmin = async (
   next: NextFunction
 ) => {
   if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ message: "Admin access required" })
+    return res.status(403).json({ message: "Akses admin diperlukan" })
   }
   next()
 }

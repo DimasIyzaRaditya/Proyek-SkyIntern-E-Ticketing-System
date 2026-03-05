@@ -1,3 +1,6 @@
+﻿// Controller autentikasi. Menangani registrasi & login user, verifikasi JWT,
+// manajemen profil, alur lupa/reset password via email, hapus akun,
+// serta pengambilan daftar semua user (khusus admin).
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import { Request, Response } from "express"
@@ -8,16 +11,16 @@ import { sendResetPasswordEmail } from "../utils/email"
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, name, password } = req.body
+    const { email, name, password } = req.body // Data registrasi dari body request
 
-    const hashed = await bcrypt.hash(password, 10)
+    const hashed = await bcrypt.hash(password, 10) // Password di-hash dengan bcrypt (salt 10 round)
 
-    const user = await prisma.user.create({
+    const user = await prisma.user.create({ // Simpan user baru ke database
       data: { email, name, password: hashed }
     })
 
     res.status(201).json({
-      message: "Register success",
+      message: "Registrasi berhasil",
       user
     })
 
@@ -25,81 +28,81 @@ export const register = async (req: Request, res: Response) => {
     console.error("Register error:", error)
     if (error.code === "P2002") {
       return res.status(400).json({
-        message: "Email or name already exists"
+        message: "Email atau nama sudah digunakan"
       })
     }
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body
+    const { email, password } = req.body // Kredensial login dari body request
 
     const user = await prisma.user.findUnique({
       where: { email }
-    })
+    }) // Cari user berdasarkan email
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
-    const valid = await bcrypt.compare(password, user.password)
+    const valid = await bcrypt.compare(password, user.password) // Validasi password dengan hash di database
 
     if (!valid) {
-      return res.status(401).json({ message: "Wrong password" })
+      return res.status(401).json({ message: "Password salah" })
     }
 
-    const token = jwt.sign(
+    const token = jwt.sign( // Buat JWT token berisi id, email, role user, berlaku 1 hari
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET as string,
       { expiresIn: "1d" }
     )
 
     res.json({
-      message: "Login success",
+      message: "Login berhasil",
       token
     })
 
   } catch (error) {
     console.error("Login error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const verifyToken = async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization
+    const authHeader = req.headers.authorization // Header Authorization dari request
     
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token provided" })
+      return res.status(401).json({ message: "Token tidak ditemukan" })
     }
 
-    const token = authHeader.substring(7)
+    const token = authHeader.substring(7) // Ambil token setelah "Bearer "
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) // Verifikasi & decode isi JWT
 
     res.json({
-      message: "Token is valid",
+      message: "Token valid",
       decoded
     })
 
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Token expired" })
+      return res.status(401).json({ message: "Token telah kedaluwarsa" })
     }
     if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ message: "Invalid token" })
+      return res.status(401).json({ message: "Token tidak valid" })
     }
     console.error("Verify token error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id: req.user?.id },
+      where: { id: req.user?.id }, // Ambil data profil user yang sedang login
       select: {
         id: true,
         name: true,
@@ -112,26 +115,26 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
     })
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
     res.json({ user })
   } catch (error) {
     console.error("Get profile error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, phone, avatarUrl } = req.body
+    const { name, phone, avatarUrl } = req.body // Field profil yang ingin diperbarui
 
-    const data: any = {}
+    const data: any = {} // Objek berisi hanya field yang dikirimkan (partial update)
     if (typeof name === "string") data.name = name
     if (typeof phone === "string") data.phone = phone
     if (avatarUrl === null || typeof avatarUrl === "string") data.avatarUrl = avatarUrl
 
-    const user = await prisma.user.update({
+    const user = await prisma.user.update({ // Perbarui profil user di database
       where: { id: req.user?.id },
       data,
       select: {
@@ -145,29 +148,29 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     })
 
     res.json({
-      message: "Profile updated successfully",
+      message: "Profil berhasil diperbarui",
       user
     })
   } catch (error) {
     console.error("Update profile error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
-    const { email } = req.body
+    const { email } = req.body // Email yang meminta reset password
 
     const user = await prisma.user.findUnique({
       where: { email }
-    })
+    }) // Cari user dengan email tersebut
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
-    const resetToken = generateResetToken()
-    const resetExpire = addMinutes(new Date(), 60)
+    const resetToken = generateResetToken() // Token acak untuk tautan reset password
+    const resetExpire = addMinutes(new Date(), 60) // Token kedaluwarsa dalam 60 menit
 
     await prisma.user.update({
       where: { id: user.id },
@@ -180,32 +183,32 @@ export const forgotPassword = async (req: Request, res: Response) => {
     await sendResetPasswordEmail(email, resetToken)
 
     res.json({
-      message: "Password reset link sent to your email"
+      message: "Tautan reset password telah dikirim ke email Anda"
     })
   } catch (error) {
     console.error("Forgot password error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const resetPassword = async (req: Request, res: Response) => {
   try {
-    const { resetToken, newPassword } = req.body
+    const { resetToken, newPassword } = req.body // Token reset dan password baru dari request
 
     const user = await prisma.user.findFirst({
       where: {
         resetToken,
         resetExpire: {
-          gte: new Date()
+          gte: new Date() // Pastikan token belum kedaluwarsa
         }
       }
-    })
+    }) // Temukan user berdasarkan token yang masih valid
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" })
+      return res.status(400).json({ message: "Token tidak valid atau sudah kedaluwarsa" })
     }
 
-    const hashed = await bcrypt.hash(newPassword, 10)
+    const hashed = await bcrypt.hash(newPassword, 10) // Hash password baru sebelum disimpan
 
     await prisma.user.update({
       where: { id: user.id },
@@ -217,49 +220,49 @@ export const resetPassword = async (req: Request, res: Response) => {
     })
 
     res.json({
-      message: "Password reset successfully"
+      message: "Password berhasil direset"
     })
   } catch (error) {
     console.error("Reset password error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const deleteAccount = async (req: AuthRequest, res: Response) => {
   try {
-    const email = req.params.email as string
-    const userId = req.user?.id
+    const email = req.params.email as string // Email konfirmasi akun yang akan dihapus dari URL param
+    const userId = req.user?.id // ID user yang sedang login
 
     if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" })
+      return res.status(401).json({ message: "Tidak diizinkan" })
     }
 
     const user = await prisma.user.findUnique({
       where: { id: userId }
-    })
+    }) // Ambil data user berdasarkan ID yang login
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
     if (user.email !== email) {
-      return res.status(403).json({ message: "Email does not match your account" })
+      return res.status(403).json({ message: "Email tidak sesuai dengan akun Anda" })
     }
 
     await prisma.user.delete({
       where: { id: userId }
     })
 
-    res.json({ message: "Account deleted successfully" })
+    res.json({ message: "Akun berhasil dihapus" })
   } catch (error) {
     console.error("Delete account error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const getAllUsers = async (req: AuthRequest, res: Response) => {
   try {
-    const users = await prisma.user.findMany({
+    const users = await prisma.user.findMany({ // Ambil semua user (tanpa password) urut dari terbaru
       select: {
         id: true,
         name: true,
@@ -275,33 +278,33 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
     res.json({ users })
   } catch (error) {
     console.error("Get all users error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const deleteUser = async (req: AuthRequest, res: Response) => {
   try {
-    const email = req.params.email as string
+    const email = req.params.email as string // Email user yang akan dihapus dari URL param
 
     const user = await prisma.user.findUnique({
       where: { email }
-    })
+    }) // Cari user target berdasarkan email
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
     if (user.role === "ADMIN") {
-      return res.status(403).json({ message: "Cannot delete admin account" })
+      return res.status(403).json({ message: "Akun admin tidak dapat dihapus" })
     }
 
     await prisma.user.delete({
       where: { email }
     })
 
-    res.json({ message: "User deleted successfully" })
+    res.json({ message: "Pengguna berhasil dihapus" })
   } catch (error) {
     console.error("Delete user error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

@@ -1,10 +1,12 @@
+// Route penerbangan publik. Menyediakan endpoint pencarian penerbangan,
+// opsi daftar bandara, detail penerbangan, dan seat map (memerlukan autentikasi).
 import { Router } from "express"
 import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
 import * as airportController from "../controllers/airport.controller"
 import { authenticate } from "../middleware/auth.middleware"
 
-const router = Router()
+const router = Router() // Router Express untuk semua route penerbangan publik
 
 /**
  * @swagger

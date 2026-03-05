@@ -1,5 +1,10 @@
+// Utilitas pengiriman email menggunakan Nodemailer.
+// Menyediakan fungsi untuk mengirim email reset password (dengan HTML template)
+// dan konfirmasi pemesanan tiket. Jika SMTP belum dikonfigurasi,
+// token/informasi akan dicetak ke console sebagai fallback.
 import nodemailer from "nodemailer"
 
+// Konfigurasi SMTP transporter untuk pengiriman email (Gmail atau server SMTP lain)
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: parseInt(process.env.SMTP_PORT || "587"),
@@ -22,7 +27,7 @@ export const sendResetPasswordEmail = async (
       return
     }
 
-    const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`
+    const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}` // URL tautan reset password yang dikirimkan ke email user
 
     await transporter.sendMail({
       from: process.env.SMTP_FROM || "noreply@skyintern.com",

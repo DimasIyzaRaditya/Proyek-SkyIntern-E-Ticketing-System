@@ -1,16 +1,21 @@
+﻿// Controller pemesanan tiket. Mengelola alur lengkap booking:
+// membuat pesanan (step 1), memproses pembayaran via Midtrans Snap (step 2),
+// menerima notifikasi webhook pembayaran, serta melihat, membatalkan,
+// dan mengunduh tiket untuk user maupun admin.
 import { Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateBookingCode, generateTicketNumber, calculateTotalPrice, addMinutes } from "../utils/helpers"
-import { uploadFile } from "../utils/minio"
+import { uploadFile, deleteFile } from "../utils/minio"
 import { sendBookingConfirmation } from "../utils/email"
 import { createTransaction, checkTransactionStatus, verifySignature, mapMidtransStatus } from "../utils/midtrans"
 
 // Step 1: Create Booking with Passenger Data
 export const createBooking = async (req: AuthRequest, res: Response) => {
   try {
-    const { flightId, passengers, seatIds } = req.body
-    // passengers: [{ type, title, firstName, lastName, idType, idNumber, nationality, dateOfBirth }]
+    const { flightId, passengers, seatIds } = req.body // ID penerbangan, data penumpang, dan ID kursi yang dipilih
+    // passengers: [{ type, title, firstName, lastName, documentType, documentNumber, nationality, dateOfBirth }]
+    // documentType: 'KTP' atau 'PASSPORT'
     // seatIds: [flightSeatId1, flightSeatId2, ...]
 
     const flight = await prisma.flight.findUnique({
@@ -18,7 +23,7 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     })
 
     if (!flight) {
-      return res.status(404).json({ message: "Flight not found" })
+      return res.status(404).json({ message: "Penerbangan tidak ditemukan" })
     }
 
     // Check seat availability
@@ -31,20 +36,20 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       })
 
       if (seats.length !== seatIds.length) {
-        return res.status(400).json({ message: "Some seats are not available" })
+        return res.status(400).json({ message: "Beberapa kursi tidak tersedia" })
       }
     }
 
     // Calculate total price
-    let seatPrice = 0
+    let seatPrice = 0 // Total harga tambahan dari kursi yang dipilih
     if (seatIds && seatIds.length > 0) {
       const seats = await prisma.flightSeat.findMany({
         where: { id: { in: seatIds } }
-      })
-      seatPrice = seats.reduce((sum, seat) => sum + seat.additionalPrice, 0)
+      }) // Ambil data kursi terpilih untuk menghitung harga tambahan
+      seatPrice = seats.reduce((sum, seat) => sum + seat.additionalPrice, 0) // Jumlah seluruh harga tambahan kursi
     }
 
-    const totalPrice = calculateTotalPrice(
+    const totalPrice = calculateTotalPrice( // Hitung total harga: (base + seat) x penumpang + pajak + admin fee
       flight.basePrice,
       flight.tax,
       flight.adminFee,
@@ -53,8 +58,8 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     )
 
     // Create booking
-    const bookingCode = generateBookingCode()
-    const expiresAt = addMinutes(new Date(), 15)
+    const bookingCode = generateBookingCode() // Kode booking 6 karakter unik (A-Z0-9)
+    const expiresAt = addMinutes(new Date(), 15) // Booking kedaluwarsa dalam 15 menit jika belum dibayar
 
     const booking = await prisma.booking.create({
       data: {
@@ -70,8 +75,8 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
             title: p.title,
             firstName: p.firstName,
             lastName: p.lastName,
-            idType: p.idType,
-            idNumber: p.idNumber,
+            documentType: p.documentType,   // Jenis dokumen identitas (KTP/PASSPORT)
+            documentNumber: p.documentNumber, // Nomor NIK atau nomor paspor
             nationality: p.nationality,
             dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : undefined
           }))
@@ -101,13 +106,13 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     }
 
     res.status(201).json({
-      message: "Booking created successfully",
+      message: "Pemesanan berhasil dibuat",
       booking,
       expiresIn: 15 * 60
     })
   } catch (error) {
     console.error("Create booking error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
@@ -119,7 +124,7 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        payment: true,
+        payment: true, // Cek apakah sudah ada record pembayaran sebelumnya
         flight: {
           include: {
             airline: true,
@@ -133,15 +138,15 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
     })
 
     if (!booking) {
-      return res.status(404).json({ message: "Booking not found" })
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" })
     }
 
     if (booking.userId !== req.user!.id) {
-      return res.status(403).json({ message: "Unauthorized" })
+      return res.status(403).json({ message: "Tidak diizinkan" })
     }
 
     if (booking.status !== "PENDING") {
-      return res.status(400).json({ message: "Booking is not pending" })
+      return res.status(400).json({ message: "Pemesanan bukan dalam status menunggu" })
     }
 
     // Check if booking expired
@@ -157,20 +162,20 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
         data: { status: "AVAILABLE", bookingId: null }
       })
 
-      return res.status(400).json({ message: "Booking has expired" })
+      return res.status(400).json({ message: "Pemesanan telah kedaluwarsa" })
     }
 
     // Check if payment already exists
     if (booking.payment) {
       if (booking.payment.status === "SUCCESS") {
-        return res.status(400).json({ message: "Payment already completed" })
+        return res.status(400).json({ message: "Pembayaran sudah selesai" })
       }
     }
 
     // Create Midtrans transaction
-    const orderId = `${booking.bookingCode}-${Date.now()}`
+    const orderId = `${booking.bookingCode}-${Date.now()}` // ID unik transaksi Midtrans (kode booking + timestamp)
     
-    const midtransParams = {
+    const midtransParams = { // Parameter yang dikirim ke Midtrans Snap API
       orderId,
       amount: booking.totalPrice,
       customerDetails: {
@@ -188,10 +193,10 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
       ]
     }
 
-    const transaction = await createTransaction(midtransParams)
+    const transaction = await createTransaction(midtransParams) // Buat transaksi Midtrans, dapatkan token Snap & redirect URL
 
     // Create or update payment record
-    const payment = await prisma.payment.upsert({
+    const payment = await prisma.payment.upsert({ // Simpan atau perbarui record pembayaran
       where: { bookingId: booking.id },
       create: {
         bookingId: booking.id,
@@ -207,7 +212,7 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
     })
 
     res.json({
-      message: "Payment transaction created",
+      message: "Transaksi pembayaran berhasil dibuat",
       payment: {
         orderId,
         amount: booking.totalPrice,
@@ -218,7 +223,7 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Payment error:", error)
     res.status(500).json({ 
-      message: "Failed to create payment", 
+      message: "Gagal membuat pembayaran", 
       error: error.message 
     })
   }
@@ -227,10 +232,10 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
 // Get User Bookings
 export const getMyBookings = async (req: AuthRequest, res: Response) => {
   try {
-    const { status } = req.query
+    const { status } = req.query // Filter status booking (PENDING/PAID/CANCELLED) dari query string
 
     const where: any = {
-      userId: req.user!.id
+      userId: req.user!.id // Hanya tampilkan booking milik user yang login
     }
 
     if (status) {
@@ -254,21 +259,21 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
       orderBy: {
         createdAt: "desc"
       }
-    })
+    }) // Ambil booking user beserta detail penerbangan, penumpang, pembayaran, dan tiket
 
     res.json({ bookings })
   } catch (error) {
     console.error("Get my bookings error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 // Admin: Get All Bookings
 export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
   try {
-    const { status } = req.query
+    const { status } = req.query // Filter status booking dari query string (opsional)
 
-    const where: any = {}
+    const where: any = {} // Kondisi filter, kosong berarti tampilkan semua booking
     if (status) {
       where.status = status as string
     }
@@ -302,19 +307,19 @@ export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
     res.json({ bookings })
   } catch (error) {
     console.error("Get all bookings admin error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 // Get Booking Detail
 export const getBookingDetail = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const { id } = req.params // ID booking dari URL param
 
     const booking = await prisma.booking.findUnique({
       where: { id: parseInt(id as string) },
       include: {
-        flight: {
+        flight: { // Ambil detail booking lengkap termasuk kursi
           include: {
             airline: true,
             origin: true,
@@ -333,26 +338,26 @@ export const getBookingDetail = async (req: AuthRequest, res: Response) => {
     })
 
     if (!booking) {
-      return res.status(404).json({ message: "Booking not found" })
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" })
     }
 
     if (booking.userId !== req.user!.id && req.user!.role !== "ADMIN") {
-      return res.status(403).json({ message: "Unauthorized" })
+      return res.status(403).json({ message: "Tidak diizinkan" })
     }
 
     res.json({ booking })
   } catch (error) {
     console.error("Get booking detail error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 // Get Ticket
 export const getTicket = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const { id } = req.params // ID tiket dari URL param
 
-    const ticket = await prisma.ticket.findUnique({
+    const ticket = await prisma.ticket.findUnique({ // Ambil tiket beserta data booking lengkap
       where: { id: parseInt(id as string) },
       include: {
         booking: {
@@ -377,39 +382,39 @@ export const getTicket = async (req: AuthRequest, res: Response) => {
     })
 
     if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found" })
+      return res.status(404).json({ message: "Tiket tidak ditemukan" })
     }
 
     if (ticket.booking.userId !== req.user!.id && req.user!.role !== "ADMIN") {
-      return res.status(403).json({ message: "Unauthorized" })
+      return res.status(403).json({ message: "Tidak diizinkan" })
     }
 
     res.json({ ticket })
   } catch (error) {
     console.error("Get ticket error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 // Cancel Booking
 export const cancelBooking = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const { id } = req.params // ID booking dari URL param
 
     const booking = await prisma.booking.findUnique({
       where: { id: parseInt(id as string) }
-    })
+    }) // Cari booking yang akan dibatalkan
 
     if (!booking) {
-      return res.status(404).json({ message: "Booking not found" })
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" })
     }
 
     if (booking.userId !== req.user!.id) {
-      return res.status(403).json({ message: "Unauthorized" })
+      return res.status(403).json({ message: "Tidak diizinkan" })
     }
 
     if (booking.status !== "PENDING" && booking.status !== "PAID") {
-      return res.status(400).json({ message: "Cannot cancel this booking" })
+      return res.status(400).json({ message: "Pemesanan ini tidak dapat dibatalkan" })
     }
 
     // Update booking
@@ -424,10 +429,10 @@ export const cancelBooking = async (req: AuthRequest, res: Response) => {
       data: { status: "AVAILABLE", bookingId: null }
     })
 
-    res.json({ message: "Booking cancelled successfully" })
+    res.json({ message: "Pemesanan berhasil dibatalkan" })
   } catch (error) {
     console.error("Cancel booking error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
@@ -456,16 +461,16 @@ export const paymentNotification = async (req: any, res: Response) => {
       notification.status_code,
       gross_amount,
       signature_key
-    )
+    ) // Validasi tanda tangan webhook dari Midtrans agar tidak bisa dipalsukan
 
     if (!isValid) {
       console.error("❌ Invalid signature from Midtrans")
-      return res.status(403).json({ message: "Invalid signature" })
+      return res.status(403).json({ message: "Tanda tangan tidak valid" })
     }
 
     // Find payment by transaction ID
     const payment = await prisma.payment.findFirst({
-      where: { transactionId: order_id },
+      where: { transactionId: order_id }, // Cari record pembayaran berdasarkan order ID Midtrans
       include: {
         booking: {
           include: {
@@ -485,11 +490,11 @@ export const paymentNotification = async (req: any, res: Response) => {
 
     if (!payment) {
       console.error("❌ Payment not found for order:", order_id)
-      return res.status(404).json({ message: "Payment not found" })
+      return res.status(404).json({ message: "Pembayaran tidak ditemukan" })
     }
 
     // Map Midtrans status to our status
-    const paymentStatus = mapMidtransStatus(transaction_status, fraud_status)
+    const paymentStatus = mapMidtransStatus(transaction_status, fraud_status) // Konversi status Midtrans ke status internal (SUCCESS/PENDING/FAILED)
 
     // Update payment status
     await prisma.payment.update({
@@ -567,9 +572,61 @@ export const paymentNotification = async (req: any, res: Response) => {
       })
     }
 
-    res.json({ message: "Notification processed successfully" })
+    res.json({ message: "Notifikasi berhasil diproses" })
   } catch (error) {
     console.error("❌ Payment notification error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+// Upload gambar dokumen identitas penumpang (KTP/Paspor) ke MinIO
+export const uploadPassengerDocument = async (req: AuthRequest, res: Response) => {
+  try {
+    const passengerId = parseInt(req.params.passengerId) // ID penumpang dari URL param
+    const file = req.file // File gambar yang di-upload via multipart/form-data
+
+    if (!file) {
+      return res.status(400).json({ message: "File gambar dokumen wajib diunggah" })
+    }
+
+    // Cari penumpang beserta data booking untuk verifikasi kepemilikan
+    const passenger = await prisma.passenger.findUnique({
+      where: { id: passengerId },
+      include: { booking: true }
+    })
+
+    if (!passenger) {
+      return res.status(404).json({ message: "Data penumpang tidak ditemukan" })
+    }
+
+    // Pastikan penumpang ini milik user yang sedang login
+    if (passenger.booking.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Tidak diizinkan mengakses data penumpang ini" })
+    }
+
+    // Hapus gambar lama dari MinIO jika sudah ada
+    if (passenger.documentImageUrl) {
+      const oldFileName = passenger.documentImageUrl.split("/").pop()! // Ambil nama file dari URL lama
+      await deleteFile(`passengers/${oldFileName}`).catch(() => {}) // Abaikan error jika file tidak ada
+    }
+
+    // Generate nama file unik: passengers/passengerId-timestamp.ext
+    const ext = file.mimetype.split("/")[1] || "jpg" // Ekstensi file dari MIME type
+    const fileName = `passengers/${passengerId}-${Date.now()}.${ext}` // Nama file unik di MinIO
+    const imageUrl = await uploadFile(fileName, file.buffer, file.mimetype) // Upload ke MinIO, return URL
+
+    // Simpan URL gambar ke database
+    const updated = await prisma.passenger.update({
+      where: { id: passengerId },
+      data: { documentImageUrl: imageUrl }
+    })
+
+    res.json({
+      message: "Gambar dokumen berhasil diunggah",
+      documentImageUrl: updated.documentImageUrl
+    })
+  } catch (error) {
+    console.error("Upload passenger document error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

@@ -55,6 +55,11 @@ enum FlightStatus {
   CANCELLED
 }
 
+enum documentType {
+  KTP
+  PASSPORT
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   name          String    @db.VarChar(50)
@@ -165,19 +170,20 @@ model Booking {
 }
 
 model Passenger {
-  id            Int           @id @default(autoincrement())
-  bookingId     Int
-  type          PassengerType
-  title         String        @db.VarChar(10)
-  firstName     String        @db.VarChar(50)
-  lastName      String        @db.VarChar(50)
-  idType        String        @db.VarChar(30)
-  idNumber      String        @db.VarChar(50)
-  nationality   String        @db.VarChar(50)
-  dateOfBirth   DateTime?
-  createdAt     DateTime      @default(now())
+  id                Int           @id @default(autoincrement())
+  bookingId         Int
+  type              PassengerType
+  title             String        @db.VarChar(10)
+  firstName         String        @db.VarChar(50)
+  lastName          String        @db.VarChar(50)
+  documentType      documentType  @default(KTP) // Jenis dokumen: KTP atau PASSPORT
+  documentNumber    String        @db.VarChar(16)   // Nomor NIK (16 digit) atau nomor paspor
+  documentImageUrl  String?       @db.VarChar(500)  // URL gambar scan KTP/paspor di MinIO
+  nationality       String        @db.VarChar(50)
+  dateOfBirth       DateTime?
+  createdAt         DateTime      @default(now())
 
-  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking           Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
 model Payment {

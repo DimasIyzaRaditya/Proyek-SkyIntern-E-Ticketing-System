@@ -1,8 +1,14 @@
+// Fungsi-fungsi helper umum:
+// - generateBookingCode: kode booking 6 karakter acak (A-Z0-9)
+// - generateResetToken: token reset password berbasis crypto random
+// - generateTicketNumber: nomor tiket unik berformat TKT+timestamp+random
+// - calculateTotalPrice: menghitung total harga tiket termasuk pajak & biaya admin
+// - addMinutes: menambahkan menit ke objek Date
 import crypto from "crypto"
 
 export const generateBookingCode = (): string => {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let code = ""
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" // Kumpulan karakter yang digunakan dalam kode booking
+  let code = "" // Kode booking yang sedang dibangun karakter per karakter
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length))
   }
@@ -14,8 +20,8 @@ export const generateResetToken = (): string => {
 }
 
 export const generateTicketNumber = (): string => {
-  const timestamp = Date.now().toString().slice(-8)
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
+  const timestamp = Date.now().toString().slice(-8) // 8 digit terakhir timestamp saat ini
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0") // 4 digit angka acak (0000-9999)
   return`TKT${timestamp}${random}`
 }
 

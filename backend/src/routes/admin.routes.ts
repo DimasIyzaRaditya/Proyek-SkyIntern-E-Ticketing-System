@@ -1,3 +1,6 @@
+// Route admin. Semua endpoint di sini dilindungi middleware authenticate + isAdmin.
+// Mencakup manajemen bandara, maskapai (dengan upload logo), penerbangan,
+// kursi, pemesanan, dan data user. Menggunakan multer untuk upload file.
 import { Router } from "express"
 import multer from "multer"
 import { authenticate, isAdmin } from "../middleware/auth.middleware"
@@ -8,8 +11,8 @@ import * as seatController from "../controllers/seat.controller"
 import * as bookingController from "../controllers/booking.controller"
 import { getAllUsers, deleteUser } from "../controllers/auth.controller"
 
-const router = Router()
-const upload = multer({ storage: multer.memoryStorage() })
+const router = Router() // Router Express untuk semua route admin
+const upload = multer({ storage: multer.memoryStorage() }) // Middleware upload file, disimpan di memory (buffer) bukan disk
 
 // All admin routes require authentication and admin role
 router.use(authenticate, isAdmin)

@@ -1,3 +1,6 @@
+﻿// Controller kursi pesawat (seat). Menangani pembuatan & pembaruan kursi per penerbangan,
+// menampilkan denah kursi (seat map) yang dikelompokkan per kelas,
+// serta generate otomatis kursi standar (business & economy) untuk suatu penerbangan.
 import { Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
@@ -6,21 +9,21 @@ import { SeatClass } from "@prisma/client"
 // Admin: Create Seats for Flight
 export const createFlightSeats = async (req: AuthRequest, res: Response) => {
   try {
-    const { flightId, seats } = req.body
+    const { flightId, seats } = req.body // ID penerbangan dan array data kursi dari body request
 
     // Validate flightId
     if (!flightId) {
-      return res.status(400).json({ message: "flightId is required" })
+      return res.status(400).json({ message: "flightId wajib diisi" })
     }
 
-    const parsedFlightId = parseInt(flightId)
+    const parsedFlightId = parseInt(flightId) // Konversi flightId ke integer
     if (isNaN(parsedFlightId)) {
-      return res.status(400).json({ message: "flightId must be a valid number" })
+      return res.status(400).json({ message: "flightId harus berupa angka yang valid" })
     }
 
     // Validate seats array
     if (!seats || !Array.isArray(seats) || seats.length === 0) {
-      return res.status(400).json({ message: "seats array is required and must not be empty" })
+      return res.status(400).json({ message: "Array kursi wajib diisi dan tidak boleh kosong" })
     }
 
     // Check if flight exists
@@ -28,12 +31,12 @@ export const createFlightSeats = async (req: AuthRequest, res: Response) => {
       where: { id: parsedFlightId }
     })
     if (!flight) {
-      return res.status(404).json({ message: "Flight not found" })
+      return res.status(404).json({ message: "Penerbangan tidak ditemukan" })
     }
 
     // seats: [{ seatNumber, seatClass, isExitRow, additionalPrice }]
     
-    const createdSeats = []
+    const createdSeats = [] // Koleksi kursi yang berhasil dibuat
 
     for (const seatData of seats) {
       // Find or create seat
@@ -70,22 +73,22 @@ export const createFlightSeats = async (req: AuthRequest, res: Response) => {
     }
 
     res.status(201).json({
-      message: "Flight seats created successfully",
+      message: "Kursi penerbangan berhasil dibuat",
       seats: createdSeats
     })
   } catch (error: any) {
     console.error("Create seats error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 // Admin: Update Flight Seat
 export const updateFlightSeat = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
-    const { status, additionalPrice } = req.body
+    const { id } = req.params // ID flight seat dari URL param
+    const { status, additionalPrice } = req.body // Status baru dan harga tambahan yang diperbarui
 
-    const flightSeat = await prisma.flightSeat.update({
+    const flightSeat = await prisma.flightSeat.update({ // Perbarui data kursi penerbangan
       where: { id: parseInt(id as string) },
       data: {
         status,
@@ -97,25 +100,25 @@ export const updateFlightSeat = async (req: AuthRequest, res: Response) => {
     })
 
     res.json({
-      message: "Flight seat updated successfully",
+      message: "Kursi penerbangan berhasil diperbarui",
       seat: flightSeat
     })
   } catch (error: any) {
     console.error("Update flight seat error:", error)
     if (error.code === "P2025") {
-      return res.status(404).json({ message: "Flight seat not found" })
+      return res.status(404).json({ message: "Kursi penerbangan tidak ditemukan" })
     }
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 // User: Get Seat Map
 export const getSeatMap = async (req: AuthRequest, res: Response) => {
   try {
-    const { flightId } = req.params
+    const { flightId } = req.params // ID penerbangan dari URL param
 
     const flightSeats = await prisma.flightSeat.findMany({
-      where: { flightId: parseInt(flightId as string) },
+      where: { flightId: parseInt(flightId as string) }, // Ambil semua kursi milik penerbangan ini
       include: {
         seat: true
       },
@@ -128,15 +131,15 @@ export const getSeatMap = async (req: AuthRequest, res: Response) => {
 
     // Group by seat class
     const seatMap = {
-      ECONOMY: flightSeats.filter(fs => fs.seat.seatClass === "ECONOMY"),
-      BUSINESS: flightSeats.filter(fs => fs.seat.seatClass === "BUSINESS"),
-      FIRST: flightSeats.filter(fs => fs.seat.seatClass === "FIRST")
-    }
+      ECONOMY: flightSeats.filter(fs => fs.seat.seatClass === "ECONOMY"), // Kursi kelas ekonomi
+      BUSINESS: flightSeats.filter(fs => fs.seat.seatClass === "BUSINESS"), // Kursi kelas bisnis
+      FIRST: flightSeats.filter(fs => fs.seat.seatClass === "FIRST") // Kursi kelas pertama
+    } // Denah kursi dikelompokkan per kelas
 
     res.json({ seatMap })
   } catch (error) {
     console.error("Get seat map error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
@@ -147,12 +150,12 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
 
     // Validate flightId
     if (!flightId) {
-      return res.status(400).json({ message: "flightId is required" })
+      return res.status(400).json({ message: "flightId wajib diisi" })
     }
 
     const parsedFlightId = parseInt(flightId)
     if (isNaN(parsedFlightId)) {
-      return res.status(400).json({ message: "flightId must be a valid number" })
+      return res.status(400).json({ message: "flightId harus berupa angka yang valid" })
     }
 
     // Check if flight exists
@@ -160,15 +163,15 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
       where: { id: parsedFlightId }
     })
     if (!flight) {
-      return res.status(404).json({ message: "Flight not found" })
+      return res.status(404).json({ message: "Penerbangan tidak ditemukan" })
     }
 
-    const economyRows = 30
-    const businessRows = 6
-    const seatsPerRow = 6
-    const economyExitRows = [12, 13]
+    const economyRows = 30 // Jumlah baris kelas ekonomi
+    const businessRows = 6 // Jumlah baris kelas bisnis
+    const seatsPerRow = 6 // Jumlah kursi per baris (A-F)
+    const economyExitRows = [12, 13] // Nomor baris exit row di kelas ekonomi (harga tambahan)
 
-    const seats = []
+    const seats = [] // Array definisi kursi yang akan dibuat
 
     // Business class: Rows 1-6
     for (let row = 1; row <= businessRows; row++) {
@@ -232,11 +235,11 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
     }
 
     res.status(201).json({
-      message: "Standard seats generated successfully",
+      message: "Kursi standar berhasil dibuat",
       count: createdSeats.length
     })
   } catch (error: any) {
     console.error("Generate seats error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

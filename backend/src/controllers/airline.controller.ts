@@ -1,3 +1,5 @@
+﻿// Controller maskapai penerbangan (airline). Menyediakan operasi CRUD untuk data
+// maskapai, termasuk upload/hapus logo ke MinIO object storage.
 import { Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
@@ -5,21 +7,21 @@ import { uploadFile, deleteFile } from "../utils/minio"
 
 export const createAirline = async (req: AuthRequest, res: Response) => {
   try {
-    const { code, name, country } = req.body
-    const file = req.file
+    const { code, name, country } = req.body // Data maskapai dari body request
+    const file = req.file // File logo yang diupload (opsional)
 
     if (!code || !name || !country) {
-      return res.status(400).json({ message: "Code, name, and country are required" })
+      return res.status(400).json({ message: "Kode, nama, dan negara wajib diisi" })
     }
 
-    let logoUrl: string | undefined
+    let logoUrl: string | undefined // URL logo setelah diupload ke MinIO
 
     if (file) {
-      const fileName = `airlines/${code}-${Date.now()}.${file.mimetype.split("/")[1]}`
+      const fileName = `airlines/${code}-${Date.now()}.${file.mimetype.split("/")[1]}` // Nama file unik berdasarkan kode & timestamp
       logoUrl = await uploadFile(fileName, file.buffer, file.mimetype)
     }
 
-    const airline = await prisma.airline.create({
+    const airline = await prisma.airline.create({ // Simpan data maskapai baru ke database
       data: {
         code,
         name,
@@ -29,15 +31,15 @@ export const createAirline = async (req: AuthRequest, res: Response) => {
     })
 
     res.status(201).json({
-      message: "Airline created successfully",
+      message: "Maskapai berhasil dibuat",
       airline
     })
   } catch (error: any) {
     console.error("Create airline error:", error)
     if (error.code === "P2002") {
-      return res.status(400).json({ message: "Airline code already exists" })
+      return res.status(400).json({ message: "Kode maskapai sudah digunakan" })
     }
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
@@ -45,59 +47,59 @@ export const getAllAirlines = async (req: AuthRequest, res: Response) => {
   try {
     const airlines = await prisma.airline.findMany({
       orderBy: { name: "asc" }
-    })
+    }) // Ambil semua maskapai urut abjad
 
     res.json({ airlines })
   } catch (error) {
     console.error("Get all airlines error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const getAirline = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const { id } = req.params // ID maskapai dari URL param
 
     const airline = await prisma.airline.findUnique({
       where: { id: parseInt(id as string) }
-    })
+    }) // Cari maskapai berdasarkan ID
 
     if (!airline) {
-      return res.status(404).json({ message: "Airline not found" })
+      return res.status(404).json({ message: "Maskapai tidak ditemukan" })
     }
 
     res.json({ airline })
   } catch (error) {
     console.error("Get airline error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const updateAirline = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
-    const { code, name, country } = req.body
-    const file = req.file
+    const { id } = req.params // ID maskapai dari URL param
+    const { code, name, country } = req.body // Data maskapai yang diperbarui
+    const file = req.file // File logo baru (opsional)
 
     if (!code || !name || !country) {
-      return res.status(400).json({ message: "Code, name, and country are required" })
+      return res.status(400).json({ message: "Kode, nama, dan negara wajib diisi" })
     }
 
     const existingAirline = await prisma.airline.findUnique({
       where: { id: parseInt(id as string) }
-    })
+    }) // Cek maskapai yang ingin diperbarui
 
     if (!existingAirline) {
-      return res.status(404).json({ message: "Airline not found" })
+      return res.status(404).json({ message: "Maskapai tidak ditemukan" })
     }
 
-    let logoUrl = existingAirline.logo
+    let logoUrl = existingAirline.logo // Pertahankan logo lama jika tidak ada file baru
 
     if (file) {
       // Delete old logo if exists
       if (existingAirline.logo) {
         try {
-          const oldFileName = existingAirline.logo.split("/").pop()
+          const oldFileName = existingAirline.logo.split("/").pop() // Ambil nama file logo lama dari URL
           if (oldFileName) {
             await deleteFile(`airlines/${oldFileName}`)
           }
@@ -107,7 +109,7 @@ export const updateAirline = async (req: AuthRequest, res: Response) => {
       }
 
       // Upload new logo
-      const fileName = `airlines/${code}-${Date.now()}.${file.mimetype.split("/")[1]}`
+      const fileName = `airlines/${code}-${Date.now()}.${file.mimetype.split("/")[1]}` // Nama file logo baru yang unik
       logoUrl = await uploadFile(fileName, file.buffer, file.mimetype)
     }
 
@@ -122,31 +124,31 @@ export const updateAirline = async (req: AuthRequest, res: Response) => {
     })
 
     res.json({
-      message: "Airline updated successfully",
+      message: "Maskapai berhasil diperbarui",
       airline
     })
   } catch (error: any) {
     console.error("Update airline error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const deleteAirline = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const { id } = req.params // ID maskapai dari URL param
 
     const airline = await prisma.airline.findUnique({
       where: { id: parseInt(id as string) }
-    })
+    }) // Cari maskapai yang akan dihapus
 
     if (!airline) {
-      return res.status(404).json({ message: "Airline not found" })
+      return res.status(404).json({ message: "Maskapai tidak ditemukan" })
     }
 
     // Delete logo from Minio
     if (airline.logo) {
       try {
-        const fileName = airline.logo.split("/").pop()
+        const fileName = airline.logo.split("/").pop() // Nama file logo yang akan dihapus dari MinIO
         if (fileName) {
           await deleteFile(`airlines/${fileName}`)
         }
@@ -159,33 +161,33 @@ export const deleteAirline = async (req: AuthRequest, res: Response) => {
       where: { id: parseInt(id as string) }
     })
 
-    res.json({ message: "Airline deleted successfully" })
+    res.json({ message: "Maskapai berhasil dihapus" })
   } catch (error: any) {
     console.error("Delete airline error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 
 export const removeAirlineLogo = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const { id } = req.params // ID maskapai dari URL param
 
     const airline = await prisma.airline.findUnique({
       where: { id: parseInt(id as string) }
-    })
+    }) // Cari maskapai yang logo-nya akan dihapus
 
     if (!airline) {
-      return res.status(404).json({ message: "Airline not found" })
+      return res.status(404).json({ message: "Maskapai tidak ditemukan" })
     }
 
     if (!airline.logo) {
-      return res.status(400).json({ message: "Airline does not have a logo" })
+      return res.status(400).json({ message: "Maskapai tidak memiliki logo" })
     }
 
     // Try to delete from MinIO (best-effort, file might already be missing)
     try {
-      const urlPath = new URL(airline.logo).pathname
-      const objectName = urlPath.replace(/^\/[^\/]+\//, "")
+      const urlPath = new URL(airline.logo).pathname // Path dari URL logo MinIO
+      const objectName = urlPath.replace(/^\/[^\/]+\//, "") // Nama objek di bucket (tanpa prefix bucket)
       if (objectName) await deleteFile(objectName)
     } catch (deleteError) {
       console.warn("Could not delete logo from MinIO (file may already be missing):", deleteError)
@@ -194,14 +196,14 @@ export const removeAirlineLogo = async (req: AuthRequest, res: Response) => {
     const updated = await prisma.airline.update({
       where: { id: parseInt(id as string) },
       data: { logo: null }
-    })
+    }) // Hapus referensi logo dari database
 
     res.json({
-      message: "Logo removed successfully",
+      message: "Logo berhasil dihapus",
       airline: updated
     })
   } catch (error: any) {
     console.error("Remove airline logo error:", error)
-    res.status(500).json({ message: "Internal server error" })
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

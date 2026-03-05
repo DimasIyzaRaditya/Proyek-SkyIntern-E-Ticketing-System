@@ -1,5 +1,8 @@
+// Konfigurasi Swagger/OpenAPI untuk menghasilkan dokumentasi API secara otomatis
+// dari anotasi JSDoc yang ada di file route. Dokumentasi tersedia di /api-docs.
 import swaggerJsdoc from "swagger-jsdoc"
 
+// Opsi konfigurasi Swagger: metadata API, server URL, dan pola file route yang dibaca
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",

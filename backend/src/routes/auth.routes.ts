@@ -1,8 +1,10 @@
+// Route autentikasi. Mendaftarkan endpoint untuk register, login, verifikasi token,
+// profil user, lupa/reset password, dan hapus akun. Dilengkapi dokumentasi Swagger.
 import { Router } from "express"
 import { register, login, verifyToken, getProfile, updateProfile, forgotPassword, resetPassword, deleteAccount } from "../controllers/auth.controller"
 import { authenticate } from "../middleware/auth.middleware"
 
-const router = Router()
+const router = Router() // Router Express untuk semua route autentikasi
 
 /**
  * @swagger
