@@ -171,14 +171,14 @@ function SearchResultsPageContent() {
                           )}
                         </div>
 
-                        <div className="grid min-w-[240px] grid-cols-[auto_1fr_auto] items-center gap-4 text-center text-slate-900">
+                        <div className="grid min-w-60 grid-cols-[auto_1fr_auto] items-center gap-4 text-center text-slate-900">
                           <div>
                             <p className="text-3xl font-black">{flight.departureTime}</p>
                             <p className="text-sm text-slate-600">{extractAirportCode(flight.origin)}</p>
                           </div>
                           <div>
                             <p className="text-sm text-slate-500">{flight.duration}</p>
-                            <div className="mx-auto mt-1 h-[2px] w-16 bg-slate-300" />
+                            <div className="mx-auto mt-1 h-0.5 w-16 bg-slate-300" />
                             <p className="text-sm text-slate-500">{stopCount}</p>
                           </div>
                           <div>
@@ -193,7 +193,7 @@ function SearchResultsPageContent() {
                           <button
                             key={`${flight.id}-${tab.key}`}
                             onClick={() => setActiveTabs((prev) => ({ ...prev, [flight.id]: tab.key }))}
-                            className={`relative rounded-md px-1 py-0.5 transition ${getActiveTab(flight.id) === tab.key ? "text-blue-700 after:scale-x-100" : "hover:text-blue-700 after:scale-x-0 hover:after:scale-x-100"} after:absolute after:bottom-[-3px] after:left-0 after:h-[2px] after:w-full after:origin-left after:rounded-full after:bg-blue-600 after:transition-transform after:duration-200`}
+                            className={`relative rounded-md px-1 py-0.5 transition ${getActiveTab(flight.id) === tab.key ? "text-blue-700 after:scale-x-100" : "hover:text-blue-700 after:scale-x-0 hover:after:scale-x-100"} after:absolute after:-bottom-0.75 after:left-0 after:h-0.5 after:w-full after:origin-left after:rounded-full after:bg-blue-600 after:transition-transform after:duration-200`}
                           >
                             {tab.label}
                           </button>
@@ -205,7 +205,7 @@ function SearchResultsPageContent() {
                       </div>
                     </div>
 
-                    <div className="w-full lg:w-auto lg:min-w-[170px] lg:text-right">
+                    <div className="w-full lg:w-auto lg:min-w-42.5 lg:text-right">
                       <p className="text-3xl font-black text-orange-600">{formatRupiah(flight.price)}<span className="text-sm font-semibold text-slate-500">/pax</span></p>
                       <p className="mt-1 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">Round-trip Combo</p>
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import {
   deleteAdminAirline,
@@ -14,6 +14,8 @@ import {
 type SortField = "id" | "code" | "name" | "country";
 type SortDirection = "asc" | "desc";
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 export default function AdminAirlinesPage() {
   const [airlines, setAirlines] = useState<AdminAirline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,10 +23,10 @@ export default function AdminAirlinesPage() {
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("id");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const displayedAirlines = useMemo(() => {
+  const filteredAndSorted = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
     const filtered = keyword
@@ -52,25 +54,17 @@ export default function AdminAirlinesPage() {
     });
   }, [airlines, search, sortDirection, sortField]);
 
-  const totalPages = Math.max(1, Math.ceil(displayedAirlines.length / rowsPerView));
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
 
-  const visibleAirlines = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerView;
-    const end = start + rowsPerView;
-    return displayedAirlines.slice(start, end);
-  }, [displayedAirlines, currentPage, rowsPerView]);
+  const displayedAirlines = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSorted.slice(start, start + pageSize);
+  }, [filteredAndSorted, currentPage, pageSize]);
 
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
-
-    const start = Math.max(1, currentPage - 2);
-    const end = Math.min(totalPages, start + 4);
-    const normalizedStart = Math.max(1, end - 4);
-
-    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
-  }, [currentPage, totalPages]);
+  // Reset ke halaman 1 saat filter/sort/pageSize berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortField, sortDirection, pageSize]);
 
   const loadAirlines = async () => {
     setLoading(true);
@@ -89,10 +83,6 @@ export default function AdminAirlinesPage() {
   useEffect(() => {
     void loadAirlines();
   }, []);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, sortField, sortDirection, rowsPerView]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -154,7 +144,7 @@ export default function AdminAirlinesPage() {
             <option value="desc">Descending</option>
           </select>
           <div className="flex items-center justify-end text-sm font-medium text-slate-600">
-            Total: {displayedAirlines.length}
+            Total: {filteredAndSorted.length}
           </div>
         </div>
 
@@ -179,7 +169,7 @@ export default function AdminAirlinesPage() {
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-slate-500">No airlines match the current filter.</td>
                 </tr>
-              ) : visibleAirlines.map((item) => (
+              ) : displayedAirlines.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3">
                     {item.logo ? (
@@ -218,61 +208,80 @@ export default function AdminAirlinesPage() {
           </table>
         </div>
 
-        {!loading && displayedAirlines.length > 0 && (
-          <div className="mt-4 space-y-3 text-sm text-slate-600">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, displayedAirlines.length)} dari {displayedAirlines.length} data.
-              </p>
+        {/* Pagination */}
+        {!loading && filteredAndSorted.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <span>Baris per halaman:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+              <span className="ml-2 text-slate-500">
+                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredAndSorted.length)} dari {filteredAndSorted.length}
+              </span>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
-              <div className="inline-flex items-center gap-2">
-                <label htmlFor="rows-per-view-airlines" className="font-medium text-slate-700">Tampilkan</label>
-                <select
-                  id="rows-per-view-airlines"
-                  value={rowsPerView}
-                  onChange={(event) => setRowsPerView(Number(event.target.value))}
-                  className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-                >
-                  <option value={10}>10 data</option>
-                  <option value={20}>20 data</option>
-                  <option value={50}>50 data</option>
-                  <option value={100}>100 data</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Prev
-                </button>
-                {pageNumbers.map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                      page === currentPage
-                        ? "bg-blue-600 text-white"
-                        : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+              >
+                «
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2)
+                .reduce<(number | "…")[]>((acc, page, idx, arr) => {
+                  if (idx > 0 && page - (arr[idx - 1] as number) > 1) acc.push("…");
+                  acc.push(page);
+                  return acc;
+                }, [])
+                .map((item, idx) =>
+                  item === "…" ? (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">…</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setCurrentPage(item as number)}
+                      className={`rounded-lg border px-3 py-1 text-sm font-medium ${
+                        currentPage === item
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+              >
+                »
+              </button>
             </div>
           </div>
         )}
