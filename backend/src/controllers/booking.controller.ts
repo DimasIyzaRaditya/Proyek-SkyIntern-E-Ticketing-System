@@ -582,7 +582,7 @@ export const paymentNotification = async (req: any, res: Response) => {
 // Upload gambar dokumen identitas penumpang (KTP/Paspor) ke MinIO
 export const uploadPassengerDocument = async (req: AuthRequest, res: Response) => {
   try {
-    const passengerId = parseInt(req.params.passengerId) // ID penumpang dari URL param
+    const passengerId = parseInt(String(req.params.passengerId)) // ID penumpang dari URL param (cast ke string terlebih dahulu)
     const file = req.file // File gambar yang di-upload via multipart/form-data
 
     if (!file) {
