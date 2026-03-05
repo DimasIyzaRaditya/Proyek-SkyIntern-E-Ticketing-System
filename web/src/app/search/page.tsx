@@ -286,7 +286,7 @@ export default function SearchPage() {
         setAirportMaster(dedupedMapped);
 
         const nextOrigin = dedupedMapped[0]?.label;
-        const nextDestination = dedupedMapped.find((item) => item.label !== nextOrigin)?.label ?? dedupedMapped[0]?.label;
+        const nextDestination = mapped.find((item) => item.label !== nextOrigin)?.label ?? mapped[0]?.label;
 
         if (nextOrigin) setOrigin(nextOrigin);
         if (nextDestination) setDestination(nextDestination);

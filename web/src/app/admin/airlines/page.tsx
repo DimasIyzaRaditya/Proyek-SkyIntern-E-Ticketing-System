@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
@@ -18,6 +18,9 @@ type AirlineForm = {
   country: string;
 };
 
+type SortField = "id" | "code" | "name" | "country";
+type SortDirection = "asc" | "desc";
+
 export default function AdminAirlinesPage() {
   const [airlines, setAirlines] = useState<AdminAirline[]>([]);
   const [form, setForm] = useState<AirlineForm>({ code: "", name: "", country: "" });
@@ -27,7 +30,38 @@ export default function AdminAirlinesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const displayedAirlines = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    const filtered = keyword
+      ? airlines.filter((item) =>
+          [item.code, item.name, item.country, String(item.id)]
+            .join(" ")
+            .toLowerCase()
+            .includes(keyword),
+        )
+      : airlines;
+
+    return [...filtered].sort((a, b) => {
+      const directionFactor = sortDirection === "asc" ? 1 : -1;
+
+      if (sortField === "id") {
+        return (a.id - b.id) * directionFactor;
+      }
+
+      const left = a[sortField].toLowerCase();
+      const right = b[sortField].toLowerCase();
+
+      if (left < right) return -1 * directionFactor;
+      if (left > right) return 1 * directionFactor;
+      return 0;
+    });
+  }, [airlines, search, sortDirection, sortField]);
 
   const loadAirlines = async () => {
     setLoading(true);
@@ -57,14 +91,28 @@ export default function AdminAirlinesPage() {
     }
   };
 
-  const handleRemoveLogo = () => {
+  const resetLogoSelection = () => {
     setLogoFile(null);
     setLogoPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleRemoveLogo = () => {
+    resetLogoSelection();
+  };
+
   const handleSave = async () => {
     if (!form.code.trim() || !form.name.trim() || !form.country.trim()) return;
+
+    const normalizedCode = form.code.trim().toUpperCase();
+    const isDuplicateCode = airlines.some(
+      (item) => item.code.toUpperCase() === normalizedCode && item.id !== editingId,
+    );
+
+    if (isDuplicateCode) {
+      setMessage("Kode maskapai sudah digunakan.");
+      return;
+    }
 
     setSaving(true);
     setMessage("");
@@ -72,14 +120,14 @@ export default function AdminAirlinesPage() {
     try {
       if (editingId) {
         await updateAdminAirline(editingId, {
-          code: form.code.trim().toUpperCase(),
+          code: normalizedCode,
           name: form.name.trim(),
           country: form.country.trim(),
           logo: logoFile ?? undefined,
         });
       } else {
         await createAdminAirline({
-          code: form.code.trim().toUpperCase(),
+          code: normalizedCode,
           name: form.name.trim(),
           country: form.country.trim(),
           logo: logoFile ?? undefined,
@@ -88,7 +136,7 @@ export default function AdminAirlinesPage() {
 
       setEditingId(null);
       setForm({ code: "", name: "", country: "" });
-      handleRemoveLogo();
+      resetLogoSelection();
       await loadAirlines();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Gagal menyimpan data maskapai.");
@@ -107,7 +155,7 @@ export default function AdminAirlinesPage() {
   const handleCancel = () => {
     setEditingId(null);
     setForm({ code: "", name: "", country: "" });
-    handleRemoveLogo();
+    resetLogoSelection();
     setMessage("");
   };
 
@@ -184,6 +232,36 @@ export default function AdminAirlinesPage() {
       </section>
 
       <section className="mt-5 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_150px_auto]">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari code, nama, country, atau ID"
+            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+          />
+          <select
+            value={sortField}
+            onChange={(event) => setSortField(event.target.value as SortField)}
+            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+          >
+            <option value="name">Sort: Name</option>
+            <option value="code">Sort: Code</option>
+            <option value="country">Sort: Country</option>
+            <option value="id">Sort: ID</option>
+          </select>
+          <select
+            value={sortDirection}
+            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+          <div className="flex items-center justify-end text-sm font-medium text-slate-600">
+            Total: {displayedAirlines.length}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-blue-50 text-slate-600">
@@ -201,7 +279,11 @@ export default function AdminAirlinesPage() {
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-slate-500">Memuat data maskapai...</td>
                 </tr>
-              ) : airlines.map((item) => (
+              ) : displayedAirlines.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-4 text-center text-slate-500">Tidak ada data yang sesuai filter.</td>
+                </tr>
+              ) : displayedAirlines.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3">
                     {item.logo ? (
