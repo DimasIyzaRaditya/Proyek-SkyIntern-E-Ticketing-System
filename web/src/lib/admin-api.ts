@@ -87,6 +87,14 @@ export const getAdminAirlines = async () => {
   return response.airlines;
 };
 
+export const getAdminAirlineById = async (id: number) => {
+  const response = await apiRequest<{ airline: AdminAirline }>(`/api/admin/airlines/${id}`, {
+    auth: true,
+  });
+
+  return response.airline;
+};
+
 export const createAdminAirline = async (payload: { code: string; name: string; country: string; logo?: File }) => {
   const { getAuthToken } = await import("@/lib/auth");
   const { API_BASE_URL } = await import("@/lib/api-client");
