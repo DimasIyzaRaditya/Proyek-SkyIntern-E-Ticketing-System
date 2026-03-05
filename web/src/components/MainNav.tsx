@@ -62,52 +62,54 @@ export default function MainNav() {
 
   return (
     <nav className="sticky top-0 z-40 border-b border-blue-100 bg-[linear-gradient(120deg,#0b2f61_0%,#114a8f_45%,#0a2349_100%)] text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-3 sm:flex-nowrap sm:gap-3 sm:px-5 sm:py-3.5">
-        <Link href="/" className="inline-flex shrink-0 items-center gap-1.5 text-lg font-black tracking-tight sm:gap-2 sm:text-2xl">
-          <Plane className="h-4 w-4 shrink-0 sm:h-6 sm:w-6" />
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-2.5 py-2.5 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-3 md:px-5 md:py-3.5">
+        <Link href="/" className="inline-flex shrink-0 items-center gap-1.5 text-base font-black tracking-tight sm:gap-2 sm:text-lg md:text-xl lg:text-2xl">
+          <Plane className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />
           <span>SkyIntern</span>
         </Link>
 
-        <div className="flex w-full min-w-0 items-center justify-end gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:ml-auto sm:w-auto sm:max-w-none sm:overflow-visible sm:pb-0 sm:gap-2">
-          {activeMenus.map((item) => (
-            <Link
-              key={`stable-${item.href}`}
-              href={item.href}
-              className={`inline-flex shrink-0 items-center justify-center rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
-                pathname === item.href || (item.href === "/admin" && pathname.startsWith("/admin"))
-                  ? "border-white/80 bg-white/20 text-white"
-                  : "border-white/25 bg-white/5 text-blue-100 hover:bg-white/15 hover:text-white"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-
-          {authState.loggedIn ? (
-            <>
-              <span className="inline-flex h-8 shrink-0 items-center rounded-xl bg-white/95 px-3 text-[11px] font-semibold text-blue-700 sm:h-auto sm:px-4 sm:py-2 sm:text-sm">
-                {authState.displayName}
-              </span>
-              <button
-                onClick={() => {
-                  clearSession();
-                  router.push("/auth/login");
-                }}
-                className="inline-flex h-8 shrink-0 items-center rounded-xl bg-rose-600 px-3 text-[11px] font-semibold text-white transition hover:bg-rose-700 sm:h-auto sm:px-5 sm:py-2 sm:text-sm"
+        <div className="w-full min-w-0 sm:ml-auto sm:w-auto">
+          <div className="flex flex-wrap items-center justify-start gap-1 sm:justify-end sm:gap-1.5 md:gap-2">
+            {activeMenus.map((item) => (
+              <Link
+                key={`stable-${item.href}`}
+                href={item.href}
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-xl border px-2 py-1 text-[10px] font-semibold transition sm:px-2.5 sm:py-1.5 sm:text-[11px] md:px-3 md:py-1.5 md:text-xs lg:px-4 lg:py-2 lg:text-sm ${
+                  pathname === item.href || (item.href === "/admin" && pathname.startsWith("/admin"))
+                    ? "border-white/80 bg-white/20 text-white"
+                    : "border-white/25 bg-white/5 text-blue-100 hover:bg-white/15 hover:text-white"
+                }`}
               >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/auth/login" className="inline-flex h-8 shrink-0 items-center rounded-xl bg-white/95 px-3 text-[11px] font-semibold text-blue-600 transition hover:bg-blue-50 sm:h-auto sm:px-4 sm:py-2 sm:text-sm">
-                Masuk
+                {item.label}
               </Link>
-              <Link href="/auth/register" className="inline-flex h-8 shrink-0 items-center rounded-xl bg-blue-600 px-3 text-[11px] font-semibold text-white transition hover:bg-blue-700 sm:h-auto sm:px-5 sm:py-2 sm:text-sm">
-                Daftar
-              </Link>
-            </>
-          )}
+            ))}
+
+            {authState.loggedIn ? (
+              <>
+                <span className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-white/95 px-2.5 text-[10px] font-semibold text-blue-700 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-4 lg:py-2 lg:text-sm">
+                  {authState.displayName}
+                </span>
+                <button
+                  onClick={() => {
+                    clearSession();
+                    router.push("/auth/login");
+                  }}
+                  className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-rose-600 px-2.5 text-[10px] font-semibold text-white transition hover:bg-rose-700 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-5 lg:py-2 lg:text-sm"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/auth/login" className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-white/95 px-2.5 text-[10px] font-semibold text-blue-600 transition hover:bg-blue-50 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-4 lg:py-2 lg:text-sm">
+                  Masuk
+                </Link>
+                <Link href="/auth/register" className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-blue-600 px-2.5 text-[10px] font-semibold text-white transition hover:bg-blue-700 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-5 lg:py-2 lg:text-sm">
+                  Daftar
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </nav>

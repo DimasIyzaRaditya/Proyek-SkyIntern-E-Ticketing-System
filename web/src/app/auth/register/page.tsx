@@ -88,7 +88,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Email Gmail</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">Email</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="nama@gmail.com" className="w-full rounded-2xl border border-blue-100 bg-blue-50 py-3 pl-10 pr-4 outline-none ring-blue-200 focus:ring" />

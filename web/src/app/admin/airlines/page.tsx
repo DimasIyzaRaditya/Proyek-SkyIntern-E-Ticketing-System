@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ImagePlus, Pencil, Plus } from "lucide-react";
+import { ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import {
+  deleteAdminAirline,
   getAdminAirlines,
   type AdminAirline,
 } from "@/lib/admin-api";
@@ -18,8 +19,10 @@ export default function AdminAirlinesPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortField, setSortField] = useState<SortField>("id");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [rowsPerView, setRowsPerView] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const displayedAirlines = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -49,6 +52,26 @@ export default function AdminAirlinesPage() {
     });
   }, [airlines, search, sortDirection, sortField]);
 
+  const totalPages = Math.max(1, Math.ceil(displayedAirlines.length / rowsPerView));
+
+  const visibleAirlines = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerView;
+    const end = start + rowsPerView;
+    return displayedAirlines.slice(start, end);
+  }, [displayedAirlines, currentPage, rowsPerView]);
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    const normalizedStart = Math.max(1, end - 4);
+
+    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
+  }, [currentPage, totalPages]);
+
   const loadAirlines = async () => {
     setLoading(true);
     setMessage("");
@@ -57,7 +80,7 @@ export default function AdminAirlinesPage() {
       const data = await getAdminAirlines();
       setAirlines(data);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal memuat data maskapai.");
+      setMessage(error instanceof Error ? error.message : "Failed to load airlines.");
     } finally {
       setLoading(false);
     }
@@ -67,8 +90,32 @@ export default function AdminAirlinesPage() {
     void loadAirlines();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortField, sortDirection, rowsPerView]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const handleDelete = async (id: number) => {
+    const confirmed = window.confirm("Delete this airline?");
+    if (!confirmed) return;
+
+    setMessage("");
+
+    try {
+      await deleteAdminAirline(id);
+      await loadAirlines();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to delete airline.");
+    }
+  };
+
   return (
-    <AdminShell title="Airline Management" description="Klik Add Airline untuk menambah data maskapai. Edit dan delete dilakukan di halaman detail maskapai.">
+    <AdminShell title="Airline Management" description="Click Add Airline to create a new airline. Edit and delete are available in this table and the detail page.">
       <section className="mt-5 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
         <div className="mb-4 flex justify-end">
           <Link
@@ -85,7 +132,7 @@ export default function AdminAirlinesPage() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Cari code, nama, country, atau ID"
+            placeholder="Search code, name, country, or ID"
             className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
           />
           <select
@@ -126,13 +173,13 @@ export default function AdminAirlinesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-slate-500">Memuat data maskapai...</td>
+                  <td colSpan={6} className="p-4 text-center text-slate-500">Loading airlines...</td>
                 </tr>
               ) : displayedAirlines.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-slate-500">Tidak ada data yang sesuai filter.</td>
+                  <td colSpan={6} className="p-4 text-center text-slate-500">No airlines match the current filter.</td>
                 </tr>
-              ) : displayedAirlines.map((item) => (
+              ) : visibleAirlines.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3">
                     {item.logo ? (
@@ -155,8 +202,14 @@ export default function AdminAirlinesPage() {
                         href={`/admin/airlines/${item.id}`}
                         className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700"
                       >
-                        <Pencil className="h-3.5 w-3.5" /> Kelola
+                        <Pencil className="h-3.5 w-3.5" /> Edit
                       </Link>
+                      <button
+                        onClick={() => void handleDelete(item.id)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -164,6 +217,65 @@ export default function AdminAirlinesPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && displayedAirlines.length > 0 && (
+          <div className="mt-4 space-y-3 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p>
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, displayedAirlines.length)} dari {displayedAirlines.length} data.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
+              <div className="inline-flex items-center gap-2">
+                <label htmlFor="rows-per-view-airlines" className="font-medium text-slate-700">Tampilkan</label>
+                <select
+                  id="rows-per-view-airlines"
+                  value={rowsPerView}
+                  onChange={(event) => setRowsPerView(Number(event.target.value))}
+                  className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+                >
+                  <option value={10}>10 data</option>
+                  <option value={20}>20 data</option>
+                  <option value={50}>50 data</option>
+                  <option value={100}>100 data</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                {pageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                      page === currentPage
+                        ? "bg-blue-600 text-white"
+                        : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </AdminShell>
   );

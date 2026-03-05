@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { ImagePlus, Save, Trash2, ArrowLeft, X } from "lucide-react";
+import { ImagePlus, Save, ArrowLeft, X } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import {
-  deleteAdminAirline,
   getAdminAirlineById,
   type AdminAirline,
   updateAdminAirline,
@@ -42,7 +41,7 @@ export default function AdminAirlineDetailPage() {
 
   const loadAirline = async () => {
     if (Number.isNaN(airlineId)) {
-      setMessage("ID maskapai tidak valid.");
+      setMessage("Invalid airline ID.");
       setLoading(false);
       return;
     }
@@ -56,7 +55,7 @@ export default function AdminAirlineDetailPage() {
       setForm({ code: data.code, name: data.name, country: data.country });
       setLogoPreview(data.logo);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal memuat detail maskapai.");
+      setMessage(error instanceof Error ? error.message : "Failed to load airline details.");
     } finally {
       setLoading(false);
     }
@@ -95,47 +94,29 @@ export default function AdminAirlineDetailPage() {
       setLogoPreview(updated.logo);
       setLogoFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      setMessage("Maskapai berhasil diperbarui.");
+      setMessage("Airline updated successfully.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal mengupdate maskapai.");
+      setMessage(error instanceof Error ? error.message : "Failed to update airline.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!airline) return;
-
-    const confirmed = window.confirm(`Hapus maskapai ${airline.name}?`);
-    if (!confirmed) return;
-
-    setSaving(true);
-    setMessage("");
-
-    try {
-      await deleteAdminAirline(airline.id);
-      router.push("/admin/airlines");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal menghapus maskapai.");
-      setSaving(false);
-    }
-  };
-
   return (
-    <AdminShell title="Kelola Maskapai" description="Edit data, upload logo baru, atau hapus maskapai dari halaman ini.">
+    <AdminShell title="Manage Airline" description="Edit airline data and upload a new logo from this page.">
       <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <Link
             href="/admin/airlines"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            <ArrowLeft className="h-4 w-4" /> Kembali
+            <ArrowLeft className="h-4 w-4" /> Back
           </Link>
           <div className="text-sm font-medium text-slate-500">ID: {Number.isNaN(airlineId) ? "-" : airlineId}</div>
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-600">Memuat detail maskapai...</p>
+          <p className="text-sm text-slate-600">Loading airline details...</p>
         ) : (
           <>
             <div className="grid gap-3 md:grid-cols-3">
@@ -160,7 +141,7 @@ export default function AdminAirlineDetailPage() {
             </div>
 
             <div className="mt-4">
-              <p className="mb-2 text-sm font-medium text-slate-600">Logo Maskapai (pilih gambar baru jika ingin mengganti)</p>
+              <p className="mb-2 text-sm font-medium text-slate-600">Airline Logo (choose a new image to replace current logo)</p>
               <div className="flex items-center gap-4">
                 {logoPreview ? (
                   <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-blue-100 bg-blue-50">
@@ -190,7 +171,7 @@ export default function AdminAirlineDetailPage() {
                     htmlFor="logo-upload-detail"
                     className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
                   >
-                    <ImagePlus className="h-4 w-4" /> Pilih Gambar
+                    <ImagePlus className="h-4 w-4" /> Choose Image
                   </label>
                   {logoFile && <p className="mt-1 text-xs text-slate-500">{logoFile.name}</p>}
                 </div>
@@ -203,14 +184,14 @@ export default function AdminAirlineDetailPage() {
                 onClick={() => void handleSave()}
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                <Save className="h-4 w-4" /> Simpan Perubahan
+                <Save className="h-4 w-4" /> Save Changes
               </button>
               <button
                 disabled={saving}
-                onClick={() => void handleDelete()}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                onClick={() => router.push("/admin/airlines")}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
-                <Trash2 className="h-4 w-4" /> Hapus Maskapai
+                Cancel
               </button>
             </div>
           </>

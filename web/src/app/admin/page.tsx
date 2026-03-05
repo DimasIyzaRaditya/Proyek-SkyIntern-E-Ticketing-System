@@ -115,11 +115,11 @@ export default function AdminPage() {
   return (
     <AdminShell title="Admin Dashboard" description="Overview penjualan tiket, revenue, dan aktivitas booking terkini.">
       {message && (
-        <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{message}</p>
+        <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:text-sm">{message}</p>
       )}
 
       {loading ? (
-        <section className="rounded-3xl border border-blue-100 bg-white p-8 text-center text-sm text-slate-600 shadow-sm">
+        <section className="rounded-3xl border border-blue-100 bg-white p-6 text-center text-xs text-slate-600 shadow-sm sm:p-8 sm:text-sm">
           Memuat dashboard admin...
         </section>
       ) : (
@@ -131,25 +131,25 @@ export default function AdminPage() {
               <p className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 uppercase tracking-wide">
                 <UserCircle2 className="h-3.5 w-3.5" /> Admin
               </p>
-              <p className="mt-2 text-lg font-black text-slate-900 truncate">{adminName}</p>
+              <p className="mt-2 truncate text-base font-black text-slate-900 sm:text-lg">{adminName}</p>
               <p className="text-xs text-slate-500 truncate">{adminEmail}</p>
             </div>
 
             <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Booking</p>
-              <p className="mt-1 text-4xl font-black text-indigo-700">{stats.total}</p>
+              <p className="mt-1 text-3xl font-black text-indigo-700 sm:text-4xl">{stats.total}</p>
               <p className="mt-1 text-xs text-slate-500">Hari ini: <span className="font-bold text-indigo-600">{stats.today}</span></p>
             </div>
 
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tiket Terjual</p>
-              <p className="mt-1 text-4xl font-black text-emerald-700">{stats.paid + stats.issued}</p>
+              <p className="mt-1 text-3xl font-black text-emerald-700 sm:text-4xl">{stats.paid + stats.issued}</p>
               <p className="mt-1 text-xs text-slate-500">Paid: {stats.paid} · Issued: {stats.issued}</p>
             </div>
 
             <div className="rounded-2xl border border-violet-100 bg-violet-50 p-5 shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Revenue</p>
-              <p className="mt-1 text-xl font-black text-violet-700 leading-tight">{formatRupiah(stats.revenue)}</p>
+              <p className="mt-1 text-lg font-black leading-tight text-violet-700 sm:text-xl">{formatRupiah(stats.revenue)}</p>
               <p className="mt-1 text-xs text-slate-500">Pending: {stats.pending} · Batal: {stats.cancelled}</p>
             </div>
           </div>
@@ -159,7 +159,7 @@ export default function AdminPage() {
 
             {/* Monthly bar chart */}
             <section className="col-span-2 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-              <h2 className="inline-flex items-center gap-2 text-lg font-black text-slate-900 mb-5">
+              <h2 className="mb-5 inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
                 <TrendingUp className="h-5 w-5 text-blue-700" /> Penjualan 6 Bulan Terakhir
               </h2>
               <div className="flex items-end gap-2 h-36">
@@ -188,7 +188,7 @@ export default function AdminPage() {
 
             {/* Status breakdown */}
             <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm flex flex-col gap-3">
-              <h2 className="text-lg font-black text-slate-900 mb-1">Status Booking</h2>
+              <h2 className="mb-1 text-base font-black text-slate-900 sm:text-lg">Status Booking</h2>
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 flex items-center gap-3">
                 <Ticket className="h-5 w-5 text-blue-600 shrink-0" />
                 <div><p className="text-xs text-slate-500">Issued</p><p className="text-2xl font-black text-blue-700">{stats.issued}</p></div>
@@ -210,11 +210,11 @@ export default function AdminPage() {
 
           {/* ── Recent Bookings Table ── */}
           <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-            <h2 className="inline-flex items-center gap-2 text-xl font-black text-slate-900 mb-4">
+            <h2 className="mb-4 inline-flex items-center gap-2 text-lg font-black text-slate-900 sm:text-xl">
               <ReceiptText className="h-5 w-5 text-blue-700" /> Booking Terbaru
             </h2>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-xs sm:text-sm">
                 <thead className="bg-blue-50 text-slate-600">
                   <tr>
                     <th className="rounded-l-xl p-3">Kode</th>

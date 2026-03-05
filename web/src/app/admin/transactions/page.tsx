@@ -52,6 +52,8 @@ export default function AdminTransactionsPage() {
 
   // daftar transaksi
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [rowsPerView, setRowsPerView] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // status loading
   const [loading, setLoading] = useState(true);
@@ -113,6 +115,36 @@ export default function AdminTransactionsPage() {
     return transactions.filter((item) => item.status === statusFilter);
 
   }, [statusFilter, transactions]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / rowsPerView));
+
+  const visibleTransactions = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerView;
+    const end = start + rowsPerView;
+    return filteredTransactions.slice(start, end);
+  }, [filteredTransactions, currentPage, rowsPerView]);
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    const normalizedStart = Math.max(1, end - 4);
+
+    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, rowsPerView]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
 
   return (
@@ -186,7 +218,7 @@ export default function AdminTransactionsPage() {
               ) : (
 
                 // menampilkan transaksi yang sudah difilter
-                filteredTransactions.map((item) => (
+                visibleTransactions.map((item) => (
 
                   <tr
                     key={item.id}
@@ -236,6 +268,65 @@ export default function AdminTransactionsPage() {
           </table>
 
         </div>
+
+        {!loading && filteredTransactions.length > 0 && (
+          <div className="mt-4 space-y-3 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p>
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, filteredTransactions.length)} dari {filteredTransactions.length} data.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
+              <div className="inline-flex items-center gap-2">
+                <label htmlFor="rows-per-view-transactions" className="font-medium text-slate-700">Tampilkan</label>
+                <select
+                  id="rows-per-view-transactions"
+                  value={rowsPerView}
+                  onChange={(event) => setRowsPerView(Number(event.target.value))}
+                  className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+                >
+                  <option value={10}>10 data</option>
+                  <option value={20}>20 data</option>
+                  <option value={50}>50 data</option>
+                  <option value={100}>100 data</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                {pageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                      page === currentPage
+                        ? "bg-blue-600 text-white"
+                        : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
 

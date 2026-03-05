@@ -115,6 +115,9 @@ export const createAdminAirline = async (payload: { code: string; name: string; 
 
   if (!response.ok) {
     const errData = (await response.json().catch(() => ({}))) as { message?: string };
+    if (payload.logo && errData.message === "Terjadi kesalahan pada server") {
+      throw new Error("Logo upload service is unavailable. Please start MinIO server (port 9000) and try again.");
+    }
     throw new Error(errData.message ?? "Gagal membuat maskapai.");
   }
 
@@ -142,6 +145,9 @@ export const updateAdminAirline = async (id: number, payload: { code: string; na
 
   if (!response.ok) {
     const data = (await response.json().catch(() => ({}))) as { message?: string };
+    if (payload.logo && data.message === "Terjadi kesalahan pada server") {
+      throw new Error("Logo upload service is unavailable. Please start MinIO server (port 9000) and try again.");
+    }
     throw new Error(data.message ?? "Gagal mengupdate maskapai.");
   }
 
@@ -162,6 +168,17 @@ export const getAdminAirports = async () => {
   });
 
   return response.airports;
+};
+
+export const getAdminAirportById = async (id: number) => {
+  const airports = await getAdminAirports();
+  const airport = airports.find((item) => item.id === id);
+
+  if (!airport) {
+    throw new Error("Airport not found.");
+  }
+
+  return airport;
 };
 
 export const createAdminAirport = async (payload: {
@@ -210,6 +227,17 @@ export const getAdminFlights = async () => {
   });
 
   return response.flights;
+};
+
+export const getAdminFlightById = async (id: number) => {
+  const flights = await getAdminFlights();
+  const flight = flights.find((item) => item.id === id);
+
+  if (!flight) {
+    throw new Error("Flight not found.");
+  }
+
+  return flight;
 };
 
 export const createAdminFlight = async (payload: {

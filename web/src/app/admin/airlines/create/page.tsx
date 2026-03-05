@@ -42,7 +42,7 @@ export default function AdminAirlineCreatePage() {
 
   const handleSave = async () => {
     if (!form.code.trim() || !form.name.trim() || !form.country.trim()) {
-      setMessage("Code, Airline Name, dan Country wajib diisi.");
+      setMessage("Code, Airline Name, and Country are required.");
       return;
     }
 
@@ -59,20 +59,20 @@ export default function AdminAirlineCreatePage() {
 
       router.push("/admin/airlines");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal menambah maskapai.");
+      setMessage(error instanceof Error ? error.message : "Failed to add airline.");
       setSaving(false);
     }
   };
 
   return (
-    <AdminShell title="Add Airline" description="Tambahkan maskapai baru beserta logo. Setelah tersimpan, data muncul di tabel dengan kolom Logo, Code, Airline Name, Country, ID, dan Action.">
+    <AdminShell title="Add Airline" description="Create a new airline with optional logo. After saving, it appears in the table with Logo, Code, Airline Name, Country, ID, and Action columns.">
       <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <Link
             href="/admin/airlines"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            <ArrowLeft className="h-4 w-4" /> Kembali
+            <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </div>
 
@@ -88,7 +88,7 @@ export default function AdminAirlineCreatePage() {
         </div>
 
         <div className="mt-4">
-          <p className="mb-2 text-sm font-medium text-slate-600">Logo Maskapai (opsional)</p>
+          <p className="mb-2 text-sm font-medium text-slate-600">Airline Logo (optional)</p>
           <div className="flex items-center gap-4">
             {logoPreview ? (
               <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-blue-100 bg-blue-50">
@@ -118,7 +118,7 @@ export default function AdminAirlineCreatePage() {
                 htmlFor="logo-upload-create"
                 className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
               >
-                <ImagePlus className="h-4 w-4" /> Pilih Gambar
+                <ImagePlus className="h-4 w-4" /> Choose Image
               </label>
               {logoFile && <p className="mt-1 text-xs text-slate-500">{logoFile.name}</p>}
             </div>

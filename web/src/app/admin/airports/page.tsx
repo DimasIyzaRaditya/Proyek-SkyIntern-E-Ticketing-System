@@ -1,129 +1,145 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
-import {
-  createAdminAirport,
-  deleteAdminAirport,
-  getAdminAirports,
-  type AdminAirport,
-  updateAdminAirport,
-} from "@/lib/admin-api";
+import { getAdminAirports, type AdminAirport } from "@/lib/admin-api";
 
-type AirportForm = {
-  name: string;
-  city: string;
-  country: string;
-  timezone: string;
-};
+type SortField = "id" | "name" | "city" | "country" | "timezone";
+type SortDirection = "asc" | "desc";
 
 export default function AdminAirportsPage() {
   const [airports, setAirports] = useState<AdminAirport[]>([]);
-  const [form, setForm] = useState<AirportForm>({
-    name: "",
-    city: "",
-    country: "Indonesia",
-    timezone: "Asia/Jakarta",
-  });
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<SortField>("id");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [rowsPerView, setRowsPerView] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const loadAirports = async () => {
-    setLoading(true);
-    setMessage("");
+  const displayedAirports = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
 
-    try {
-      const data = await getAdminAirports();
-      setAirports(data);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal memuat data bandara.");
-    } finally {
-      setLoading(false);
+    const filtered = keyword
+      ? airports.filter((item) =>
+          [String(item.id), item.name, item.city, item.country, item.timezone]
+            .join(" ")
+            .toLowerCase()
+            .includes(keyword),
+        )
+      : airports;
+
+    return [...filtered].sort((a, b) => {
+      const directionFactor = sortDirection === "asc" ? 1 : -1;
+
+      if (sortField === "id") {
+        return (a.id - b.id) * directionFactor;
+      }
+
+      const left = a[sortField].toLowerCase();
+      const right = b[sortField].toLowerCase();
+
+      if (left < right) return -1 * directionFactor;
+      if (left > right) return 1 * directionFactor;
+      return 0;
+    });
+  }, [airports, search, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedAirports.length / rowsPerView));
+
+  const visibleAirports = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerView;
+    const end = start + rowsPerView;
+    return displayedAirports.slice(start, end);
+  }, [displayedAirports, currentPage, rowsPerView]);
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
     }
-  };
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    const normalizedStart = Math.max(1, end - 4);
+
+    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
+  }, [currentPage, totalPages]);
 
   useEffect(() => {
+    const loadAirports = async () => {
+      setLoading(true);
+      setMessage("");
+
+      try {
+        const data = await getAdminAirports();
+        setAirports(data);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Failed to load airports.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     void loadAirports();
   }, []);
 
-  const handleSave = async () => {
-    if (!form.name.trim() || !form.city.trim() || !form.country.trim() || !form.timezone.trim()) return;
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortField, sortDirection, rowsPerView]);
 
-    setSaving(true);
-    setMessage("");
-
-    try {
-      if (editingId) {
-        await updateAdminAirport(editingId, {
-          name: form.name.trim(),
-          city: form.city.trim(),
-          country: form.country.trim(),
-          timezone: form.timezone.trim(),
-        });
-      } else {
-        await createAdminAirport({
-          name: form.name.trim(),
-          city: form.city.trim(),
-          country: form.country.trim(),
-          timezone: form.timezone.trim(),
-        });
-      }
-
-      setEditingId(null);
-      setForm({
-        name: "",
-        city: "",
-        country: "Indonesia",
-        timezone: "Asia/Jakarta",
-      });
-      await loadAirports();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal menyimpan data bandara.");
-    } finally {
-      setSaving(false);
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
     }
-  };
-
-  const handleEdit = (item: AdminAirport) => {
-    setForm({
-      name: item.name,
-      city: item.city,
-      country: item.country,
-      timezone: item.timezone,
-    });
-    setEditingId(item.id);
-  };
-
-  const handleDelete = async (id: number) => {
-    setMessage("");
-
-    try {
-      await deleteAdminAirport(id);
-      await loadAirports();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal menghapus data bandara.");
-    }
-  };
+  }, [currentPage, totalPages]);
 
   return (
-    <AdminShell title="Airport Management (CRUD)" description="Tambah, edit, dan hapus data bandara: kode, nama, dan lokasi.">
-      <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-4">
-          <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input value={form.city} onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))} placeholder="City" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input value={form.country} onChange={(event) => setForm((prev) => ({ ...prev, country: event.target.value }))} placeholder="Country" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input value={form.timezone} onChange={(event) => setForm((prev) => ({ ...prev, timezone: event.target.value }))} placeholder="Timezone" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <button disabled={saving} onClick={() => void handleSave()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 md:col-span-4">
-            <Plus className="h-4 w-4" /> {editingId ? "Update" : "Add Airport"}
-          </button>
-        </div>
-        {message && <p className="mt-3 text-sm text-rose-700">{message}</p>}
-      </section>
-
+    <AdminShell title="Airport Management" description="Manage airports from the list. Use Add Airport to create a new record.">
       <section className="mt-5 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex justify-end">
+          <Link
+            href="/admin/airports/create"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> Add Airport
+          </Link>
+        </div>
+
+        {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
+
+        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_150px_auto]">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search ID, name, city, country, or timezone"
+            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+          />
+          <select
+            value={sortField}
+            onChange={(event) => setSortField(event.target.value as SortField)}
+            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+          >
+            <option value="name">Sort: Name</option>
+            <option value="city">Sort: City</option>
+            <option value="country">Sort: Country</option>
+            <option value="timezone">Sort: Timezone</option>
+            <option value="id">Sort: ID</option>
+          </select>
+          <select
+            value={sortDirection}
+            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+          <div className="flex items-center justify-end text-sm font-medium text-slate-600">
+            Total: {displayedAirports.length}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-blue-50 text-slate-600">
@@ -139,9 +155,13 @@ export default function AdminAirportsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-slate-500">Memuat data bandara...</td>
+                  <td colSpan={6} className="p-4 text-center text-slate-500">Loading airports...</td>
                 </tr>
-              ) : airports.map((item) => (
+              ) : displayedAirports.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-4 text-center text-slate-500">No airports match the current filter.</td>
+                </tr>
+              ) : visibleAirports.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3 font-semibold">{item.id}</td>
                   <td className="p-3">{item.name}</td>
@@ -150,8 +170,18 @@ export default function AdminAirportsPage() {
                   <td className="p-3">{item.timezone}</td>
                   <td className="p-3">
                     <div className="flex gap-2">
-                      <button onClick={() => handleEdit(item)} className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>
-                      <button onClick={() => void handleDelete(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
+                      <Link
+                        href={`/admin/airports/${item.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Link>
+                      <Link
+                        href={`/admin/airports/${item.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </Link>
                     </div>
                   </td>
                 </tr>
@@ -159,6 +189,67 @@ export default function AdminAirportsPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && displayedAirports.length > 0 && (
+          <div className="mt-4 space-y-3 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p>
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, displayedAirports.length)} dari {displayedAirports.length} data.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
+              <div className="inline-flex items-center gap-2">
+                <label htmlFor="rows-per-view" className="font-medium text-slate-700">Tampilkan</label>
+                <select
+                  id="rows-per-view"
+                  value={rowsPerView}
+                  onChange={(event) => setRowsPerView(Number(event.target.value))}
+                  className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+                >
+                  <option value={10}>10 data</option>
+                  <option value={20}>20 data</option>
+                  <option value={50}>50 data</option>
+                  <option value={100}>100 data</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Prev
+                </button>
+
+                {pageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                      page === currentPage
+                        ? "bg-blue-600 text-white"
+                        : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </AdminShell>
   );
