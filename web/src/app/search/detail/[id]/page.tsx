@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
 
-export default function FlightDetailPage() {
+function FlightDetailPageContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
@@ -120,5 +120,13 @@ export default function FlightDetailPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function FlightDetailPage() {
+  return (
+    <Suspense>
+      <FlightDetailPageContent />
+    </Suspense>
   );
 }

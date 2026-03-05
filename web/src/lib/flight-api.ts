@@ -53,12 +53,15 @@ type GetFlightDetailResponse = {
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 const extractCity = (value: string) => {
-  const withDash = value.split(" - ")[1];
+  const normalized = value.trim();
+  if (!normalized) return "";
+
+  const withDash = normalized.split(" - ")[1];
   if (withDash?.trim()) return withDash.trim().toLowerCase();
 
-  const withoutCode = value.replace(/\s*\([A-Z]{3}\)$/, "");
+  const withoutCode = normalized.replace(/\s*\([A-Z]{3}\)\s*$/, "");
   const city = withoutCode.split(",")[0]?.trim();
-  return (city || "").toLowerCase();
+  return (city || withoutCode).toLowerCase();
 };
 
 const mapSortToApi = (sortBy: "price-low" | "price-high" | "duration" | "departure") => {

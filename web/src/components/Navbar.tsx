@@ -19,13 +19,13 @@ export default function Navbar({
 }: NavbarProps) {
   return (
     <nav className="sticky top-0 z-50 border-b border-blue-100 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-8">
-          <button onClick={() => onNavigate("home")} className="text-3xl font-extrabold tracking-tight text-blue-600">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex min-w-0 items-center gap-4 sm:gap-8">
+          <button onClick={() => onNavigate("home")} className="text-2xl font-extrabold tracking-tight text-blue-600 sm:text-3xl">
             SkyIntern
           </button>
 
-          <div className="hidden items-center gap-6 text-sm font-medium md:flex">
+          <div className="hidden items-center gap-4 text-sm font-medium lg:flex">
             {([
               ["home", "Home"],
               ["bookings", "Pesanan Saya"],
@@ -50,11 +50,11 @@ export default function Navbar({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button onClick={onOpenLogin} className="rounded-xl px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">
+        <div className="flex w-full items-center justify-end gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-auto sm:overflow-visible">
+          <button onClick={onOpenLogin} className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">
             Masuk
           </button>
-          <button onClick={onOpenRegister} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
+          <button onClick={onOpenRegister} className="shrink-0 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
             Daftar
           </button>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Download, QrCode, Ticket, UserRound } from "lucide-react";
 import MainNav from "@/components/MainNav";
@@ -20,7 +20,7 @@ const getStatusClass = (status: BookingStatus) => {
   return "bg-amber-100 text-amber-700";
 };
 
-export default function ETicketPage() {
+function ETicketPageContent() {
   const searchParams = useSearchParams();
 
   const passenger = searchParams.get("passenger") ?? "Abimanyu Pratama";
@@ -117,5 +117,13 @@ export default function ETicketPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function ETicketPage() {
+  return (
+    <Suspense>
+      <ETicketPageContent />
+    </Suspense>
   );
 }

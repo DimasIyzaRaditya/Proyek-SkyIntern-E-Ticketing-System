@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
@@ -38,7 +38,7 @@ const formatDate = (value: string) =>
     year: "numeric",
   }).format(new Date(value));
 
-export default function MyBookingsPage() {
+function MyBookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("Upcoming");
@@ -125,7 +125,7 @@ export default function MyBookingsPage() {
     };
 
     void loadBookings();
-  }, [authenticated, router, searchParams]);
+  }, [authenticated, dynamicBooking, router, searchParams]);
 
   const bookingList = useMemo(
     () => liveBookings.filter((item) => item.tab === activeTab),
@@ -236,5 +236,13 @@ export default function MyBookingsPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function MyBookingsPage() {
+  return (
+    <Suspense>
+      <MyBookingsPageContent />
+    </Suspense>
   );
 }

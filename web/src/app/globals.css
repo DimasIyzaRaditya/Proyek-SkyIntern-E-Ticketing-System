@@ -1,9 +1,11 @@
 @import "tailwindcss";
+/* Mengimpor Tailwind CSS agar bisa menggunakan utility class Tailwind */
 
 :root {
   --background: #f8fbff;
   --foreground: #0f172a;
 }
+/* Variabel warna utama untuk background dan teks */
 
 @theme inline {
   --color-background: var(--background);
@@ -11,12 +13,14 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+/* Menghubungkan variabel warna dan font agar bisa dipakai oleh Tailwind */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+/* Mengatur warna background, warna teks, dan font default halaman */
 
 html,
 body {
@@ -24,6 +28,7 @@ body {
   max-width: 100%;
   overflow-x: clip;
 }
+/* Mencegah halaman melebar ke samping (scroll horizontal) */
 
 body {
   overflow-y: auto;
@@ -31,11 +36,13 @@ body {
   touch-action: pan-y pinch-zoom;
   overscroll-behavior-x: none;
 }
+/* Mengatur perilaku scroll agar lebih smooth terutama di mobile */
 
 * {
   box-sizing: border-box;
   min-width: 0;
 }
+/* Semua elemen memakai box-sizing yang konsisten */
 
 @keyframes panelPop {
   from {
@@ -49,12 +56,14 @@ body {
     filter: blur(0);
   }
 }
+/* Animasi saat panel muncul (fade + naik sedikit + hilang blur) */
 
 .popup-panel-animate {
   animation: panelPop 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
   transform-origin: top center;
   will-change: transform, opacity, filter;
 }
+/* Class untuk memberi animasi muncul pada panel atau popup */
 
 @keyframes panelClose {
   from {
@@ -68,33 +77,40 @@ body {
     filter: blur(1px);
   }
 }
+/* Animasi saat panel ditutup */
 
 .popup-panel-close-animate {
   animation: panelClose 170ms ease-in forwards;
   transform-origin: top center;
   will-change: transform, opacity, filter;
 }
+/* Class animasi ketika popup ditutup */
 
 .nav-link-animate {
   transition: color 200ms ease, transform 200ms ease;
 }
+/* Animasi halus pada link navigasi */
 
 .nav-link-animate:hover {
   transform: translateY(-1px);
 }
+/* Link sedikit naik ketika di hover */
 
 .nav-btn-animate {
   transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
 }
+/* Animasi tombol navigasi */
 
 .nav-btn-animate:hover {
   transform: translateY(-1px) scale(1.02);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
 }
+/* Efek tombol saat hover: sedikit naik + bayangan */
 
 .nav-btn-animate:active {
   transform: translateY(0) scale(0.98);
 }
+/* Efek tombol saat diklik */
 
 @media (prefers-reduced-motion: reduce) {
   .popup-panel-animate {
@@ -117,3 +133,5 @@ body {
     box-shadow: none;
   }
 }
+/* Jika pengguna mengaktifkan reduce motion (aksesibilitas),
+   maka animasi akan dimatikan agar lebih nyaman dilihat */

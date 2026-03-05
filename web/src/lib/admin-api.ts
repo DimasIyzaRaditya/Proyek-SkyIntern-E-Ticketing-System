@@ -265,3 +265,56 @@ export const getAdminBookings = async (status?: "PENDING" | "PAID" | "CANCELLED"
 
   return response.bookings;
 };
+
+export type AdminSeat = {
+  id: number;
+  seatId: number;
+  flightId: number;
+  status: "AVAILABLE" | "RESERVED" | "OCCUPIED";
+  additionalPrice: number;
+  seat: {
+    seatNumber: string;
+    seatClass: "ECONOMY" | "BUSINESS" | "FIRST";
+    isExitRow: boolean;
+  };
+};
+
+export const getAdminSeatMap = async (flightId: number) => {
+  const response = await apiRequest<{
+    seats?: AdminSeat[];
+    seatMap?: {
+      ECONOMY?: AdminSeat[];
+      BUSINESS?: AdminSeat[];
+      FIRST?: AdminSeat[];
+    };
+  }>(`/api/flights/${flightId}/seats`, {
+    auth: true,
+  });
+
+  if (Array.isArray(response.seats)) {
+    return response.seats;
+  }
+
+  const economy = response.seatMap?.ECONOMY ?? [];
+  const business = response.seatMap?.BUSINESS ?? [];
+  const first = response.seatMap?.FIRST ?? [];
+  return [...first, ...business, ...economy];
+};
+
+export const generateAdminSeats = async (flightId: number) => {
+  const response = await apiRequest<{ message: string; seats: AdminSeat[] }>("/api/admin/seats/generate", {
+    method: "POST",
+    auth: true,
+    body: { flightId },
+  });
+  return response;
+};
+
+export const updateAdminSeat = async (seatId: number, payload: { status?: string; additionalPrice?: number }) => {
+  const response = await apiRequest<{ message: string; seat: AdminSeat }>(`/api/admin/seats/${seatId}`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
+  });
+  return response.seat;
+};

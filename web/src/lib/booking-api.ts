@@ -43,3 +43,61 @@ export const getMyBookingsFromApi = async () => {
 
   return response.bookings;
 };
+
+export type PassengerPayload = {
+  type: "ADULT" | "CHILD";
+  title: string;
+  firstName: string;
+  lastName: string;
+  idType: string;
+  idNumber: string;
+  nationality: string;
+  dateOfBirth?: string;
+};
+
+type CreateBookingResponse = {
+  message: string;
+  booking: {
+    id: number;
+    bookingCode: string;
+    status: BookingStatusApi;
+    totalPrice: number;
+  };
+};
+
+export const createBookingFromApi = async (payload: {
+  flightId: number;
+  passengers: PassengerPayload[];
+  seatIds?: number[];
+}) => {
+  return apiRequest<CreateBookingResponse>("/api/bookings", {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+};
+
+type CreatePaymentResponse = {
+  message: string;
+  snapToken?: string;
+  redirectUrl?: string;
+  payment?: {
+    id: number;
+    status: string;
+  };
+};
+
+export const createPaymentFromApi = async (bookingId: number) => {
+  return apiRequest<CreatePaymentResponse>(`/api/bookings/${bookingId}/payment`, {
+    method: "POST",
+    auth: true,
+    body: { bookingId },
+  });
+};
+
+export const cancelBookingFromApi = async (bookingId: number) => {
+  return apiRequest<{ message: string }>(`/api/bookings/${bookingId}/cancel`, {
+    method: "POST",
+    auth: true,
+  });
+};

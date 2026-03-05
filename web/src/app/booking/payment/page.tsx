@@ -1,26 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
 import { isAuthenticated } from "@/lib/auth";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
+import { createBookingFromApi, createPaymentFromApi } from "@/lib/booking-api";
 
-const extractAirportCode = (value: string) => {
-  const match = value.match(/\(([A-Z]{3})\)$/);
-  if (match) return match[1];
-  return value.split(" - ")[0].trim();
-};
-
-export default function PaymentSummaryPage() {
+function PaymentSummaryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [gateway, setGateway] = useState<"Dummy Payment" | "Midtrans Sandbox">("Dummy Payment");
   const [countdown, setCountdown] = useState(15 * 60);
   const [paid, setPaid] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [gatewaySimulated, setGatewaySimulated] = useState(false);
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
   const [isLoadingFlight, setIsLoadingFlight] = useState(true);
@@ -114,27 +111,75 @@ export default function PaymentSummaryPage() {
     .toString()
     .padStart(2, "0")}:${(countdown % 60).toString().padStart(2, "0")}`;
 
-  const handlePayNow = () => {
+  const handlePayNow = async () => {
     if (!gatewaySimulated) return;
-    setPaid(true);
 
-    const seats = (searchParams.get("seats") ?? "12A").split(",");
-    const origin = extractAirportCode(searchParams.get("origin") ?? "Jakarta, Indonesia (CGK)");
-    const destination = extractAirportCode(searchParams.get("destination") ?? "Denpasar, Indonesia (DPS)");
+    setBookingLoading(true);
+    setBookingError(null);
 
-    const query = new URLSearchParams({
-      flightNumber: activeFlight.flightNumber,
-      airline: activeFlight.airline,
-      origin,
-      destination,
-      departureDate: searchParams.get("departureDate") ?? "2026-03-15",
-      seat: seats[0] ?? "12A",
-      fullName: searchParams.get("fullName") ?? "Passenger",
-    });
+    try {
+      const adultCount = adult;
+      const childCount = child;
+      const totalPassengers = Math.max(1, adultCount + childCount);
 
-    setTimeout(() => {
-      router.push(`/bookings?${query.toString()}`);
-    }, 700);
+      const buildPassengers = () => {
+        const passengers = [];
+        const firstName = searchParams.get("pFirstName") ?? "Passenger";
+        const lastName = searchParams.get("pLastName") ?? "";
+        const title = searchParams.get("pTitle") ?? "Mr";
+        const idType = searchParams.get("pIdType") ?? "KTP";
+        const idNumber = searchParams.get("pIdNumber") ?? "0000000000000000";
+        const nationality = searchParams.get("pNationality") ?? "Indonesian";
+        const dob = searchParams.get("pDob") ?? undefined;
+
+        for (let i = 0; i < adultCount; i++) {
+          passengers.push({
+            type: "ADULT" as const,
+            title,
+            firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
+            lastName,
+            idType,
+            idNumber: i === 0 ? idNumber : `${idNumber}${i}`,
+            nationality,
+            dateOfBirth: dob,
+          });
+        }
+        for (let i = 0; i < childCount; i++) {
+          passengers.push({
+            type: "CHILD" as const,
+            title: "Ms",
+            firstName: `Child${i + 1}`,
+            lastName,
+            idType,
+            idNumber: `${idNumber}C${i}`,
+            nationality,
+          });
+        }
+        return passengers.slice(0, Math.max(1, totalPassengers));
+      };
+
+      const bookingResult = await createBookingFromApi({
+        flightId: Number(flightId),
+        passengers: buildPassengers(),
+      });
+
+      // Try to initiate payment (Midtrans); ignore errors in dev without keys
+      try {
+        await createPaymentFromApi(bookingResult.booking.id);
+      } catch {
+        // Midtrans not configured in dev, continue to confirmation
+      }
+
+      setPaid(true);
+
+      setTimeout(() => {
+        router.push(`/bookings`);
+      }, 800);
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : "Gagal membuat booking. Silakan coba lagi.");
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
   if (!authenticated) {
@@ -227,12 +272,18 @@ export default function PaymentSummaryPage() {
             </p>
           </div>
 
+          {bookingError && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {bookingError}
+            </div>
+          )}
+
           <button
-            onClick={handlePayNow}
-            disabled={countdown === 0 || !gatewaySimulated}
+            onClick={() => void handlePayNow()}
+            disabled={countdown === 0 || !gatewaySimulated || bookingLoading}
             className="mt-8 w-full rounded-2xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            Pay Now
+            {bookingLoading ? "Memproses Booking..." : "Pay Now"}
           </button>
 
           {!gatewaySimulated && (
@@ -254,5 +305,13 @@ export default function PaymentSummaryPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function PaymentSummaryPage() {
+  return (
+    <Suspense>
+      <PaymentSummaryPageContent />
+    </Suspense>
   );
 }

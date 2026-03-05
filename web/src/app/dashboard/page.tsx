@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
@@ -45,12 +45,22 @@ export default function DashboardPage() {
       return;
     }
 
+    if (getUserSession()?.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+
     const loadDashboard = async () => {
       setLoading(true);
       setMessage("");
 
       try {
         const [profile, bookingData] = await Promise.all([getProfileFromApi(), getMyBookingsFromApi()]);
+
+        if (profile.role === "admin") {
+          router.replace("/admin");
+          return;
+        }
 
         setUserSession(profile);
         setFullName(profile.fullName);
@@ -79,11 +89,6 @@ export default function DashboardPage() {
 
     void loadDashboard();
   }, [authenticated, router]);
-
-  const upcomingCount = useMemo(
-    () => bookings.filter((booking) => booking.status === "PENDING" || booking.status === "PAID").length,
-    [bookings],
-  );
 
   const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -115,7 +120,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
         <MainNav />
-        <main className="mx-auto max-w-6xl px-6 py-10">
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
           <section className="rounded-3xl border border-blue-100 bg-white p-8 text-center text-sm font-semibold text-slate-600 shadow-lg">
             Memuat dashboard...
           </section>
@@ -127,12 +132,12 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-lg">
-          <h1 className="text-3xl font-black text-slate-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">Profil pengguna dan riwayat pemesanan dari API.</p>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <section className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
+          <h1 className="text-xl font-black text-slate-900 sm:text-2xl md:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-xs text-slate-600 sm:text-sm">Profil pengguna dan riwayat pemesanan dari API.</p>
 
-          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center">
+          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:mt-5 sm:flex-row sm:items-center sm:p-4">
             <div className="h-20 w-20 overflow-hidden rounded-full border border-blue-200 bg-white">
               {avatarUrl ? (
                 <Image src={avatarUrl} alt="Foto profil" width={80} height={80} className="h-full w-full object-cover" unoptimized />
@@ -152,37 +157,26 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
               <p className="text-xs font-semibold text-slate-600">Nama</p>
-              <p className="mt-1 text-base font-black text-slate-900">{fullName}</p>
+              <p className="mt-1 text-sm font-black text-slate-900 sm:text-base">{fullName}</p>
             </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
               <p className="text-xs font-semibold text-slate-600">Email</p>
-              <p className="mt-1 text-base font-black text-slate-900">{email}</p>
+              <p className="mt-1 truncate text-sm font-black text-slate-900 sm:text-base">{email}</p>
             </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
               <p className="text-xs font-semibold text-slate-600">No. HP</p>
-              <p className="mt-1 text-base font-black text-slate-900">{phoneNumber || "-"}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-              <p className="text-xs font-semibold text-slate-600">Total Booking</p>
-              <p className="mt-1 text-2xl font-black text-emerald-700">{bookings.length}</p>
-            </div>
-            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-              <p className="text-xs font-semibold text-slate-600">Upcoming / Paid</p>
-              <p className="mt-1 text-2xl font-black text-indigo-700">{upcomingCount}</p>
+              <p className="mt-1 text-sm font-black text-slate-900 sm:text-base">{phoneNumber || "-"}</p>
             </div>
           </div>
         </section>
 
-        <section className="mt-6 rounded-3xl border border-blue-100 bg-white p-6 shadow-lg">
+        <section className="mt-4 rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:mt-6 sm:p-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="inline-flex items-center gap-2 text-xl font-black text-slate-900">
-              <Ticket className="h-5 w-5 text-blue-700" /> Riwayat Pemesanan
+            <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-xl">
+              <Ticket className="h-4 w-4 text-blue-700 sm:h-5 sm:w-5" /> Riwayat Pemesanan
             </h2>
             <Link href="/bookings" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
               Lihat semua

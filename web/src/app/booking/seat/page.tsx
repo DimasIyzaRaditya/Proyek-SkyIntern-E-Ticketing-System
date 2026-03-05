@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
@@ -11,7 +11,7 @@ const occupiedSeats = new Set(["2B", "3F", "5D", "7A", "8C", "10F"]);
 const systemBlockedSeats = new Set(["4C", "6E"]);
 const specialSeats = new Set(["1A", "1B", "1C", "1D", "12A", "12F"]);
 
-export default function SeatSelectionPage() {
+function SeatSelectionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const flightId = searchParams.get("flightId") ?? "";
@@ -200,5 +200,13 @@ export default function SeatSelectionPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function SeatSelectionPage() {
+  return (
+    <Suspense>
+      <SeatSelectionPageContent />
+    </Suspense>
   );
 }

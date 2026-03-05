@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import { formatRupiah } from "@/lib/currency";
@@ -59,7 +59,7 @@ export default function AdminSchedulesPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setMessage("");
 
@@ -87,11 +87,11 @@ export default function AdminSchedulesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [editingId]);
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
 
   const handleSave = async () => {
     if (!form.flightNumber.trim() || !form.airlineId || !form.originId || !form.destinationId || !form.departureTime || !form.arrivalTime) {
@@ -199,12 +199,30 @@ export default function AdminSchedulesPage() {
               <option key={item.id} value={item.id}>{item.city} - {item.name}</option>
             ))}
           </select>
-          <input type="number" value={form.basePrice} onChange={(event) => setForm((prev) => ({ ...prev, basePrice: Number(event.target.value) || 0 }))} placeholder="Base Price" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input type="number" value={form.tax} onChange={(event) => setForm((prev) => ({ ...prev, tax: Number(event.target.value) || 0 }))} placeholder="Tax" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input type="number" value={form.adminFee} onChange={(event) => setForm((prev) => ({ ...prev, adminFee: Number(event.target.value) || 0 }))} placeholder="Admin Fee" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input value={form.aircraft} onChange={(event) => setForm((prev) => ({ ...prev, aircraft: event.target.value }))} placeholder="Aircraft" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input type="datetime-local" value={form.departureTime} onChange={(event) => setForm((prev) => ({ ...prev, departureTime: event.target.value }))} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
-          <input type="datetime-local" value={form.arrivalTime} onChange={(event) => setForm((prev) => ({ ...prev, arrivalTime: event.target.value }))} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Base Price (Rp)</label>
+            <input type="number" value={form.basePrice} onChange={(event) => setForm((prev) => ({ ...prev, basePrice: Number(event.target.value) || 0 }))} placeholder="Base Price" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Tax (Rp)</label>
+            <input type="number" value={form.tax} onChange={(event) => setForm((prev) => ({ ...prev, tax: Number(event.target.value) || 0 }))} placeholder="Tax" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Admin Fee (Rp)</label>
+            <input type="number" value={form.adminFee} onChange={(event) => setForm((prev) => ({ ...prev, adminFee: Number(event.target.value) || 0 }))} placeholder="Admin Fee" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Aircraft / Tipe Pesawat</label>
+            <input value={form.aircraft} onChange={(event) => setForm((prev) => ({ ...prev, aircraft: event.target.value }))} placeholder="Aircraft" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Waktu Keberangkatan</label>
+            <input type="datetime-local" value={form.departureTime} onChange={(event) => setForm((prev) => ({ ...prev, departureTime: event.target.value }))} className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Waktu Kedatangan</label>
+            <input type="datetime-local" value={form.arrivalTime} onChange={(event) => setForm((prev) => ({ ...prev, arrivalTime: event.target.value }))} className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+          </div>
           <button disabled={saving} onClick={() => void handleSave()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 md:col-span-3">
             <Plus className="h-4 w-4" /> {editingId ? "Update Schedule" : "Save Schedule"}
           </button>

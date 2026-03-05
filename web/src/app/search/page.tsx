@@ -28,7 +28,6 @@ const holidayMap: Record<string, string> = {
 
 type ActivePanel = "none" | "airport" | "date" | "guests";
 type AirportMode = "origin" | "destination";
-type DatePanelTab = "calendar" | "price-table";
 type RecentSearchItem = {
   origin: string;
   destination: string;
@@ -36,7 +35,6 @@ type RecentSearchItem = {
   returnDate: string;
   adult: number;
   child: number;
-  room: number;
   timestamp: number;
 };
 
@@ -92,15 +90,6 @@ const formatLongDate = (dateValue: string) =>
     month: "short",
     year: "numeric",
   }).format(parseDate(dateValue));
-
-const formatPriceShort = (value: number) => `${Math.round(value / 1000)}K`;
-
-const createFareForDate = (isoDate: string) => {
-  // NOTE: Harga simulasi dibuat deterministik dari tanggal agar konsisten tiap render.
-  const digits = isoDate.replaceAll("-", "");
-  const seed = digits.split("").reduce((sum, digit) => sum + Number(digit), 0);
-  return 750000 + (seed % 11) * 55000;
-};
 
 const createMonthCells = (monthDate: Date, startDate: Date, endDate: Date) => {
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -177,16 +166,16 @@ export default function SearchPage() {
   const [returnDate, setReturnDate] = useState("2026-03-05");
   const [adult, setAdult] = useState(2);
   const [child, setChild] = useState(0);
-  const [room, setRoom] = useState(1);
   const [activePanel, setActivePanel] = useState<ActivePanel>("none");
   const [closingPanel, setClosingPanel] = useState<ActivePanel>("none");
   const [isSelectingReturn, setIsSelectingReturn] = useState(false);
   const [airportMode, setAirportMode] = useState<AirportMode>("origin");
-  const [datePanelTab, setDatePanelTab] = useState<DatePanelTab>("calendar");
   const [calendarOffset, setCalendarOffset] = useState(0);
   const [airportKeyword, setAirportKeyword] = useState("");
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(loadRecentSearches);
   const [airportMaster, setAirportMaster] = useState<AirportOption[]>([]);
+  const [airportLoading, setAirportLoading] = useState(false);
+  const [airportLoadError, setAirportLoadError] = useState<string | null>(null);
 
   const { leftMonth, rightMonth, leftMonthCells, rightMonthCells } = useMemo(() => {
     const checkInDate = parseDate(departureDate);
@@ -203,42 +192,20 @@ export default function SearchPage() {
     };
   }, [calendarOffset, departureDate, returnDate]);
 
-  const fareMap = useMemo(() => {
-    // NOTE: Fare map dipakai untuk visual "lowest fare" dan mode Price Table.
-    const mappedFare = new Map<string, number>();
-    [...leftMonthCells, ...rightMonthCells].forEach((cell) => {
-      if (!cell.isoDate || !cell.inCurrentMonth) return;
-      mappedFare.set(cell.isoDate, createFareForDate(cell.isoDate));
-    });
-    return mappedFare;
-  }, [leftMonthCells, rightMonthCells]);
-
-  const lowestFare = useMemo(() => {
-    const fares = Array.from(fareMap.values());
-    return fares.length ? Math.min(...fares) : 0;
-  }, [fareMap]);
-
-  const priceTableRows = useMemo(
-    () =>
-      Array.from(fareMap.entries())
-        .sort((first, second) => first[1] - second[1])
-        .slice(0, 24),
-    [fareMap],
-  );
-
   const airportByLabel = useMemo(
     () => new Map(airportMaster.map((item) => [item.label, item])),
     [airportMaster],
   );
 
   const popularAirportOptions = useMemo(() => {
-    const popularCodes = ["CGK", "DPS", "SUB", "SIN", "KNO", "YIA"];
-    const fromCodes = popularCodes
-      .map((code) => airportMaster.find((item) => item.code === code))
-      .filter((item): item is AirportOption => Boolean(item));
+    const uniqueByCode = new Map<string, AirportOption>();
+    airportMaster.forEach((item) => {
+      if (!uniqueByCode.has(item.code)) {
+        uniqueByCode.set(item.code, item);
+      }
+    });
 
-    if (fromCodes.length > 0) return fromCodes;
-    return airportMaster.slice(0, 10);
+    return Array.from(uniqueByCode.values()).slice(0, 12);
   }, [airportMaster]);
 
   const airportOptions = useMemo(() => {
@@ -269,31 +236,68 @@ export default function SearchPage() {
 
     const loadAirportOptions = async () => {
       try {
+        setAirportLoading(true);
+        setAirportLoadError(null);
         const airports = await getAirportOptionsFromApi();
         if (!isMounted) return;
 
         const mapped = airports
-          .map((item) => ({
-            code: item.code,
-            city: item.city,
-            country: item.country,
-            airportName: item.airportName,
-            label: item.label,
-            compactLabel: `${item.city} (${item.code})`,
-            secondaryLabel: `${item.airportName} • ${item.city}, ${item.country}`,
-            searchText: `${item.city} ${item.country} ${item.airportName} ${item.code}`.toLowerCase(),
-          }))
+          .map((item) => {
+            const code = (item.code ?? "").trim().toUpperCase();
+            const city = (item.city ?? "").trim();
+            const country = (item.country ?? "").trim();
+            const airportName = (item.airportName ?? "").trim();
+            const label = (item.label ?? `${city}, ${country} (${code})`).trim();
+
+            if (!code || !city || !country || !airportName || !label) {
+              return null;
+            }
+
+            return {
+              code,
+              city,
+              country,
+              airportName,
+              label,
+              compactLabel: `${city} (${code})`,
+              secondaryLabel: `${airportName} • ${city}, ${country}`,
+              searchText: `${city} ${country} ${airportName} ${code}`.toLowerCase(),
+            };
+          })
+          .filter((item): item is AirportOption => Boolean(item))
           .sort((first, second) => first.city.localeCompare(second.city));
 
-        setAirportMaster(mapped);
+        if (mapped.length === 0) {
+          setAirportMaster([]);
+          setAirportLoadError("Data bandara dari API kosong atau tidak valid.");
+          return;
+        }
 
-        const nextOrigin = mapped.find((item) => item.code === "CGK")?.label ?? mapped[0]?.label;
-        const nextDestination = mapped.find((item) => item.code === "DPS")?.label ?? mapped[1]?.label ?? mapped[0]?.label;
+        // Deduplikasi berdasarkan label agar key di React map selalu unik.
+        // API kadang mengembalikan beberapa record dengan kota/kode yang sama.
+        const seenLabels = new Map<string, AirportOption>();
+        for (const airport of mapped) {
+          if (!seenLabels.has(airport.label)) {
+            seenLabels.set(airport.label, airport);
+          }
+        }
+        const dedupedMapped = Array.from(seenLabels.values());
+
+        setAirportMaster(dedupedMapped);
+
+        const nextOrigin = dedupedMapped[0]?.label;
+        const nextDestination = dedupedMapped.find((item) => item.label !== nextOrigin)?.label ?? dedupedMapped[0]?.label;
 
         if (nextOrigin) setOrigin(nextOrigin);
         if (nextDestination) setDestination(nextDestination);
       } catch {
-        // Fallback: keep default labels when API is unavailable.
+        if (!isMounted) return;
+        setAirportMaster([]);
+        setAirportLoadError("Gagal mengambil data bandara dari API. Pastikan backend berjalan di port 3000.");
+      } finally {
+        if (isMounted) {
+          setAirportLoading(false);
+        }
       }
     };
 
@@ -334,7 +338,6 @@ export default function SearchPage() {
     setReturnDate(item.returnDate);
     setAdult(item.adult);
     setChild(item.child);
-    setRoom(item.room);
     setActivePanel("none");
   };
 
@@ -346,7 +349,6 @@ export default function SearchPage() {
       returnDate,
       adult,
       child,
-      room,
       timestamp: Date.now(),
     });
 
@@ -491,7 +493,7 @@ export default function SearchPage() {
             <div className="grid gap-2 text-sm font-bold text-blue-100 md:grid-cols-[1.1fr_1.1fr_1fr_auto]">
               <p className="pl-1">Keberangkatan & Tujuan</p>
               <p className="pl-1">Check-in & Check-out Dates</p>
-              <p className="pl-1">Guests and Rooms</p>
+              <p className="pl-1">Guests</p>
               <p className="hidden md:block" />
             </div>
 
@@ -528,7 +530,6 @@ export default function SearchPage() {
                   onClick={() => {
                     setIsSelectingReturn(false);
                     openPanel("date");
-                    setDatePanelTab("calendar");
                     setCalendarOffset(0);
                   }}
                   className="inline-flex w-full items-center gap-2 border-b border-slate-200 px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50 md:border-b-0 md:border-r"
@@ -545,7 +546,7 @@ export default function SearchPage() {
                 >
                   <Users className="h-5 w-5 text-blue-500" />
                   <span className="text-sm font-semibold sm:text-base lg:text-lg">
-                    {adult} Adult(s), {child} Child, {room} Room
+                    {adult} Adult(s), {child} Child
                   </span>
                 </button>
 
@@ -600,15 +601,23 @@ export default function SearchPage() {
                 </div>
 
                 <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  {airportLoadError && (
+                    <div className="border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                      {airportLoadError}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
                     <p className="text-sm font-bold text-slate-600">
-                      {airportKeyword.trim() ? "Autocomplete Suggestion Panel" : "Popular Cities or Airports"}
+                      {airportKeyword.trim() ? "Autocomplete Suggestion Panel" : "Popular Cities or Airports (API)"}
                     </p>
-                    {recentSearches.length > 0 && (
-                      <button onClick={clearRecentSearches} className="text-xs font-semibold text-red-500 hover:text-red-600">
-                        Clear
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {airportLoading && <span className="text-xs font-semibold text-blue-700">Memuat dari API...</span>}
+                      {recentSearches.length > 0 && (
+                        <button onClick={clearRecentSearches} className="text-xs font-semibold text-red-500 hover:text-red-600">
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="max-h-[60vh] overflow-y-auto">
@@ -632,7 +641,9 @@ export default function SearchPage() {
                       </button>
                     ))}
 
-                    {airportOptions.length === 0 ? (
+                    {airportLoading && airportOptions.length === 0 ? (
+                      <p className="px-3 py-3 text-sm text-slate-500">Sedang mengambil data bandara dari API...</p>
+                    ) : airportOptions.length === 0 ? (
                       <p className="px-3 py-3 text-sm text-slate-500">Bandara tidak ditemukan.</p>
                     ) : (
                       airportOptions.map((item) => (
@@ -677,8 +688,8 @@ export default function SearchPage() {
 
             {activePanel === "guests" && (
               <section className={`${closingPanel === "guests" ? "popup-panel-close-animate" : "popup-panel-animate"} mt-3 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-2xl`}>
-                <h2 className="text-lg font-black">Guests and Rooms</h2>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <h2 className="text-lg font-black">Guests</h2>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-slate-700">
                     Adult
                     <input
@@ -699,16 +710,6 @@ export default function SearchPage() {
                       className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-2 py-1"
                     />
                   </label>
-                  <label className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    Room
-                    <input
-                      type="number"
-                      min={1}
-                      value={room}
-                      onChange={(event) => setRoom(Math.max(1, Number(event.target.value) || 1))}
-                      className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-2 py-1"
-                    />
-                  </label>
                 </div>
                 <button
                   onClick={triggerClosePanel}
@@ -721,30 +722,6 @@ export default function SearchPage() {
 
             {activePanel === "date" && (
               <section className={`${closingPanel === "date" ? "popup-panel-close-animate" : "popup-panel-animate"} mt-3 w-full rounded-2xl border border-slate-200 bg-white p-3 text-slate-900 shadow-2xl sm:p-4`}>
-                {/* NOTE: Tab ini meniru UI referensi (Calendar / Price Table) agar user bisa berpindah mode tampilan. */}
-                <div className="mb-3 inline-flex overflow-hidden rounded-lg border border-slate-300 bg-slate-50 text-sm font-semibold">
-                  <button
-                    onClick={() => setDatePanelTab("calendar")}
-                    className={`px-3 py-1.5 ${
-                      datePanelTab === "calendar"
-                        ? "bg-blue-600 text-white"
-                        : "bg-transparent text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    Calendar
-                  </button>
-                  <button
-                    onClick={() => setDatePanelTab("price-table")}
-                    className={`border-l border-slate-300 px-3 py-1.5 ${
-                      datePanelTab === "price-table"
-                        ? "bg-blue-600 text-white"
-                        : "bg-transparent text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    Price Table
-                  </button>
-                </div>
-
                 <h2 className="text-2xl font-black">Stay Date</h2>
 
                 <div className="mt-3 grid gap-4 border-b border-slate-200 pb-4 md:grid-cols-2">
@@ -770,8 +747,7 @@ export default function SearchPage() {
                   </span>
                 </div>
 
-                {datePanelTab === "calendar" ? (
-                  <>
+                <>
                     <div className="mt-4 flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold text-slate-500 sm:text-sm">Geser kiri/kanan untuk pindah bulan</p>
                       <div className="flex items-center gap-2">
@@ -819,8 +795,6 @@ export default function SearchPage() {
                             }
 
                             const isHoliday = Boolean(cell.holidayName) || cell.isWeekend;
-                            const cellFare = fareMap.get(cell.isoDate);
-                            const isLowestCell = cellFare === lowestFare;
 
                             return (
                               <button
@@ -836,17 +810,6 @@ export default function SearchPage() {
                                 }`}
                               >
                                 <span>{cell.day}</span>
-                                {cellFare && (
-                                  <span
-                                    className={`mt-1 rounded px-1 py-0.5 text-[10px] font-bold ${
-                                      isLowestCell
-                                        ? "bg-lime-300 text-lime-900"
-                                        : "bg-lime-200 text-lime-800"
-                                    }`}
-                                  >
-                                    {formatPriceShort(cellFare)}
-                                  </span>
-                                )}
                                 <span
                                   className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
                                     isHoliday ? "bg-red-500" : "bg-emerald-500"
@@ -859,36 +822,7 @@ export default function SearchPage() {
                       </div>
                     ))}
                     </div>
-                  </>
-                ) : (
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                    {/* NOTE: Mode Price Table menampilkan tanggal termurah duluan agar user cepat ambil keputusan. */}
-                    <div className="grid grid-cols-[1fr_auto] border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
-                      <span>Date</span>
-                      <span>Fare</span>
-                    </div>
-                    <div className="max-h-[60vh] overflow-y-auto">
-                      {priceTableRows.map(([isoDate, fare]) => (
-                        <button
-                          key={`price-${isoDate}`}
-                          onClick={() => handleDaySelect(isoDate)}
-                          className="grid w-full grid-cols-[1fr_auto] items-center border-b border-slate-100 px-4 py-2 text-left hover:bg-blue-50"
-                        >
-                          <span className="text-sm font-semibold text-slate-800">{formatLongDate(isoDate)}</span>
-                          <span
-                            className={`rounded px-2 py-1 text-xs font-bold ${
-                              fare === lowestFare
-                                ? "bg-lime-300 text-lime-900"
-                                : "bg-lime-200 text-lime-800"
-                            }`}
-                          >
-                            {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(fare)}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                </>
 
                 <button
                   onClick={triggerClosePanel}
@@ -901,7 +835,6 @@ export default function SearchPage() {
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Holiday / Weekend</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Weekday</span>
-                  <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded bg-lime-300" /> Lowest flight price</span>
                 </div>
               </section>
             )}

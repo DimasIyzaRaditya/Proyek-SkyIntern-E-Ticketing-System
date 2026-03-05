@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { Plane } from "lucide-react";
 import { clearSession, getUserSession, isAuthenticated } from "@/lib/auth";
 
-const userMenus = [
+const publicMenus = [
   { href: "/search", label: "Flights" },
   { href: "/bookings", label: "Bookings" },
+];
+
+const userMenus = [
+  ...publicMenus,
   { href: "/dashboard", label: "Dashboard" },
   { href: "/profile", label: "Profile" },
+];
+
+const adminMenus = [
+  ...publicMenus,
+  { href: "/admin", label: "Admin Dashboard" },
 ];
 
 /*
@@ -23,27 +32,49 @@ const userMenus = [
 export default function MainNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(false);
 
-  useEffect(() => {
-    setLoggedIn(isAuthenticated());
-  }, [pathname]);
+  const authSnapshot = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const authenticated = isAuthenticated();
+      const session = getUserSession();
+      if (!authenticated || !session) return "guest::User";
+      return `${session.role}::${session.fullName ?? "User"}`;
+    },
+    () => "guest::User",
+  );
+
+  const authState = useMemo(() => {
+    const [roleRaw, nameRaw] = authSnapshot.split("::");
+    const role = roleRaw === "admin" ? "admin" : roleRaw === "user" ? "user" : null;
+    return {
+      loggedIn: role !== null,
+      role,
+      displayName: nameRaw || "User",
+    } as {
+      loggedIn: boolean;
+      role: "user" | "admin" | null;
+      displayName: string;
+    };
+  }, [authSnapshot]);
+
+  const activeMenus = !authState.loggedIn ? publicMenus : authState.role === "admin" ? adminMenus : userMenus;
 
   return (
     <nav className="sticky top-0 z-40 border-b border-blue-100 bg-[linear-gradient(120deg,#0b2f61_0%,#114a8f_45%,#0a2349_100%)] text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-3 sm:flex-nowrap sm:gap-3 sm:px-5 sm:py-3.5">
         <Link href="/" className="inline-flex shrink-0 items-center gap-1.5 text-lg font-black tracking-tight sm:gap-2 sm:text-2xl">
           <Plane className="h-4 w-4 shrink-0 sm:h-6 sm:w-6" />
           <span>SkyIntern</span>
         </Link>
 
-        <div className="ml-auto flex min-w-0 max-w-[78%] items-center justify-end gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:max-w-none sm:overflow-visible sm:pb-0 sm:gap-2">
-          {(loggedIn ? userMenus : userMenus.filter((item) => item.href === "/search" || item.href === "/bookings")).map((item) => (
+        <div className="flex w-full min-w-0 items-center justify-end gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:ml-auto sm:w-auto sm:max-w-none sm:overflow-visible sm:pb-0 sm:gap-2">
+          {activeMenus.map((item) => (
             <Link
               key={`stable-${item.href}`}
               href={item.href}
               className={`inline-flex shrink-0 items-center justify-center rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
-                pathname === item.href
+                pathname === item.href || (item.href === "/admin" && pathname.startsWith("/admin"))
                   ? "border-white/80 bg-white/20 text-white"
                   : "border-white/25 bg-white/5 text-blue-100 hover:bg-white/15 hover:text-white"
               }`}
@@ -52,15 +83,14 @@ export default function MainNav() {
             </Link>
           ))}
 
-          {loggedIn ? (
+          {authState.loggedIn ? (
             <>
               <span className="inline-flex h-8 shrink-0 items-center rounded-xl bg-white/95 px-3 text-[11px] font-semibold text-blue-700 sm:h-auto sm:px-4 sm:py-2 sm:text-sm">
-                {getUserSession()?.fullName ?? "User"}
+                {authState.displayName}
               </span>
               <button
                 onClick={() => {
                   clearSession();
-                  setLoggedIn(false);
                   router.push("/auth/login");
                 }}
                 className="inline-flex h-8 shrink-0 items-center rounded-xl bg-rose-600 px-3 text-[11px] font-semibold text-white transition hover:bg-rose-700 sm:h-auto sm:px-5 sm:py-2 sm:text-sm"

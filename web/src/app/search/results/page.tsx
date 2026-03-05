@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
@@ -23,7 +23,7 @@ const extractAirportCode = (value: string) => {
   return value.split(" - ")[0].trim();
 };
 
-export default function SearchResultsPage() {
+function SearchResultsPageContent() {
   const searchParams = useSearchParams();
   const [sortBy, setSortBy] = useState<"price-low" | "price-high" | "duration" | "departure">("price-low");
   const [activeTabs, setActiveTabs] = useState<Record<string, FlightInfoTab>>({});
@@ -224,5 +224,13 @@ export default function SearchResultsPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function SearchResultsPage() {
+  return (
+    <Suspense>
+      <SearchResultsPageContent />
+    </Suspense>
   );
 }
