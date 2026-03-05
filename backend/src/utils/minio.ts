@@ -14,13 +14,27 @@ export const minioClient = new Client({
 
 const BUCKET_NAME = "skyintern" // Nama bucket penyimpanan semua file aplikasi
 
+const PUBLIC_READ_POLICY = JSON.stringify({
+  Version: "2012-10-17",
+  Statement: [
+    {
+      Effect: "Allow",
+      Principal: { AWS: ["*"] },
+      Action: ["s3:GetObject"],
+      Resource: [`arn:aws:s3:::${BUCKET_NAME}/*`]
+    }
+  ]
+})
+
 export const initializeBucket = async () => {
   try {
     const exists = await minioClient.bucketExists(BUCKET_NAME) // Cek apakah bucket sudah ada di MinIO
     if (!exists) {
       await minioClient.makeBucket(BUCKET_NAME, "us-east-1")
-      console.log(`✅ MinIO bucket "${BUCKET_NAME}" created successfully`)
+      await minioClient.setBucketPolicy(BUCKET_NAME, PUBLIC_READ_POLICY)
+      console.log(`✅ MinIO bucket "${BUCKET_NAME}" created successfully with public-read policy`)
     } else {
+      await minioClient.setBucketPolicy(BUCKET_NAME, PUBLIC_READ_POLICY)
       console.log(`✅ MinIO connected - bucket "${BUCKET_NAME}" ready`)
     }
   } catch (error: any) {
