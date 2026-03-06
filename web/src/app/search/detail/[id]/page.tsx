@@ -93,7 +93,14 @@ function FlightDetailPageContent() {
 
           <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-2xl font-bold text-slate-900">{flight.logo} {flight.airline}</p>
+              <div className="flex items-center gap-3">
+                {flight.logo.startsWith("http") ? (
+                  <img src={flight.logo} alt={flight.airline} className="h-10 w-10 rounded-full object-contain" />
+                ) : (
+                  <span className="text-3xl">{flight.logo}</span>
+                )}
+                <p className="text-2xl font-bold text-slate-900">{flight.airline}</p>
+              </div>
               <p className="mt-2 text-slate-600">Aircraft Type: {flight.aircraft}</p>
               <p className="mt-1 text-slate-600">Route: {origin} → {destination}</p>
               <p className="mt-1 text-slate-600">Time: {flight.departureTime} - {flight.arrivalTime} ({flight.duration})</p>

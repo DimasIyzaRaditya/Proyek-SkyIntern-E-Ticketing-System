@@ -1,5 +1,6 @@
 "use client";
 
+import Script from "next/script";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -9,20 +10,35 @@ import { isAuthenticated } from "@/lib/auth";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
 import { createBookingFromApi, createPaymentFromApi } from "@/lib/booking-api";
 
+declare global {
+  interface Window {
+    snap: {
+      pay: (
+        token: string,
+        options: {
+          onSuccess?: (result: unknown) => void;
+          onPending?: (result: unknown) => void;
+          onError?: (result: unknown) => void;
+          onClose?: () => void;
+        }
+      ) => void;
+    };
+  }
+}
+
+const COUNTDOWN_DURATION = 15 * 60;
+
 function PaymentSummaryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
-  const [gateway, setGateway] = useState<"Dummy Payment" | "Midtrans Sandbox">("Dummy Payment");
-  const [countdown, setCountdown] = useState(15 * 60);
+  const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
   const [paid, setPaid] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [gatewaySimulated, setGatewaySimulated] = useState(false);
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
   const [isLoadingFlight, setIsLoadingFlight] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
-  const authenticated = isAuthenticated();
+  const [authenticated, setAuthenticated] = useState<boolean>(true);
 
   const flightId = searchParams.get("flightId") ?? "";
   const adult = Number(searchParams.get("adult") ?? "1");
@@ -85,12 +101,29 @@ function PaymentSummaryPageContent() {
   const adminFee = 12000;
   const totalPrice = ticketPrice + tax + adminFee + extraPrice;
 
+  // Fix hydration: read auth state only on client
   useEffect(() => {
-    if (!authenticated) {
+    const auth = isAuthenticated();
+    setAuthenticated(auth);
+    if (!auth) {
       const redirect = encodeURIComponent(`/booking/payment?${searchParams.toString()}`);
       router.replace(`/auth/login?redirect=${redirect}`);
     }
-  }, [authenticated, router, searchParams]);
+  }, [router, searchParams]);
+
+  // Persist countdown across refreshes using localStorage
+  const countdownKey = `payment_start_${flightId || "unknown"}`;
+  useEffect(() => {
+    const stored = localStorage.getItem(countdownKey);
+    if (stored) {
+      const elapsed = Math.floor((Date.now() - Number(stored)) / 1000);
+      const remaining = Math.max(0, COUNTDOWN_DURATION - elapsed);
+      setCountdown(remaining);
+    } else {
+      localStorage.setItem(countdownKey, String(Date.now()));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdownKey]);
 
   useEffect(() => {
     if (paid) return;
@@ -98,6 +131,7 @@ function PaymentSummaryPageContent() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          localStorage.removeItem(countdownKey);
           return 0;
         }
         return prev - 1;
@@ -105,6 +139,7 @@ function PaymentSummaryPageContent() {
     }, 1000);
 
     return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paid]);
 
   const countdownText = `${Math.floor(countdown / 60)
@@ -112,8 +147,6 @@ function PaymentSummaryPageContent() {
     .padStart(2, "0")}:${(countdown % 60).toString().padStart(2, "0")}`;
 
   const handlePayNow = async () => {
-    if (!gatewaySimulated) return;
-
     setBookingLoading(true);
     setBookingError(null);
 
@@ -127,8 +160,8 @@ function PaymentSummaryPageContent() {
         const firstName = searchParams.get("pFirstName") ?? "Passenger";
         const lastName = searchParams.get("pLastName") ?? "";
         const title = searchParams.get("pTitle") ?? "Mr";
-        const idType = searchParams.get("pIdType") ?? "KTP";
-        const idNumber = searchParams.get("pIdNumber") ?? "0000000000000000";
+        const documentType = searchParams.get("pIdType") ?? "KTP";
+        const documentNumber = searchParams.get("pIdNumber") ?? "0000000000000000";
         const nationality = searchParams.get("pNationality") ?? "Indonesian";
         const dob = searchParams.get("pDob") ?? undefined;
 
@@ -138,8 +171,8 @@ function PaymentSummaryPageContent() {
             title,
             firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
             lastName,
-            idType,
-            idNumber: i === 0 ? idNumber : `${idNumber}${i}`,
+            documentType,
+            documentNumber: i === 0 ? documentNumber : `${documentNumber}${i}`,
             nationality,
             dateOfBirth: dob,
           });
@@ -150,34 +183,55 @@ function PaymentSummaryPageContent() {
             title: "Ms",
             firstName: `Child${i + 1}`,
             lastName,
-            idType,
-            idNumber: `${idNumber}C${i}`,
+            documentType,
+            documentNumber: `${documentNumber}C${i}`,
             nationality,
           });
         }
         return passengers.slice(0, Math.max(1, totalPassengers));
       };
 
+      // Step 1: create booking
       const bookingResult = await createBookingFromApi({
         flightId: Number(flightId),
         passengers: buildPassengers(),
       });
 
-      // Try to initiate payment (Midtrans); ignore errors in dev without keys
-      try {
-        await createPaymentFromApi(bookingResult.booking.id);
-      } catch {
-        // Midtrans not configured in dev, continue to confirmation
+      // Step 2: create Midtrans payment and get Snap token
+      const paymentResult = await createPaymentFromApi(bookingResult.booking.id);
+      const snapToken = paymentResult.payment?.snapToken;
+      const redirectUrl = paymentResult.payment?.redirectUrl;
+
+      setBookingLoading(false);
+
+      if (snapToken && typeof window !== "undefined" && window.snap) {
+        // Open Midtrans Snap popup
+        window.snap.pay(snapToken, {
+          onSuccess: () => {
+            setPaid(true);
+            localStorage.removeItem(countdownKey);
+            setTimeout(() => router.push("/bookings?status=success"), 800);
+          },
+          onPending: () => {
+            setPaid(true);
+            localStorage.removeItem(countdownKey);
+            setTimeout(() => router.push("/bookings?status=pending"), 800);
+          },
+          onError: () => {
+            setBookingError("Pembayaran gagal. Silakan coba lagi.");
+          },
+          onClose: () => {
+            setBookingError("Popup pembayaran ditutup sebelum selesai.");
+          },
+        });
+      } else if (redirectUrl) {
+        // Fallback: redirect ke halaman pembayaran Midtrans
+        window.location.href = redirectUrl;
+      } else {
+        setBookingError("Gagal memuat gateway pembayaran. Coba refresh halaman.");
       }
-
-      setPaid(true);
-
-      setTimeout(() => {
-        router.push(`/bookings`);
-      }, 800);
     } catch (error) {
       setBookingError(error instanceof Error ? error.message : "Gagal membuat booking. Silakan coba lagi.");
-    } finally {
       setBookingLoading(false);
     }
   };
@@ -205,6 +259,15 @@ function PaymentSummaryPageContent() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
+      <Script
+        src={
+          process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === "true"
+            ? "https://app.midtrans.com/snap/snap.js"
+            : "https://app.sandbox.midtrans.com/snap/snap.js"
+        }
+        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+        strategy="afterInteractive"
+      />
       <MainNav />
       <main className="mx-auto max-w-3xl px-6 py-12">
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
@@ -222,55 +285,7 @@ function PaymentSummaryPageContent() {
             <div className="flex justify-between border-t border-blue-200 pt-3 text-lg font-bold text-blue-700"><span>Total Price</span><span>{formatRupiah(totalPrice)}</span></div>
           </div>
 
-          <div className="mt-6">
-            <p className="mb-2 text-sm font-semibold text-slate-700">Choose Payment Method</p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {["Bank Transfer", "Credit Card", "E-Wallet"].map((method) => (
-                <button
-                  key={method}
-                  onClick={() => setPaymentMethod(method)}
-                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
-                    paymentMethod === method
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-blue-100 bg-white text-slate-700 hover:bg-blue-50"
-                  }`}
-                >
-                  {method}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-            <p className="text-sm font-semibold text-slate-700">Simulasi Payment Gateway</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {(["Dummy Payment", "Midtrans Sandbox"] as const).map((provider) => (
-                <button
-                  key={provider}
-                  onClick={() => {
-                    setGateway(provider);
-                    setGatewaySimulated(false);
-                  }}
-                  className={`rounded-xl px-3 py-2 text-xs font-semibold ${
-                    gateway === provider
-                      ? "bg-blue-600 text-white"
-                      : "border border-blue-200 bg-white text-blue-700"
-                  }`}
-                >
-                  {provider}
-                </button>
-              ))}
-              <button
-                onClick={() => setGatewaySimulated(true)}
-                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-              >
-                Simulasikan Gateway
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-slate-600">
-              Provider aktif: <span className="font-semibold text-blue-700">{gateway}</span> • Status: {gatewaySimulated ? "Terhubung" : "Belum disimulasikan"}
-            </p>
-          </div>
 
           {bookingError && (
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -280,21 +295,15 @@ function PaymentSummaryPageContent() {
 
           <button
             onClick={() => void handlePayNow()}
-            disabled={countdown === 0 || !gatewaySimulated || bookingLoading}
+            disabled={countdown === 0 || bookingLoading}
             className="mt-8 w-full rounded-2xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {bookingLoading ? "Memproses Booking..." : "Pay Now"}
           </button>
 
-          {!gatewaySimulated && (
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-              Silakan klik <span className="font-semibold">Simulasikan Gateway</span> sebelum melakukan pembayaran.
-            </div>
-          )}
-
           {paid && (
             <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              Pembayaran berhasil via {paymentMethod}. Flow booking selesai end-to-end.
+              Pembayaran berhasil. Flow booking selesai end-to-end.
             </div>
           )}
           {countdown === 0 && !paid && (

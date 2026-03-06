@@ -49,8 +49,8 @@ export type PassengerPayload = {
   title: string;
   firstName: string;
   lastName: string;
-  idType: string;
-  idNumber: string;
+  documentType: string;
+  documentNumber: string;
   nationality: string;
   dateOfBirth?: string;
 };
@@ -79,11 +79,11 @@ export const createBookingFromApi = async (payload: {
 
 type CreatePaymentResponse = {
   message: string;
-  snapToken?: string;
-  redirectUrl?: string;
-  payment?: {
-    id: number;
-    status: string;
+  payment: {
+    orderId: string;
+    amount: number;
+    snapToken: string;
+    redirectUrl: string;
   };
 };
 
