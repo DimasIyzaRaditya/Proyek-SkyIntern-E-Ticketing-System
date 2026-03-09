@@ -7,6 +7,8 @@ type BackendBooking = {
   bookingCode: string;
   status: BookingStatusApi;
   createdAt: string;
+  flightId: number;
+  totalPrice: number;
   flight: {
     flightNumber: string;
     departureTime: string;
@@ -25,6 +27,12 @@ type BackendBooking = {
   passengers: Array<{
     firstName: string;
     lastName: string;
+    title?: string;
+    documentType?: string;
+    documentNumber?: string;
+    nationality?: string;
+    dateOfBirth?: string | null;
+    type?: string;
   }>;
   ticket: {
     id: number;
@@ -97,6 +105,13 @@ export const createPaymentFromApi = async (bookingId: number) => {
 
 export const cancelBookingFromApi = async (bookingId: number) => {
   return apiRequest<{ message: string }>(`/api/bookings/${bookingId}/cancel`, {
+    method: "POST",
+    auth: true,
+  });
+};
+
+export const syncPaymentFromApi = async (bookingId: number) => {
+  return apiRequest<{ message: string; status: string }>(`/api/bookings/${bookingId}/sync-payment`, {
     method: "POST",
     auth: true,
   });

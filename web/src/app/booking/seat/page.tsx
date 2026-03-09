@@ -1,26 +1,54 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { RefreshCcw } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
 import { isAuthenticated } from "@/lib/auth";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
+import { getAdminSeatMap, type AdminSeat } from "@/lib/admin-api";
 
-const occupiedSeats = new Set(["2B", "3F", "5D", "7A", "8C", "10F"]);
-const systemBlockedSeats = new Set(["4C", "6E"]);
-const specialSeats = new Set(["1A", "1B", "1C", "1D", "12A", "12F"]);
 
 function SeatSelectionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const flightId = searchParams.get("flightId") ?? "";
-  const authenticated = isAuthenticated();
+  const [authenticated, setAuthenticated] = useState(true);
+
+  useEffect(() => {
+    setAuthenticated(isAuthenticated());
+  }, []);
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
   const [isLoadingFlight, setIsLoadingFlight] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
+  const [seatData, setSeatData] = useState<AdminSeat[]>([]);
+  const [seatLoading, setSeatLoading] = useState(false);
+  const [seatError, setSeatError] = useState<string | null>(null);
+
+  // Derived seat sets from API data
+  const occupiedSeats = useMemo(
+    () => new Set(seatData.filter((s) => s.status !== "AVAILABLE").map((s) => s.seat.seatNumber)),
+    [seatData],
+  );
+  const specialSeats = useMemo(
+    () => new Set(seatData.filter((s) => s.additionalPrice > 0).map((s) => s.seat.seatNumber)),
+    [seatData],
+  );
+  const specialPriceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    seatData.forEach((s) => {
+      if (s.additionalPrice > 0) map.set(s.seat.seatNumber, s.additionalPrice);
+    });
+    return map;
+  }, [seatData]);
+  // All seat numbers from API (for grid)
+  const allSeatNumbers = useMemo(
+    () => seatData.map((s) => s.seat.seatNumber),
+    [seatData],
+  );
 
   useEffect(() => {
     if (!authenticated) {
@@ -41,6 +69,9 @@ function SeatSelectionPageContent() {
     arrivalTime: "-",
     duration: "-",
     price: Number(searchParams.get("price") ?? "0"),
+    basePrice: Number(searchParams.get("price") ?? "0"),
+    tax: 0,
+    adminFee: 0,
     facilities: ["Cabin Bag 7kg"],
   }), [flightId, searchParams]);
 
@@ -78,17 +109,38 @@ function SeatSelectionPageContent() {
     };
   }, [fallbackFlight, flightId]);
 
+  useEffect(() => {
+    if (!flightId) return;
+    setSeatLoading(true);
+    setSeatError(null);
+    getAdminSeatMap(Number(flightId))
+      .then((seats) => setSeatData(seats))
+      .catch((err) => setSeatError(err instanceof Error ? err.message : "Gagal memuat peta kursi."))
+      .finally(() => setSeatLoading(false));
+  }, [flightId]);
+
+  const reloadSeats = useCallback(() => {
+    if (!flightId) return;
+    setSeatLoading(true);
+    setSeatError(null);
+    getAdminSeatMap(Number(flightId))
+      .then((seats) => setSeatData(seats))
+      .catch((err) => setSeatError(err instanceof Error ? err.message : "Gagal memuat peta kursi."))
+      .finally(() => setSeatLoading(false));
+  }, [flightId]);
+
   const toggleSeat = (seat: string) => {
-    if (occupiedSeats.has(seat) || systemBlockedSeats.has(seat)) return;
+    if (occupiedSeats.has(seat)) return;
     setSelectedSeats((prev) => (prev.includes(seat) ? prev.filter((s) => s !== seat) : [...prev, seat]));
   };
 
-  const extraPrice = selectedSeats.reduce((acc, seat) => acc + (specialSeats.has(seat) ? 150000 : 0), 0);
+  const extraPrice = selectedSeats.reduce((acc, seat) => acc + (specialPriceMap.get(seat) ?? 0), 0);
 
   const continueToPassenger = () => {
     if (!selectedSeats.length) return;
 
-    const query = new URLSearchParams({
+    const existingBookingId = searchParams.get("existingBookingId") ?? "";
+    const params: Record<string, string> = {
       flightId,
       origin: searchParams.get("origin") ?? "",
       destination: searchParams.get("destination") ?? "",
@@ -98,9 +150,10 @@ function SeatSelectionPageContent() {
       child: searchParams.get("child") ?? "0",
       seats: selectedSeats.join(","),
       extraPrice: String(extraPrice),
-    });
+    };
+    if (existingBookingId) params.existingBookingId = existingBookingId;
 
-    router.push(`/booking/passenger?${query.toString()}`);
+    router.push(`/booking/passenger?${new URLSearchParams(params).toString()}`);
   };
 
   if (!authenticated) {
@@ -140,39 +193,56 @@ function SeatSelectionPageContent() {
               <div className="mb-4 flex flex-wrap gap-4 text-sm">
                 <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-green-500" /> Available</span>
                 <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-blue-600" /> Selected</span>
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-slate-400" /> Occupied (Gray)</span>
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-red-500" /> Occupied (Red)</span>
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-amber-500" /> Special Seat (+{formatRupiah(150000)})</span>
+                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-slate-400" /> Occupied</span>
+                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-amber-500" /> Special Seat (+extra)</span>
               </div>
 
-              <div className="grid grid-cols-6 gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                {Array.from({ length: 30 }, (_, index) => {
-                  const row = Math.floor(index / 6) + 1;
-                  const letter = String.fromCharCode(65 + (index % 6));
-                  const seatId = `${row}${letter}`;
-                  const isOccupied = occupiedSeats.has(seatId);
-                  const isSystemBlocked = systemBlockedSeats.has(seatId);
-                  const isSelected = selectedSeats.includes(seatId);
-                  const isSpecial = specialSeats.has(seatId);
+              {seatLoading ? (
+                <p className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-slate-600">
+                  Memuat peta kursi...
+                </p>
+              ) : seatError ? (
+                <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                  <p className="text-sm font-semibold text-red-700">{seatError}</p>
+                  <button onClick={reloadSeats} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200">
+                    <RefreshCcw className="h-3.5 w-3.5" /> Coba Lagi
+                  </button>
+                </div>
+              ) : allSeatNumbers.length === 0 ? (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                  <p className="text-sm font-semibold text-amber-700">Peta kursi belum tersedia untuk penerbangan ini.</p>
+                  <p className="mt-1 text-xs text-amber-600">Flight ID: <code>{flightId || "(kosong)"}</code> — Minta admin untuk generate kursi lewat halaman Admin &gt; Seats.</p>
+                  <button onClick={reloadSeats} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-200">
+                    <RefreshCcw className="h-3.5 w-3.5" /> Refresh
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-6 gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  {allSeatNumbers.map((seatId) => {
+                    const isOccupied = occupiedSeats.has(seatId);
+                    const isSelected = selectedSeats.includes(seatId);
+                    const isSpecial = specialSeats.has(seatId);
+                    const extraAmt = specialPriceMap.get(seatId) ?? 0;
 
-                  let className = "bg-green-500 text-white hover:bg-green-600";
-                  if (isOccupied) className = "cursor-not-allowed bg-slate-400 text-white";
-                  else if (isSystemBlocked) className = "cursor-not-allowed bg-red-500 text-white";
-                  else if (isSelected) className = "bg-blue-600 text-white";
-                  else if (isSpecial) className = "bg-amber-500 text-white hover:bg-amber-600";
+                    let className = "bg-green-500 text-white hover:bg-green-600";
+                    if (isOccupied) className = "cursor-not-allowed bg-slate-400 text-white";
+                    else if (isSelected) className = "bg-blue-600 text-white";
+                    else if (isSpecial) className = "bg-amber-500 text-white hover:bg-amber-600";
 
-                  return (
-                    <button
-                      key={seatId}
-                      disabled={isOccupied || isSystemBlocked}
-                      onClick={() => toggleSeat(seatId)}
-                      className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${className}`}
-                    >
-                      {seatId}
-                    </button>
-                  );
-                })}
-              </div>
+                    return (
+                      <button
+                        key={seatId}
+                        disabled={isOccupied}
+                        onClick={() => toggleSeat(seatId)}
+                        title={isSpecial ? `+${formatRupiah(extraAmt)}` : seatId}
+                        className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${className}`}
+                      >
+                        {seatId}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <aside className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">

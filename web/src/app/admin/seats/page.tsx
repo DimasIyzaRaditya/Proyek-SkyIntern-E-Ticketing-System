@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { RefreshCcw, Zap } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, RefreshCcw, Zap } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import {
   generateAdminSeats,
@@ -32,6 +32,9 @@ export default function AdminSeatsPage() {
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("error");
+  const [flightSearch, setFlightSearch] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadSeatMap = async (flightId: number) => {
     setLoadingSeats(true);
@@ -96,6 +99,29 @@ export default function AdminSeatsPage() {
     }
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filteredFlights = useMemo(() => {
+    const q = flightSearch.toLowerCase();
+    if (!q) return flights;
+    return flights.filter(
+      (f) =>
+        f.flightNumber.toLowerCase().includes(q) ||
+        f.airline.name.toLowerCase().includes(q) ||
+        (f.origin?.city ?? "").toLowerCase().includes(q) ||
+        (f.destination?.city ?? "").toLowerCase().includes(q),
+    );
+  }, [flights, flightSearch]);
+
   const selectedFlight = useMemo(
     () => flights.find((f) => f.id === selectedFlightId) ?? null,
     [flights, selectedFlightId],
@@ -121,21 +147,63 @@ const stats = useMemo(() => {
             {loadingFlights ? (
               <p className="text-sm text-slate-500">Memuat penerbangan...</p>
             ) : (
-              <select
-                value={selectedFlightId ?? ""}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  setSelectedFlightId(Number.isFinite(value) && value > 0 ? value : null);
-                }}
-                className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-slate-700"
-              >
-                <option value="">Pilih penerbangan</option>
-                {flights.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    [{f.flightNumber}] {f.airline.name} — {f.origin?.city ?? "Origin"} → {f.destination?.city ?? "Destination"}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={dropdownRef}>
+                {/* Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen((o) => !o)}
+                  className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-slate-700"
+                >
+                  <span className="truncate">
+                    {selectedFlight
+                      ? `[${selectedFlight.flightNumber}] ${selectedFlight.airline.name} — ${selectedFlight.origin?.city ?? "Origin"} → ${selectedFlight.destination?.city ?? "Destination"}`
+                      : "Pilih penerbangan"}
+                  </span>
+                  <ChevronDown className={`ml-2 h-4 w-4 shrink-0 text-slate-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {/* Dropdown panel */}
+                {dropdownOpen && (
+                  <div className="absolute z-50 mt-1 w-full min-w-70 rounded-xl border border-blue-100 bg-white shadow-lg">
+                    {/* Search input */}
+                    <div className="p-2">
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Cari nomor, maskapai, atau kota..."
+                        value={flightSearch}
+                        onChange={(e) => setFlightSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                      />
+                    </div>
+
+                    {/* List */}
+                    <ul className="max-h-60 overflow-y-auto pb-1">
+                      <li
+                        className="cursor-pointer px-3 py-2 text-sm text-slate-400 hover:bg-blue-50"
+                        onClick={() => { setSelectedFlightId(null); setDropdownOpen(false); setFlightSearch(""); }}
+                      >
+                        Pilih penerbangan
+                      </li>
+                      {filteredFlights.map((f) => (
+                        <li
+                          key={f.id}
+                          className={`cursor-pointer px-3 py-2 text-sm font-semibold hover:bg-blue-50 ${
+                            f.id === selectedFlightId ? "bg-blue-100 text-blue-700" : "text-slate-700"
+                          }`}
+                          onClick={() => { setSelectedFlightId(f.id); setDropdownOpen(false); setFlightSearch(""); }}
+                        >
+                          [{f.flightNumber}] {f.airline.name} — {f.origin?.city ?? "Origin"} → {f.destination?.city ?? "Destination"}
+                        </li>
+                      ))}
+                      {filteredFlights.length === 0 && (
+                        <li className="px-3 py-2 text-sm text-slate-400">Tidak ada hasil ditemukan.</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

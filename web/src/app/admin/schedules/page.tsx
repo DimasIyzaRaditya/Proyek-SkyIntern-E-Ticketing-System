@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import { formatRupiah } from "@/lib/currency";
-import { getAdminFlights, type AdminFlight } from "@/lib/admin-api";
+import { getAdminFlights, deleteAdminFlight, type AdminFlight } from "@/lib/admin-api";
 
 type SortField = "flightNumber" | "route" | "basePrice" | "departureTime" | "arrivalTime";
 type SortDirection = "asc" | "desc";
@@ -14,6 +14,7 @@ export default function AdminSchedulesPage() {
   const [flights, setFlights] = useState<AdminFlight[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("departureTime");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -202,12 +203,24 @@ export default function AdminSchedulesPage() {
                       >
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Link>
-                      <Link
-                        href={`/admin/schedules/${item.id}`}
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Hapus jadwal "${item.flightNumber}"?`)) return;
+                          setDeletingId(item.id);
+                          try {
+                            await deleteAdminFlight(item.id);
+                            setFlights((prev) => prev.filter((f) => f.id !== item.id));
+                          } catch (err) {
+                            setMessage(err instanceof Error ? err.message : "Gagal menghapus jadwal.");
+                          } finally {
+                            setDeletingId(null);
+                          }
+                        }}
+                        disabled={deletingId === item.id}
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
                       >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                      </Link>
+                        <Trash2 className="h-3.5 w-3.5" /> {deletingId === item.id ? "..." : "Delete"}
+                      </button>
                     </div>
                   </td>
                 </tr>

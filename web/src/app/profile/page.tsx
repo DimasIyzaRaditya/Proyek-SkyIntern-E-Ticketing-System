@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
+import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -20,6 +21,9 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const authenticated = isAuthenticated();
+
+  type UpcomingTrip = { route: string; airline: string; date: string; status: string } | null;
+  const [upcomingTrip, setUpcomingTrip] = useState<UpcomingTrip>(null);
 
   useEffect(() => {
     if (!authenticated) {
@@ -43,7 +47,30 @@ export default function ProfilePage() {
       }
     };
 
+    const loadUpcomingTrip = async () => {
+      try {
+        const bookings = await getMyBookingsFromApi();
+        const upcoming = bookings.find(
+          (b) => b.status === "PENDING" || b.status === "PAID",
+        );
+        if (upcoming) {
+          const origin = upcoming.flight.origin.code ?? upcoming.flight.origin.city;
+          const dest = upcoming.flight.destination.code ?? upcoming.flight.destination.city;
+          const date = new Intl.DateTimeFormat("id-ID", {
+            day: "2-digit", month: "short", year: "numeric",
+          }).format(new Date(upcoming.flight.departureTime));
+          setUpcomingTrip({
+            route: `${origin} \u2192 ${dest}`,
+            airline: upcoming.flight.airline.name,
+            date,
+            status: upcoming.status === "PAID" ? "Confirmed" : "Pending Payment",
+          });
+        }
+      } catch { /* silent */ }
+    };
+
     void loadProfile();
+    void loadUpcomingTrip();
   }, [authenticated, router]);
 
   const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -188,12 +215,16 @@ export default function ProfilePage() {
           <aside className="space-y-4 sm:space-y-6">
             <section className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
               <h2 className="text-base font-black text-slate-900 sm:text-xl">Upcoming Trip</h2>
-              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                <p className="text-xs font-semibold text-blue-700">JKT → DPS</p>
-                <p className="mt-1 text-lg font-black text-slate-900">Garuda Indonesia</p>
-                <p className="text-sm text-slate-600">14 Mar 2026 • 09:40 WIB</p>
-                <p className="mt-2 text-xs font-semibold text-emerald-700">Status: Confirmed</p>
-              </div>
+              {upcomingTrip ? (
+                <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-xs font-semibold text-blue-700">{upcomingTrip.route}</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">{upcomingTrip.airline}</p>
+                  <p className="text-sm text-slate-600">{upcomingTrip.date}</p>
+                  <p className="mt-2 text-xs font-semibold text-emerald-700">Status: {upcomingTrip.status}</p>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">Tidak ada perjalanan mendatang.</p>
+              )}
               <Link href="/bookings" className="mt-4 inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700">
                 Lihat semua booking →
               </Link>

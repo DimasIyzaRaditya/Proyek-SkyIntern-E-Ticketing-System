@@ -8,26 +8,36 @@ import { isAuthenticated, getUserSession } from "@/lib/auth";
 function PassengerFormPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const authenticated = isAuthenticated();
-  const session = getUserSession();
+  const [authenticated, setAuthenticated] = useState(true);
 
   const [title, setTitle] = useState("Mr");
-  const [firstName, setFirstName] = useState(() => session?.fullName?.split(" ")[0] ?? "");
-  const [lastName, setLastName] = useState(() => session?.fullName?.split(" ").slice(1).join(" ") ?? "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [idType, setIdType] = useState("KTP");
   const [idNumber, setIdNumber] = useState("");
   const [nationality, setNationality] = useState("Indonesian");
   const [dob, setDob] = useState("");
 
   useEffect(() => {
-    if (!authenticated) {
+    const auth = isAuthenticated();
+    setAuthenticated(auth);
+    if (!auth) {
       const redirect = encodeURIComponent(`/booking/passenger?${searchParams.toString()}`);
       router.replace(`/auth/login?redirect=${redirect}`);
+      return;
     }
-  }, [authenticated, router, searchParams]);
+    // Pre-fill from session
+    const session = getUserSession();
+    if (session?.fullName) {
+      const parts = session.fullName.split(" ");
+      setFirstName(parts[0] ?? "");
+      setLastName(parts.slice(1).join(" "));
+    }
+  }, [router, searchParams]);
 
   const continueToPayment = () => {
-    const query = new URLSearchParams({
+    const existingBookingId = searchParams.get("existingBookingId") ?? "";
+    const params: Record<string, string> = {
       flightId: searchParams.get("flightId") ?? "",
       origin: searchParams.get("origin") ?? "",
       destination: searchParams.get("destination") ?? "",
@@ -37,7 +47,6 @@ function PassengerFormPageContent() {
       child: searchParams.get("child") ?? "0",
       seats: searchParams.get("seats") ?? "",
       extraPrice: searchParams.get("extraPrice") ?? "0",
-      // passenger fields for booking API
       pTitle: title,
       pFirstName: firstName,
       pLastName: lastName,
@@ -45,9 +54,10 @@ function PassengerFormPageContent() {
       pIdNumber: idNumber,
       pNationality: nationality,
       pDob: dob,
-    });
+    };
+    if (existingBookingId) params.existingBookingId = existingBookingId;
 
-    router.push(`/booking/payment?${query.toString()}`);
+    router.push(`/booking/payment?${new URLSearchParams(params).toString()}`);
   };
 
   if (!authenticated) {

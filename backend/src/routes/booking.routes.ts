@@ -227,6 +227,7 @@ router.post("/passengers/:passengerId/document-image", upload.single("document")
  */
 router.post("/:id/payment", bookingController.processPayment)
 
+router.post("/:id/sync-payment", bookingController.syncPaymentStatus)
 /**
  * @swagger
  * /api/bookings:

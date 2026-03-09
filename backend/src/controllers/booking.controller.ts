@@ -75,9 +75,9 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
             title: p.title,
             firstName: p.firstName,
             lastName: p.lastName,
-            documentType: p.documentType,   // Jenis dokumen identitas (KTP/PASSPORT)
-            documentNumber: p.documentNumber, // Nomor NIK atau nomor paspor
-            nationality: p.nationality,
+            documentType: p.documentType || p.idType || "KTP",
+            documentNumber: p.documentNumber || p.idNumber || "0000000000000000",
+            nationality: p.nationality || "Indonesian",
             dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : undefined
           }))
         }
@@ -576,6 +576,127 @@ export const paymentNotification = async (req: any, res: Response) => {
   } catch (error) {
     console.error("❌ Payment notification error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+// Sync Payment Status: cek status aktual ke Midtrans dan update booking
+export const syncPaymentStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const bookingId = parseInt(req.params.id as string)
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        payment: true,
+        flight: {
+          include: {
+            airline: true,
+            origin: true,
+            destination: true
+          }
+        },
+        user: true,
+        passengers: true
+      }
+    })
+
+    if (!booking) {
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" })
+    }
+
+    if (booking.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Tidak diizinkan" })
+    }
+
+    if (!booking.payment?.transactionId) {
+      return res.status(400).json({ message: "Belum ada transaksi pembayaran untuk booking ini" })
+    }
+
+    // Tanya langsung ke Midtrans
+    let midtransStatus: any
+    try {
+      midtransStatus = await checkTransactionStatus(booking.payment.transactionId)
+    } catch (midtransError: any) {
+      // 404 = user belum pernah mulai bayar lewat Snap (token dibuat tapi popup ditutup)
+      const is404 =
+        midtransError?.ApiResponse?.status_code === "404" ||
+        midtransError?.httpStatusCode === "404" ||
+        midtransError?.message?.includes("404")
+      if (is404) {
+        return res.json({ message: "Pembayaran belum dimulai. Silakan klik Bayar Sekarang.", status: booking.status })
+      }
+      throw midtransError
+    }
+    const paymentStatus = mapMidtransStatus(
+      midtransStatus.transaction_status,
+      midtransStatus.fraud_status
+    )
+
+    // Update payment status
+    await prisma.payment.update({
+      where: { id: booking.payment.id },
+      data: {
+        status: paymentStatus as any,
+        paidAt: paymentStatus === "SUCCESS" ? new Date() : undefined
+      }
+    })
+
+    if (paymentStatus === "SUCCESS" && booking.status === "PENDING") {
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: "PAID" }
+      })
+
+      await prisma.flightSeat.updateMany({
+        where: { bookingId },
+        data: { status: "BOOKED" }
+      })
+
+      const existingTicket = await prisma.ticket.findUnique({
+        where: { bookingId }
+      })
+
+      if (!existingTicket) {
+        const ticketNumber = generateTicketNumber()
+        const qrData = JSON.stringify({
+          ticketNumber,
+          bookingCode: booking.bookingCode,
+          passengers: booking.passengers.length,
+          flight: booking.flight.flightNumber
+        })
+
+        const ticket = await prisma.ticket.create({
+          data: { bookingId, ticketNumber, qrCode: qrData }
+        })
+
+        try {
+          await sendBookingConfirmation(
+            booking.user.email,
+            booking.bookingCode,
+            `${process.env.FRONTEND_URL}/tickets/${ticket.id}`
+          )
+        } catch { /* silent */ }
+      }
+
+      return res.json({ message: "Pembayaran dikonfirmasi. Booking sekarang berstatus PAID.", status: "PAID" })
+    }
+
+    if (paymentStatus === "FAILED" && booking.status === "PENDING") {
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: "CANCELLED" }
+      })
+      await prisma.flightSeat.updateMany({
+        where: { bookingId },
+        data: { status: "AVAILABLE", bookingId: null }
+      })
+      return res.json({ message: "Pembayaran gagal. Booking dibatalkan.", status: "CANCELLED" })
+    }
+
+    res.json({ message: "Status sudah sinkron.", status: booking.status })
+  } catch (error: any) {
+    console.error("Sync payment status error:", error)
+    res.status(500).json({ message: "Gagal memeriksa status pembayaran", error: error.message })
   }
 }
 

@@ -1,21 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Download, QrCode, Ticket, UserRound } from "lucide-react";
 import MainNav from "@/components/MainNav";
 
-type BookingStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
-
-const getNextStatus = (status: BookingStatus): BookingStatus => {
-  if (status === "Pending") return "Paid";
-  if (status === "Paid") return "Issued";
-  return status;
-};
+type BookingStatus = "Pending" | "Processing" | "Paid" | "Cancelled";
 
 const getStatusClass = (status: BookingStatus) => {
-  if (status === "Issued") return "bg-emerald-100 text-emerald-700";
-  if (status === "Paid") return "bg-blue-100 text-blue-700";
+  if (status === "Paid") return "bg-emerald-100 text-emerald-700";
+  if (status === "Processing") return "bg-blue-100 text-blue-700";
   if (status === "Cancelled") return "bg-rose-100 text-rose-700";
   return "bg-amber-100 text-amber-700";
 };
@@ -28,23 +22,8 @@ function ETicketPageContent() {
   const seat = searchParams.get("seat") ?? "12A";
   const route = searchParams.get("route") ?? "CGK → DPS";
   const date = searchParams.get("date") ?? "15 Mar 2026";
-  const initialStatus = (searchParams.get("status") as BookingStatus | null) ?? "Pending";
-  const pdfUrl = searchParams.get("pdfUrl") ?? "https://minio.skyintern.local/e-ticket/BK-SAMPLE.pdf";
-  const [status, setStatus] = useState<BookingStatus>(initialStatus);
-
-  useEffect(() => {
-    setStatus(initialStatus);
-  }, [initialStatus]);
-
-  useEffect(() => {
-    if (status === "Issued" || status === "Cancelled") return;
-
-    const timer = window.setInterval(() => {
-      setStatus((prev) => getNextStatus(prev));
-    }, 4500);
-
-    return () => window.clearInterval(timer);
-  }, [status]);
+  const pdfUrl = searchParams.get("pdfUrl") ?? "";
+  const status = (searchParams.get("status") as BookingStatus | null) ?? "Paid";
 
   const qrData = useMemo(
     () =>
@@ -101,17 +80,23 @@ function ETicketPageContent() {
               </div>
             </div>
 
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700"
-            >
-              <Download className="h-4 w-4" /> Download PDF
-            </a>
+            {pdfUrl ? (
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700"
+              >
+                <Download className="h-4 w-4" /> Download PDF
+              </a>
+            ) : (
+              <div className="rounded-2xl border border-blue-100 bg-slate-50 px-4 py-3 text-center text-xs text-slate-500">
+                PDF tiket belum tersedia.
+              </div>
+            )}
 
             <p className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-xs text-slate-600">
-              Note: tombol Download PDF membuka file boarding pass dari penyimpanan Minio (simulasi), dan status akan berubah otomatis sampai Issued.
+              E-Ticket digital ini dapat digunakan sebagai bukti pemesanan. Tunjukkan QR code ini kepada petugas bandara.
             </p>
           </div>
         </section>

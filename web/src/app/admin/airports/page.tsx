@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
-import { getAdminAirports, type AdminAirport } from "@/lib/admin-api";
+import { getAdminAirports, deleteAdminAirport, type AdminAirport } from "@/lib/admin-api";
 
 type SortField = "id" | "name" | "city" | "country" | "timezone";
 type SortDirection = "asc" | "desc";
@@ -13,6 +13,7 @@ export default function AdminAirportsPage() {
   const [airports, setAirports] = useState<AdminAirport[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("id");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -176,12 +177,24 @@ export default function AdminAirportsPage() {
                       >
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Link>
-                      <Link
-                        href={`/admin/airports/${item.id}`}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Hapus bandara "${item.name}"?`)) return;
+                          setDeletingId(item.id);
+                          try {
+                            await deleteAdminAirport(item.id);
+                            setAirports((prev) => prev.filter((a) => a.id !== item.id));
+                          } catch (err) {
+                            setMessage(err instanceof Error ? err.message : "Gagal menghapus bandara.");
+                          } finally {
+                            setDeletingId(null);
+                          }
+                        }}
+                        disabled={deletingId === item.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
                       >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                      </Link>
+                        <Trash2 className="h-3.5 w-3.5" /> {deletingId === item.id ? "..." : "Delete"}
+                      </button>
                     </div>
                   </td>
                 </tr>

@@ -30,15 +30,17 @@ const MONTHS_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep"
 
 export default function AdminPage() {
   const router = useRouter();
-  const authenticated = isAuthenticated();
+  const [authenticated, setAuthenticated] = useState(true);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
-  const [adminName, setAdminName] = useState(() => getUserSession()?.fullName ?? "Admin");
-  const [adminEmail, setAdminEmail] = useState(() => getUserSession()?.email ?? "");
+  const [adminName, setAdminName] = useState("Admin");
+  const [adminEmail, setAdminEmail] = useState("");
 
   useEffect(() => {
-    if (!authenticated) {
+    const auth = isAuthenticated();
+    setAuthenticated(auth);
+    if (!auth) {
       router.replace("/auth/login?redirect=/admin");
       return;
     }
@@ -66,7 +68,7 @@ export default function AdminPage() {
     };
 
     void loadDashboard();
-  }, [authenticated, router]);
+  }, [router]);
 
   const stats = useMemo(() => {
     let paid = 0, issued = 0, pending = 0, cancelled = 0, revenue = 0;

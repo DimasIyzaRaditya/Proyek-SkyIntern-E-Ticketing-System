@@ -220,22 +220,31 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
         })
       }
 
-      const flightSeat = await prisma.flightSeat.create({
-        data: {
+      const flightSeat = await prisma.flightSeat.upsert({
+        where: {
+          flightId_seatId: {
+            flightId: parsedFlightId,
+            seatId: seat.id,
+          },
+        },
+        update: {
+          additionalPrice: seatData.additionalPrice,
+        },
+        create: {
           flightId: parsedFlightId,
           seatId: seat.id,
-          additionalPrice: seatData.additionalPrice
+          additionalPrice: seatData.additionalPrice,
         },
         include: {
-          seat: true
-        }
+          seat: true,
+        },
       })
 
       createdSeats.push(flightSeat)
     }
 
     res.status(201).json({
-      message: "Kursi standar berhasil dibuat",
+      message: `Kursi standar berhasil dibuat/diperbarui (${createdSeats.length} kursi)`,
       count: createdSeats.length
     })
   } catch (error: any) {

@@ -8,7 +8,7 @@ import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
 import { isAuthenticated } from "@/lib/auth";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
-import { createBookingFromApi, createPaymentFromApi } from "@/lib/booking-api";
+import { createBookingFromApi, createPaymentFromApi, cancelBookingFromApi } from "@/lib/booking-api";
 
 declare global {
   interface Window {
@@ -35,12 +35,19 @@ function PaymentSummaryPageContent() {
   const [paid, setPaid] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [pendingSnapToken, setPendingSnapToken] = useState<string | null>(null);
+  const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(null);
+  const [snapClosed, setSnapClosed] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [bookingIdForPayment, setBookingIdForPayment] = useState<number | null>(null);
+  const [changingMethod, setChangingMethod] = useState(false);
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
   const [isLoadingFlight, setIsLoadingFlight] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState<boolean>(true);
 
   const flightId = searchParams.get("flightId") ?? "";
+  const existingBookingId = searchParams.get("existingBookingId") ?? "";
   const adult = Number(searchParams.get("adult") ?? "1");
   const child = Number(searchParams.get("child") ?? "0");
   const extraPrice = Number(searchParams.get("extraPrice") ?? "0");
@@ -57,6 +64,9 @@ function PaymentSummaryPageContent() {
     arrivalTime: "-",
     duration: "-",
     price: Number(searchParams.get("price") ?? "0"),
+    basePrice: Number(searchParams.get("price") ?? "0"),
+    tax: 0,
+    adminFee: 0,
     facilities: ["Cabin Bag 7kg"],
   }), [flightId, searchParams]);
 
@@ -96,9 +106,9 @@ function PaymentSummaryPageContent() {
 
   const activeFlight = flight ?? fallbackFlight;
 
-  const ticketPrice = activeFlight.price * adult + Math.round(activeFlight.price * 0.75 * child);
-  const tax = Math.round(ticketPrice * 0.1);
-  const adminFee = 12000;
+  const ticketPrice = activeFlight.basePrice * adult + Math.round(activeFlight.basePrice * 0.75 * child);
+  const tax = activeFlight.tax;
+  const adminFee = activeFlight.adminFee;
   const totalPrice = ticketPrice + tax + adminFee + extraPrice;
 
   // Fix hydration: read auth state only on client
@@ -112,7 +122,8 @@ function PaymentSummaryPageContent() {
   }, [router, searchParams]);
 
   // Persist countdown across refreshes using localStorage
-  const countdownKey = `payment_start_${flightId || "unknown"}`;
+  // Key is tied to existingBookingId if editing, otherwise flightId
+  const countdownKey = `payment_start_${existingBookingId || flightId || "unknown"}`;
   useEffect(() => {
     const stored = localStorage.getItem(countdownKey);
     if (stored) {
@@ -124,6 +135,16 @@ function PaymentSummaryPageContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdownKey]);
+
+  // Auto-cancel booking when countdown expires
+  useEffect(() => {
+    if (countdown !== 0 || paid || paymentPending) return;
+    const idToCancel = bookingIdForPayment ?? (existingBookingId ? Number(existingBookingId) : null);
+    if (!idToCancel) return;
+    cancelBookingFromApi(idToCancel).catch(() => { /* silent – backend also auto-expires */ });
+    localStorage.removeItem(countdownKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
 
   useEffect(() => {
     if (paid) return;
@@ -146,86 +167,155 @@ function PaymentSummaryPageContent() {
     .toString()
     .padStart(2, "0")}:${(countdown % 60).toString().padStart(2, "0")}`;
 
-  const handlePayNow = async () => {
-    setBookingLoading(true);
+  const openSnap = (token: string, fallbackUrl: string | null) => {
+    if (typeof window !== "undefined" && window.snap) {
+      window.snap.pay(token, {
+        onSuccess: () => {
+          // Actual payment confirmed
+          setPaid(true);
+          setPaymentPending(false);
+          setPendingSnapToken(null);
+          localStorage.removeItem(countdownKey);
+          setTimeout(() => router.push("/bookings?status=success"), 800);
+        },
+        onPending: () => {
+          // Async payment initiated (GoPay QR shown, VA number shown, etc.)
+          // Token is now consumed — do NOT reopen popup, just show waiting state
+          setPaymentPending(true);
+          setPendingSnapToken(null);
+          setPendingRedirectUrl(null);
+          setSnapClosed(false);
+          localStorage.removeItem(countdownKey);
+        },
+        onError: () => {
+          // Token consumed — clear so user can start fresh
+          setPendingSnapToken(null);
+          setPendingRedirectUrl(null);
+          setSnapClosed(false);
+          setPaymentPending(false);
+          setBookingError("Pembayaran gagal. Silakan coba lagi.");
+        },
+        onClose: () => {
+          // Popup closed before choosing / before paying — token still valid, allow resume
+          setSnapClosed(true);
+        },
+      });
+    } else if (fallbackUrl) {
+      window.location.href = fallbackUrl;
+    } else {
+      setBookingError("Gagal memuat gateway pembayaran. Coba refresh halaman.");
+    }
+  };
+
+  const handleChangePaymentMethod = async () => {
+    if (!bookingIdForPayment) return;
+    setChangingMethod(true);
     setBookingError(null);
+    try {
+      const paymentResult = await createPaymentFromApi(bookingIdForPayment);
+      const snapToken = paymentResult.payment?.snapToken;
+      const redirectUrl = paymentResult.payment?.redirectUrl ?? null;
+      setPaymentPending(false);
+      if (snapToken) {
+        setPendingSnapToken(snapToken);
+        setPendingRedirectUrl(redirectUrl);
+        openSnap(snapToken, redirectUrl);
+      } else if (redirectUrl) {
+        window.location.href = redirectUrl;
+      } else {
+        setBookingError("Gagal memuat gateway pembayaran.");
+      }
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : "Gagal memuat ulang pembayaran.");
+    } finally {
+      setChangingMethod(false);
+    }
+  };
+
+  const handlePayNow = async () => {
+    setBookingError(null);
+    setSnapClosed(false);
+
+    // Resume existing pending payment without creating a new booking
+    if (pendingSnapToken) {
+      openSnap(pendingSnapToken, pendingRedirectUrl);
+      return;
+    }
+
+    setBookingLoading(true);
 
     try {
-      const adultCount = adult;
-      const childCount = child;
-      const totalPassengers = Math.max(1, adultCount + childCount);
+      let bookingId: number;
 
-      const buildPassengers = () => {
-        const passengers = [];
-        const firstName = searchParams.get("pFirstName") ?? "Passenger";
-        const lastName = searchParams.get("pLastName") ?? "";
-        const title = searchParams.get("pTitle") ?? "Mr";
-        const documentType = searchParams.get("pIdType") ?? "KTP";
-        const documentNumber = searchParams.get("pIdNumber") ?? "0000000000000000";
-        const nationality = searchParams.get("pNationality") ?? "Indonesian";
-        const dob = searchParams.get("pDob") ?? undefined;
+      if (existingBookingId) {
+        // Editing flow: reuse the existing booking, skip createBooking
+        bookingId = Number(existingBookingId);
+        setBookingIdForPayment(bookingId);
+      } else {
+        // New booking flow
+        const adultCount = adult;
+        const childCount = child;
+        const totalPassengers = Math.max(1, adultCount + childCount);
 
-        for (let i = 0; i < adultCount; i++) {
-          passengers.push({
-            type: "ADULT" as const,
-            title,
-            firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
-            lastName,
-            documentType,
-            documentNumber: i === 0 ? documentNumber : `${documentNumber}${i}`,
-            nationality,
-            dateOfBirth: dob,
-          });
-        }
-        for (let i = 0; i < childCount; i++) {
-          passengers.push({
-            type: "CHILD" as const,
-            title: "Ms",
-            firstName: `Child${i + 1}`,
-            lastName,
-            documentType,
-            documentNumber: `${documentNumber}C${i}`,
-            nationality,
-          });
-        }
-        return passengers.slice(0, Math.max(1, totalPassengers));
-      };
+        const buildPassengers = () => {
+          const passengers = [];
+          const firstName = searchParams.get("pFirstName") ?? "Passenger";
+          const lastName = searchParams.get("pLastName") ?? "";
+          const title = searchParams.get("pTitle") ?? "Mr";
+          const documentType = searchParams.get("pIdType") || "KTP";
+          const documentNumber = searchParams.get("pIdNumber") || "0000000000000000";
+          const nationality = searchParams.get("pNationality") ?? "Indonesian";
+          const dob = searchParams.get("pDob") ?? undefined;
 
-      // Step 1: create booking
-      const bookingResult = await createBookingFromApi({
-        flightId: Number(flightId),
-        passengers: buildPassengers(),
-      });
+          for (let i = 0; i < adultCount; i++) {
+            passengers.push({
+              type: "ADULT" as const,
+              title,
+              firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
+              lastName,
+              documentType,
+              documentNumber: i === 0 ? documentNumber : `${documentNumber}${i}`,
+              nationality,
+              dateOfBirth: dob,
+            });
+          }
+          for (let i = 0; i < childCount; i++) {
+            passengers.push({
+              type: "CHILD" as const,
+              title: "Ms",
+              firstName: `Child${i + 1}`,
+              lastName,
+              documentType,
+              documentNumber: `${documentNumber}C${i}`,
+              nationality,
+            });
+          }
+          return passengers.slice(0, Math.max(1, totalPassengers));
+        };
 
-      // Step 2: create Midtrans payment and get Snap token
-      const paymentResult = await createPaymentFromApi(bookingResult.booking.id);
+        const bookingResult = await createBookingFromApi({
+          flightId: Number(flightId),
+          passengers: buildPassengers(),
+        });
+        bookingId = bookingResult.booking.id;
+        setBookingIdForPayment(bookingId);
+      }
+
+      // Create Midtrans payment and get Snap token
+      const paymentResult = await createPaymentFromApi(bookingId);
       const snapToken = paymentResult.payment?.snapToken;
-      const redirectUrl = paymentResult.payment?.redirectUrl;
+      const redirectUrl = paymentResult.payment?.redirectUrl ?? null;
+
+      if (snapToken) {
+        setPendingSnapToken(snapToken);
+        setPendingRedirectUrl(redirectUrl);
+      }
 
       setBookingLoading(false);
 
       if (snapToken && typeof window !== "undefined" && window.snap) {
-        // Open Midtrans Snap popup
-        window.snap.pay(snapToken, {
-          onSuccess: () => {
-            setPaid(true);
-            localStorage.removeItem(countdownKey);
-            setTimeout(() => router.push("/bookings?status=success"), 800);
-          },
-          onPending: () => {
-            setPaid(true);
-            localStorage.removeItem(countdownKey);
-            setTimeout(() => router.push("/bookings?status=pending"), 800);
-          },
-          onError: () => {
-            setBookingError("Pembayaran gagal. Silakan coba lagi.");
-          },
-          onClose: () => {
-            setBookingError("Popup pembayaran ditutup sebelum selesai.");
-          },
-        });
+        openSnap(snapToken, redirectUrl);
       } else if (redirectUrl) {
-        // Fallback: redirect ke halaman pembayaran Midtrans
         window.location.href = redirectUrl;
       } else {
         setBookingError("Gagal memuat gateway pembayaran. Coba refresh halaman.");
@@ -293,20 +383,58 @@ function PaymentSummaryPageContent() {
             </div>
           )}
 
-          <button
-            onClick={() => void handlePayNow()}
-            disabled={countdown === 0 || bookingLoading}
-            className="mt-8 w-full rounded-2xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            {bookingLoading ? "Memproses Booking..." : "Pay Now"}
-          </button>
+          {snapClosed && pendingSnapToken && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Popup ditutup sebelum pembayaran selesai. Klik tombol di bawah untuk kembali memilih metode pembayaran.
+            </div>
+          )}
+
+          {paymentPending && (
+            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+              <p className="text-sm font-semibold text-blue-800">Menunggu konfirmasi pembayaran</p>
+              <p className="mt-1 text-xs text-blue-700">
+                Instruksi pembayaran sudah dikirim (mis. QR GoPay atau nomor Virtual Account). Selesaikan pembayaran di aplikasi Anda, lalu cek status di halaman Booking saya.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {bookingIdForPayment && (
+                  <button
+                    onClick={() => void handleChangePaymentMethod()}
+                    disabled={changingMethod}
+                    className="rounded-xl border border-blue-400 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                  >
+                    {changingMethod ? "Memuat..." : "Ganti Metode Pembayaran"}
+                  </button>
+                )}
+                <button
+                  onClick={() => router.push("/bookings")}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Lihat Booking Saya
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!paymentPending && (
+            <button
+              onClick={() => void handlePayNow()}
+              disabled={countdown === 0 || bookingLoading}
+              className="mt-4 w-full rounded-2xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {bookingLoading
+                ? "Memproses Booking..."
+                : snapClosed && pendingSnapToken
+                ? "Kembali Pilih Metode Pembayaran"
+                : "Pay Now"}
+            </button>
+          )}
 
           {paid && (
             <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              Pembayaran berhasil. Flow booking selesai end-to-end.
+              Pembayaran berhasil dikonfirmasi.
             </div>
           )}
-          {countdown === 0 && !paid && (
+          {countdown === 0 && !paid && !paymentPending && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               Waktu pembayaran habis. Silakan ulangi proses booking.
             </div>

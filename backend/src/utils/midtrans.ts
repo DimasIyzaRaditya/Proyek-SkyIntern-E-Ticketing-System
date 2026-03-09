@@ -95,7 +95,7 @@ export const checkTransactionStatus = async (orderId: string) => {
     return statusResponse
   } catch (error: any) {
     console.error("Midtrans check status error:", error)
-    throw new Error(`Gagal memeriksa status pembayaran: ${error.message}`)
+    throw error // lempar original error agar caller bisa cek ApiResponse & httpStatusCode
   }
 }
 

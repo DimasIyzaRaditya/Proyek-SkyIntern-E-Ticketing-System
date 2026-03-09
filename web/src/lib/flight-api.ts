@@ -10,6 +10,9 @@ export type FlightCardItem = {
   arrivalTime: string;
   duration: string;
   price: number;
+  basePrice: number;
+  tax: number;
+  adminFee: number;
   facilities: string[];
 };
 
@@ -103,6 +106,9 @@ const toCardItem = (flight: BackendFlight): FlightCardItem => ({
   departureTime: formatTime(flight.departureTime),
   arrivalTime: formatTime(flight.arrivalTime),
   duration: formatDuration(flight.duration),
+  basePrice: flight.basePrice,
+  tax: flight.tax ?? 0,
+  adminFee: flight.adminFee ?? 0,
   price: flight.basePrice + (flight.tax ?? 0) + (flight.adminFee ?? 0),
   facilities: parseFacilities(flight.facilities),
 });
