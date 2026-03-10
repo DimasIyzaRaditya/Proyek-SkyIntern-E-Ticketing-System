@@ -2,8 +2,8 @@
 // Komponen berjalan di browser sehingga bisa memakai useState, useEffect, dll.
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye } from "lucide-react";
-// Icon untuk tombol lihat detail
+import { Eye, X } from "lucide-react";
+// Icon untuk tombol lihat detail, issue tiket, dan batal
 
 import AdminShell from "@/components/AdminShell";
 // Layout halaman admin
@@ -11,12 +11,58 @@ import AdminShell from "@/components/AdminShell";
 import { formatRupiah } from "@/lib/currency";
 // Fungsi untuk mengubah angka menjadi format Rupiah
 
-import { getAdminBookings, type AdminBooking } from "@/lib/admin-api";
+import { getAdminBookings, updateAdminBookingStatus, type AdminBooking } from "@/lib/admin-api";
 // Mengambil data booking dari API admin
 
 
-// Jenis status transaksi
+// Jenis status transaksi — didefinisikan duluan agar bisa dipakai di konstanta di bawah
 type TransactionStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
+
+type StatusAction = "markpending" | "markpaid" | "markissued" | "cancel";
+
+// Semua kemungkinan transisi status — setiap status bisa pindah ke 3 status lainnya
+const statusTransitions: Record<
+  TransactionStatus,
+  { label: string; action: StatusAction; color: string }[]
+> = {
+  Pending: [
+    { label: "Tandai Paid",    action: "markpaid",    color: "bg-blue-600 hover:bg-blue-700" },
+    { label: "Tandai Issued",  action: "markissued",  color: "bg-emerald-600 hover:bg-emerald-700" },
+    { label: "Batalkan",       action: "cancel",      color: "bg-rose-600 hover:bg-rose-700" },
+  ],
+  Paid: [
+    { label: "Tandai Pending", action: "markpending", color: "bg-amber-500 hover:bg-amber-600" },
+    { label: "Tandai Issued",  action: "markissued",  color: "bg-emerald-600 hover:bg-emerald-700" },
+    { label: "Batalkan",       action: "cancel",      color: "bg-rose-600 hover:bg-rose-700" },
+  ],
+  Issued: [
+    { label: "Tandai Pending", action: "markpending", color: "bg-amber-500 hover:bg-amber-600" },
+    { label: "Tandai Paid",    action: "markpaid",    color: "bg-blue-600 hover:bg-blue-700" },
+    { label: "Batalkan",       action: "cancel",      color: "bg-rose-600 hover:bg-rose-700" },
+  ],
+  Cancelled: [
+    { label: "Tandai Pending", action: "markpending", color: "bg-amber-500 hover:bg-amber-600" },
+    { label: "Tandai Paid",    action: "markpaid",    color: "bg-blue-600 hover:bg-blue-700" },
+    { label: "Tandai Issued",  action: "markissued",  color: "bg-emerald-600 hover:bg-emerald-700" },
+    { label: "Batalkan",       action: "cancel",      color: "bg-rose-600 hover:bg-rose-700" },
+  ],
+};
+
+// Status baru setelah aksi dijalankan
+const statusAfterAction: Record<StatusAction, TransactionStatus> = {
+  markpending: "Pending",
+  markpaid:    "Paid",
+  markissued:  "Issued",
+  cancel:      "Cancelled",
+};
+
+// Teks sukses per aksi
+const actionSuccessText: Record<StatusAction, string> = {
+  markpending: "Status berhasil diubah ke Pending.",
+  markpaid:    "Status berhasil diubah ke Paid.",
+  markissued:  "Tiket berhasil diterbitkan (Issued).",
+  cancel:      "Booking berhasil dibatalkan.",
+};
 
 
 // Struktur data transaksi yang akan ditampilkan di tabel
@@ -47,8 +93,8 @@ export default function AdminTransactionsPage() {
     "All" | "Pending" | "Paid" | "Issued" | "Cancelled"
   >("All");
 
-  // transaksi yang dipilih untuk melihat detail
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionItem | null>(null);
+  // ID transaksi yang popup detail-nya sedang terbuka
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // daftar transaksi
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -60,6 +106,17 @@ export default function AdminTransactionsPage() {
 
   // pesan error
   const [message, setMessage] = useState("");
+
+  // status loading aksi edit
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{id: string; text: string; ok: boolean} | null>(null);
+
+  // konfirmasi sebelum ubah status
+  const [pendingAction, setPendingAction] = useState<{
+    item: TransactionItem;
+    action: StatusAction;
+    label: string;
+  } | null>(null);
 
 
   useEffect(() => {
@@ -107,6 +164,34 @@ export default function AdminTransactionsPage() {
   }, []);
 
 
+  // fungsi untuk melakukan aksi edit status booking
+  const handleAction = async (
+    item: TransactionItem,
+    action: StatusAction
+  ) => {
+    setActionLoading(true);
+    setActionMessage(null);
+    setPendingAction(null);
+    try {
+      await updateAdminBookingStatus(Number(item.id), action);
+      const newStatus = statusAfterAction[action];
+      setActionMessage({ id: item.id, text: actionSuccessText[action], ok: true });
+      // perbarui status di list lokal
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === item.id ? { ...t, status: newStatus } : t))
+      );
+    } catch (err) {
+      setActionMessage({
+        id: item.id,
+        text: err instanceof Error ? err.message : "Gagal melakukan aksi.",
+        ok: false,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
   // filter transaksi berdasarkan status
   const filteredTransactions = useMemo(() => {
 
@@ -138,6 +223,7 @@ export default function AdminTransactionsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setExpandedId(null);
   }, [statusFilter, rowsPerView]);
 
   useEffect(() => {
@@ -218,49 +304,154 @@ export default function AdminTransactionsPage() {
               ) : (
 
                 // menampilkan transaksi yang sudah difilter
-                visibleTransactions.map((item) => (
+                visibleTransactions.flatMap((item) => {
+                  const isOpen = expandedId === item.id;
+                  return [
+                    <tr
+                      key={item.id}
+                      className={`border-b border-blue-100 last:border-0 transition-colors ${
+                        isOpen ? "bg-blue-50/60" : ""
+                      }`}
+                    >
+                      <td className="p-3 font-semibold">{item.id}</td>
+                      <td className="p-3">{item.customer}</td>
+                      <td className="p-3">{item.flight}</td>
+                      <td className="p-3">{formatRupiah(item.amount)}</td>
 
-                  <tr
-                    key={item.id}
-                    className="border-b border-blue-100 last:border-0"
-                  >
+                      {/* status transaksi */}
+                      <td className="p-3">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            item.status === "Issued"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : item.status === "Paid"
+                              ? "bg-blue-100 text-blue-700"
+                              : item.status === "Cancelled"
+                              ? "bg-rose-100 text-rose-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
 
-                    <td className="p-3 font-semibold">{item.id}</td>
-                    <td className="p-3">{item.customer}</td>
-                    <td className="p-3">{item.flight}</td>
-                    <td className="p-3">{formatRupiah(item.amount)}</td>
+                      {/* tombol lihat detail */}
+                      <td className="p-3">
+                        <button
+                          onClick={() =>
+                            setExpandedId((prev) => (prev === item.id ? null : item.id))
+                          }
+                          className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors ${
+                            isOpen
+                              ? "bg-slate-500 hover:bg-slate-600"
+                              : "bg-blue-600 hover:bg-blue-700"
+                          }`}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          {isOpen ? "Tutup" : "View Detail"}
+                        </button>
+                      </td>
+                    </tr>,
 
-                    {/* status transaksi */}
-                    <td className="p-3">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold
-                        ${
-                          item.status === "Issued"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : item.status === "Paid"
-                            ? "bg-blue-100 text-blue-700"
-                            : item.status === "Cancelled"
-                            ? "bg-rose-100 text-rose-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
+                    // baris detail inline — muncul tepat di bawah baris yang diklik
+                    isOpen && (
+                      <tr key={`detail-${item.id}`} className="bg-blue-50/40">
+                        <td colSpan={6} className="px-4 pb-4 pt-0">
+                          <div className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between">
+                              <h4 className="font-bold text-slate-800">Detail Transaksi #{item.id}</h4>
+                              <button
+                                onClick={() => setExpandedId(null)}
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
 
-                    {/* tombol lihat detail */}
-                    <td className="p-3">
-                      <button
-                        onClick={() => setSelectedTransaction(item)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> View Detail
-                      </button>
-                    </td>
+                            <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2 md:grid-cols-3">
+                              <p><span className="font-semibold">Booking Code:</span> {item.bookingCode}</p>
+                              <p><span className="font-semibold">Customer:</span> {item.customer}</p>
+                              <p><span className="font-semibold">Flight:</span> {item.flight}</p>
+                              <p><span className="font-semibold">Created:</span> {new Date(item.createdAt).toLocaleString("id-ID")}</p>
+                              <p><span className="font-semibold">Amount:</span> {formatRupiah(item.amount)}</p>
+                              <p>
+                                <span className="font-semibold">Status:</span>{" "}
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    item.status === "Issued"
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : item.status === "Paid"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : item.status === "Cancelled"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : "bg-amber-100 text-amber-700"
+                                  }`}
+                                >
+                                  {item.status}
+                                </span>
+                              </p>
+                            </div>
 
-                  </tr>
+                            {/* pesan hasil aksi */}
+                            {actionMessage?.id === item.id && (
+                              <p
+                                className={`mt-3 rounded-xl px-3 py-2 text-xs font-medium ${
+                                  actionMessage.ok
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-rose-50 text-rose-700"
+                                }`}
+                              >
+                                {actionMessage.text}
+                              </p>
+                            )}
 
-                ))
+                            {/* tombol ubah status — tampil untuk semua status */}
+                              <div className="mt-4 border-t border-slate-100 pt-4">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Ubah Status</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {statusTransitions[item.status].map((opt) => (
+                                    <button
+                                      key={opt.action}
+                                      disabled={actionLoading}
+                                      onClick={() =>
+                                        setPendingAction({ item, action: opt.action, label: opt.label })
+                                      }
+                                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-60 ${opt.color}`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* dialog konfirmasi aksi */}
+                                {pendingAction?.item.id === item.id && (
+                                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                                    <p className="flex-1 text-xs text-amber-800">
+                                      Konfirmasi: <span className="font-semibold">{pendingAction.label}</span> untuk booking #{item.id}?
+                                    </p>
+                                    <button
+                                      disabled={actionLoading}
+                                      onClick={() => handleAction(pendingAction.item, pendingAction.action)}
+                                      className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+                                    >
+                                      {actionLoading ? "Menyimpan..." : "Ya, Lanjutkan"}
+                                    </button>
+                                    <button
+                                      disabled={actionLoading}
+                                      onClick={() => setPendingAction(null)}
+                                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                    >
+                                      Batal
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ),
+                  ];
+                })
 
               )}
 
@@ -330,55 +521,7 @@ export default function AdminTransactionsPage() {
       </section>
 
 
-      {/* jika ada transaksi dipilih tampilkan detail */}
-      {selectedTransaction && (
-
-        <section className="mt-5 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-
-          <h3 className="text-lg font-bold text-slate-900">
-            Detail Transaksi
-          </h3>
-
-          <div className="mt-2 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-
-            <p>
-              <span className="font-semibold">ID:</span> {selectedTransaction.id}
-            </p>
-
-            <p>
-              <span className="font-semibold">Booking Code:</span>{" "}
-              {selectedTransaction.bookingCode}
-            </p>
-
-            <p>
-              <span className="font-semibold">Customer:</span>{" "}
-              {selectedTransaction.customer}
-            </p>
-
-            <p>
-              <span className="font-semibold">Flight:</span>{" "}
-              {selectedTransaction.flight}
-            </p>
-
-            <p>
-              <span className="font-semibold">Created:</span>{" "}
-              {new Date(selectedTransaction.createdAt).toLocaleString("id-ID")}
-            </p>
-
-            <p>
-              <span className="font-semibold">Amount:</span>{" "}
-              {formatRupiah(selectedTransaction.amount)}
-            </p>
-
-            <p>
-              <span className="font-semibold">Status:</span>{" "}
-              {selectedTransaction.status}
-            </p>
-
-          </div>
-        </section>
-
-      )}
+      {/* panel detail tidak diperlukan lagi — detail muncul inline di tabel */}
 
     </AdminShell>
   );

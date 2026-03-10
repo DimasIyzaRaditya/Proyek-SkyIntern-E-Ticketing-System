@@ -234,6 +234,10 @@ export default function AdminScheduleCreatePage() {
                 />
               </div>
             </div>
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-slate-600">Aircraft</label>
+              <input value={form.aircraft} onChange={(event) => setForm((prev) => ({ ...prev, aircraft: event.target.value }))} placeholder="Boeing 737-800" className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+            </div>
             <div className="sm:col-span-2 xl:col-span-3">
               <button disabled={saving} onClick={() => void handleSave()} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto">
                 <Plus className="h-4 w-4" /> Save Schedule

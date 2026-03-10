@@ -6,6 +6,8 @@ import { type ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
+import LazySection from "@/components/LazySection";
+import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
@@ -40,6 +42,8 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<BookingCard[]>([]);
   const [historyRowsPerPage, setHistoryRowsPerPage] = useState(5);
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+
+  const showSkeleton = useMinDelay(loading);
 
   const historyTotalPages = Math.max(1, Math.ceil(bookings.length / historyRowsPerPage));
   const visibleBookings = bookings.slice(
@@ -146,14 +150,36 @@ export default function DashboardPage() {
     reader.readAsDataURL(file);
   };
 
-  if (!authenticated || loading) {
+  if (!authenticated || showSkeleton) {
     return (
       <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
         <MainNav />
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-          <section className="rounded-3xl border border-blue-100 bg-white p-8 text-center text-sm font-semibold text-slate-600 shadow-lg">
-            Memuat dashboard...
-          </section>
+        <main className="mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
+          {/* Profile skeleton */}
+          <div className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="skeleton h-20 w-20 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-5 w-40 rounded-lg" />
+                <div className="skeleton h-3.5 w-56 rounded" />
+                <div className="skeleton h-3.5 w-32 rounded" />
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="skeleton h-16 rounded-2xl" />
+              ))}
+            </div>
+          </div>
+          {/* History skeleton */}
+          <div className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
+            <div className="skeleton mb-4 h-6 w-40 rounded-lg" />
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton h-20 w-full rounded-2xl" />
+              ))}
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -163,6 +189,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <LazySection>
         <section className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
           <h1 className="text-xl font-black text-slate-900 sm:text-2xl md:text-3xl">Dashboard</h1>
           <p className="mt-1 text-xs text-slate-600 sm:text-sm">Profil pengguna dan riwayat pemesanan dari API.</p>
@@ -202,7 +229,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </section>
+        </LazySection>
 
+        <LazySection delay={1}>
         <section className="mt-4 rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:mt-6 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-xl">
@@ -295,6 +324,7 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+        </LazySection>
       </main>
     </div>
   );

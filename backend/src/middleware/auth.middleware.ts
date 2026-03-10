@@ -3,6 +3,7 @@
 // memiliki role ADMIN sebelum mengakses route admin.
 import { Request, Response, NextFunction } from "express"
 import jwt from "jsonwebtoken"
+import prisma from "../prisma/client"
 
 export interface AuthRequest extends Request {
   user?: {
@@ -31,6 +32,15 @@ export const authenticate = async (
       id: Number(decoded.id),
       email: decoded.email,
       role: decoded.role
+    }
+
+    // Block check: reject requests from blocked users
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { isBlocked: true }
+    })
+    if (dbUser?.isBlocked) {
+      return res.status(403).json({ message: "Akun Anda telah diblokir oleh admin." })
     }
 
     next()

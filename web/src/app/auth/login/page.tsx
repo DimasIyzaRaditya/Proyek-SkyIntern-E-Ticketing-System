@@ -17,6 +17,8 @@ function LoginPageContent() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isBlocked = searchParams.get("blocked") === "1";
+
   const handleLogin = async () => {
     if (!email || !password) {
       setMessage("Isi email dan password terlebih dahulu.");
@@ -61,6 +63,12 @@ function LoginPageContent() {
         <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-lg sm:p-8">
           <h2 className="text-center text-3xl font-black text-slate-900">Login</h2>
           <p className="mt-1 text-center text-sm text-slate-600">Masuk ke akun SkyIntern Anda.</p>
+
+          {isBlocked && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              Akun Anda telah diblokir oleh admin. Silakan hubungi dukungan untuk informasi lebih lanjut.
+            </div>
+          )}
 
           <form className="mt-6 space-y-4">
             <div>

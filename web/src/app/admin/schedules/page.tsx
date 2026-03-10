@@ -176,17 +176,18 @@ export default function AdminSchedulesPage() {
                 <th className="p-3">Base Price</th>
                 <th className="p-3">Departure</th>
                 <th className="p-3">Arrival</th>
+                <th className="p-3">Aircraft</th>
                 <th className="rounded-r-xl p-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-slate-500">Loading schedules...</td>
+                  <td colSpan={7} className="p-4 text-center text-slate-500">Loading schedules...</td>
                 </tr>
               ) : displayedFlights.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-slate-500">No schedules match the current filter.</td>
+                  <td colSpan={7} className="p-4 text-center text-slate-500">No schedules match the current filter.</td>
                 </tr>
               ) : visibleFlights.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
@@ -195,6 +196,7 @@ export default function AdminSchedulesPage() {
                   <td className="whitespace-nowrap p-3">{formatRupiah(item.basePrice)}</td>
                   <td className="whitespace-nowrap p-3">{new Date(item.departureTime).toLocaleString("id-ID")}</td>
                   <td className="whitespace-nowrap p-3">{new Date(item.arrivalTime).toLocaleString("id-ID")}</td>
+                  <td className="whitespace-nowrap p-3">{item.aircraft ?? "—"}</td>
                   <td className="p-3">
                     <div className="flex flex-wrap gap-2">
                       <Link

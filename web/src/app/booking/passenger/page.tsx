@@ -8,34 +8,44 @@ import { isAuthenticated, getUserSession } from "@/lib/auth";
 function PassengerFormPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [authenticated, setAuthenticated] = useState(true);
 
-  const [title, setTitle] = useState("Mr");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [idType, setIdType] = useState("KTP");
   const [idNumber, setIdNumber] = useState("");
   const [nationality, setNationality] = useState("Indonesian");
   const [dob, setDob] = useState("");
+  const [idNumberTouched, setIdNumberTouched] = useState(false);
+
+  const idNumberError =
+    idNumberTouched && idNumber.trim().length > 0 && idNumber.trim().length < 8
+      ? "Nomor identitas minimal 8 karakter"
+      : null;
+
+  const isFormValid =
+    firstName.trim() !== "" &&
+    lastName.trim() !== "" &&
+    idNumber.trim().length >= 8 &&
+    nationality.trim() !== "" &&
+    dob !== "";
 
   useEffect(() => {
-    const auth = isAuthenticated();
-    setAuthenticated(auth);
-    if (!auth) {
+    if (!isAuthenticated()) {
       const redirect = encodeURIComponent(`/booking/passenger?${searchParams.toString()}`);
       router.replace(`/auth/login?redirect=${redirect}`);
       return;
     }
-    // Pre-fill from session
     const session = getUserSession();
     if (session?.fullName) {
       const parts = session.fullName.split(" ");
       setFirstName(parts[0] ?? "");
       setLastName(parts.slice(1).join(" "));
     }
-  }, [router, searchParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const continueToPayment = () => {
+    if (!isFormValid) return;
     const existingBookingId = searchParams.get("existingBookingId") ?? "";
     const params: Record<string, string> = {
       flightId: searchParams.get("flightId") ?? "",
@@ -48,7 +58,6 @@ function PassengerFormPageContent() {
       seats: searchParams.get("seats") ?? "",
       seatFlightIds: searchParams.get("seatFlightIds") ?? "",
       extraPrice: searchParams.get("extraPrice") ?? "0",
-      pTitle: title,
       pFirstName: firstName,
       pLastName: lastName,
       pIdType: idType,
@@ -61,59 +70,52 @@ function PassengerFormPageContent() {
     router.push(`/booking/payment?${new URLSearchParams(params).toString()}`);
   };
 
-  if (!authenticated) {
-    return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
-        <MainNav />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
+    <div className="grid h-dvh grid-rows-[auto_1fr] bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-2xl px-6 py-12">
-        <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
-          <h1 className="text-3xl font-black text-slate-900">Data Penumpang</h1>
-          <p className="mt-1 text-sm text-slate-500">Isi data sesuai identitas resmi yang berlaku.</p>
+      <main className="overflow-y-auto">
+        <div className="flex min-h-full items-center justify-center px-6 py-10">
+        <section className="w-full max-w-md rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
+          <h1 className="text-center text-3xl font-black text-slate-900">Data Penumpang</h1>
+          <p className="mt-1 text-center text-sm text-slate-500">Isi data sesuai identitas resmi yang berlaku.</p>
 
           <div className="mt-6 space-y-4">
-            {/* Title */}
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Sapaan</label>
-              <select value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
-                <option>Mr</option>
-                <option>Mrs</option>
-                <option>Ms</option>
-              </select>
-            </div>
-
             {/* First Name */}
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Nama Depan</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Nama Depan <span className="text-red-500">*</span>
+              </label>
               <input
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="John"
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3"
+                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
               />
             </div>
 
             {/* Last Name */}
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Nama Belakang</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Nama Belakang <span className="text-red-500">*</span>
+              </label>
               <input
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Doe"
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3"
+                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
               />
             </div>
 
             {/* ID Type */}
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Jenis Identitas</label>
-              <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Jenis Identitas <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={idType}
+                onChange={(e) => setIdType(e.target.value)}
+                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
+              >
                 <option>KTP</option>
                 <option>Passport</option>
                 <option>SIM</option>
@@ -122,46 +124,67 @@ function PassengerFormPageContent() {
 
             {/* ID Number */}
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Nomor Identitas</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Nomor Identitas <span className="text-red-500">*</span>
+              </label>
               <input
                 value={idNumber}
                 onChange={(e) => setIdNumber(e.target.value)}
-                placeholder="3174010101010001"
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3"
+                onBlur={() => setIdNumberTouched(true)}
+                placeholder="Minimal 8 karakter"
+                className={`w-full rounded-2xl border px-4 py-3 focus:outline-none ${
+                  idNumberError
+                    ? "border-red-400 bg-red-50 focus:border-red-400"
+                    : "border-blue-100 bg-blue-50 focus:border-blue-400"
+                }`}
               />
+              {idNumberError && (
+                <p className="mt-1 text-xs text-red-500">{idNumberError}</p>
+              )}
             </div>
 
             {/* Nationality */}
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Kewarganegaraan</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Kewarganegaraan <span className="text-red-500">*</span>
+              </label>
               <input
                 value={nationality}
                 onChange={(e) => setNationality(e.target.value)}
                 placeholder="Indonesian"
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3"
+                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
               />
             </div>
 
             {/* Date of Birth */}
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Tanggal Lahir</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Tanggal Lahir <span className="text-red-500">*</span>
+              </label>
               <input
                 type="date"
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3"
+                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
               />
             </div>
 
+            {!isFormValid && (
+              <p className="text-center text-xs text-slate-400">
+                Lengkapi semua data untuk melanjutkan ke pembayaran.
+              </p>
+            )}
+
             <button
               onClick={continueToPayment}
-              disabled={!firstName.trim() || !idNumber.trim()}
-              className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!isFormValid}
+              className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Lanjutkan ke Pembayaran
             </button>
           </div>
         </section>
+        </div>
       </main>
     </div>
   );

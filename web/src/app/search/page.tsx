@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpDown, CalendarDays, ChevronLeft, ChevronRight, Plane, PlaneLanding, PlaneTakeoff, Search, Users } from "lucide-react";
 import MainNav from "@/components/MainNav";
+import LazySection from "@/components/LazySection";
 import { getAirportOptionsFromApi } from "@/lib/airport-api";
 
 
@@ -483,6 +484,7 @@ export default function SearchPage() {
     >
       <MainNav />
       <main className="mx-auto w-full max-w-7xl overflow-x-clip px-4 pb-10 pt-6 md:px-6 md:pt-8">
+        <LazySection>
         <section
           className="relative overflow-visible rounded-[28px] bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-8 text-white shadow-xl md:px-8 md:py-10"
         >
@@ -839,6 +841,7 @@ export default function SearchPage() {
             )}
           </div>
         </section>
+        </LazySection>
       </main>
     </div>
   );

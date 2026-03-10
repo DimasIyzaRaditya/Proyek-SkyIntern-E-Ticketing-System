@@ -68,6 +68,7 @@ model User {
   phone         String?   @db.VarChar(20)
   avatarUrl     String?   @db.Text
   role          Role      @default(USER)
+  isBlocked     Boolean   @default(false)
   resetToken    String?   @db.VarChar(255)
   resetExpire   DateTime?
   createdAt     DateTime  @default(now())

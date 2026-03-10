@@ -49,6 +49,17 @@ export const apiRequest = async <T>(path: string, options: ApiRequestOptions = {
 
   if (!response.ok) {
     const message = await readErrorMessage(response);
+    // If the account is blocked, clear session and redirect to login
+    if (
+      response.status === 403 &&
+      message === "Akun Anda telah diblokir oleh admin."
+    ) {
+      if (typeof window !== "undefined") {
+        const { clearSession } = await import("@/lib/auth");
+        clearSession();
+        window.location.href = "/auth/login?blocked=1";
+      }
+    }
     throw new Error(message);
   }
 

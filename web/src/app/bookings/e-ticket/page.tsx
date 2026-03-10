@@ -1,10 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
 import { CheckCircle2, Download, Ticket, UserRound } from "lucide-react";
 import MainNav from "@/components/MainNav";
+
+const QRCodeSVG = dynamic(
+  () => import("qrcode.react").then((m) => ({ default: m.QRCodeSVG })),
+  {
+    ssr: false,
+    loading: () => <div className="skeleton h-40 w-40 rounded-xl" />,
+  },
+);
 
 type BookingStatus = "Pending" | "Processing" | "Paid" | "Cancelled";
 
@@ -78,7 +86,7 @@ function ETicketPageContent() {
                     includeMargin={false}
                   />
                 ) : (
-                  <div className="h-40 w-40 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="skeleton h-40 w-40 rounded-xl" />
                 )}
               </div>
               <p className="mt-3 text-xl font-black tracking-widest text-slate-900">{bookingCode}</p>

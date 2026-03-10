@@ -801,3 +801,51 @@ export const uploadPassengerDocument = async (req: AuthRequest, res: Response) =
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
+
+// Admin: Update status booking secara manual
+export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string)
+    const { action } = req.body as { action: string }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { ticket: true, flight: true }
+    })
+
+    if (!booking) {
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" })
+    }
+
+    if (action === "markpending") {
+      await prisma.booking.update({ where: { id }, data: { status: "PENDING" } })
+      return res.json({ message: "Status berhasil diubah ke Pending" })
+    }
+
+    if (action === "markpaid") {
+      await prisma.booking.update({ where: { id }, data: { status: "PAID" } })
+      return res.json({ message: "Status berhasil diubah ke Paid" })
+    }
+
+    if (action === "markissued") {
+      await prisma.booking.update({ where: { id }, data: { status: "PAID" } })
+      if (!booking.ticket) {
+        const ticketNumber = generateTicketNumber()
+        const qrData = JSON.stringify({ ticketNumber, bookingCode: booking.bookingCode, flight: booking.flight.flightNumber })
+        await prisma.ticket.create({ data: { bookingId: id, ticketNumber, qrCode: qrData } })
+      }
+      return res.json({ message: "Tiket berhasil diterbitkan" })
+    }
+
+    if (action === "cancel") {
+      await prisma.booking.update({ where: { id }, data: { status: "CANCELLED" } })
+      await prisma.flightSeat.updateMany({ where: { bookingId: id }, data: { status: "AVAILABLE", bookingId: null } })
+      return res.json({ message: "Booking berhasil dibatalkan" })
+    }
+
+    return res.status(400).json({ message: "Action tidak valid" })
+  } catch (error) {
+    console.error("Update admin booking status error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}

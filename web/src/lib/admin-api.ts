@@ -302,6 +302,19 @@ export const getAdminBookings = async (status?: "PENDING" | "PAID" | "CANCELLED"
   return response.bookings;
 };
 
+export const updateAdminBookingStatus = async (
+  id: number,
+  action: "issue" | "cancel" | "markpaid" | "markpending" | "markissued"
+) => {
+  const response = await apiRequest<{ message: string }>(`/api/admin/bookings/${id}/status`, {
+    method: "PUT",
+    auth: true,
+    body: { action },
+  });
+
+  return response;
+};
+
 export type AdminSeat = {
   id: number;
   seatId: number;
@@ -368,4 +381,30 @@ export const releaseFlightSeats = async (flightId: number, seatIds: number[]) =>
     auth: true,
     body: { seatIds },
   });
+};
+
+export type AdminUser = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: "ADMIN" | "USER";
+  isBlocked: boolean;
+  avatarUrl: string | null;
+  createdAt: string;
+};
+
+export const getAllAdminUsers = async (): Promise<AdminUser[]> => {
+  const response = await apiRequest<{ users: AdminUser[] }>("/api/admin/users", {
+    auth: true,
+  });
+  return response.users;
+};
+
+export const blockAdminUser = async (userId: number): Promise<AdminUser> => {
+  const response = await apiRequest<{ message: string; user: AdminUser }>(`/api/admin/users/${userId}/block`, {
+    method: "PUT",
+    auth: true,
+  });
+  return response.user;
 };

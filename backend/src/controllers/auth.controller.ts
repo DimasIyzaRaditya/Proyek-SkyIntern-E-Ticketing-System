@@ -53,6 +53,10 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Password salah" })
     }
 
+    if (user.isBlocked) {
+      return res.status(403).json({ message: "Akun Anda telah diblokir." })
+    }
+
     const token = jwt.sign( // Buat JWT token berisi id, email, role user, berlaku 1 hari
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET as string,
@@ -269,6 +273,7 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
         email: true,
         phone: true,
         role: true,
+        isBlocked: true,
         avatarUrl: true,
         createdAt: true
       },
@@ -305,6 +310,40 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
     res.json({ message: "Pengguna berhasil dihapus" })
   } catch (error) {
     console.error("Delete user error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const blockUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = Number(req.params.id)
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: "ID user tidak valid" })
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+
+    if (!user) {
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
+    }
+
+    if (user.role === "ADMIN") {
+      return res.status(403).json({ message: "Akun admin tidak dapat diblokir" })
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isBlocked: !user.isBlocked },
+      select: { id: true, name: true, email: true, isBlocked: true }
+    })
+
+    res.json({
+      message: updated.isBlocked ? "Pengguna berhasil diblokir" : "Pemblokiran pengguna berhasil dicabut",
+      user: updated
+    })
+  } catch (error) {
+    console.error("Block user error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

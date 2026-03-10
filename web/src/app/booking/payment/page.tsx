@@ -370,7 +370,11 @@ function PaymentSummaryPageContent() {
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-3xl font-black text-slate-900">Ringkasan Pembayaran</h1>
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-mono text-xl font-bold text-red-600">{countdownText}</div>
+            <div className={`rounded-xl px-4 py-2 font-mono text-xl font-bold ${
+              countdown === 0
+                ? "border border-slate-300 bg-slate-100 text-slate-400 line-through"
+                : "border border-red-200 bg-red-50 text-red-600"
+            }`}>{countdownText}</div>
           </div>
 
           <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
@@ -406,7 +410,7 @@ function PaymentSummaryPageContent() {
                 {bookingIdForPayment && (
                   <button
                     onClick={() => void handleChangePaymentMethod()}
-                    disabled={changingMethod}
+                    disabled={changingMethod || countdown === 0}
                     className="rounded-xl border border-blue-400 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
                   >
                     {changingMethod ? "Memuat..." : "Ganti Metode Pembayaran"}
@@ -441,7 +445,7 @@ function PaymentSummaryPageContent() {
               Pembayaran berhasil dikonfirmasi.
             </div>
           )}
-          {countdown === 0 && !paid && !paymentPending && (
+          {countdown === 0 && !paid && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               Waktu pembayaran habis. Silakan ulangi proses booking.
             </div>

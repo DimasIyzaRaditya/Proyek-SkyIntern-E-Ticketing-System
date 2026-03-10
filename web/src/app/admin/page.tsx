@@ -1,12 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, CheckCircle2, Clock3, ReceiptText, Ticket, TrendingUp, UserCircle2, XCircle } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import LazySection from "@/components/LazySection";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi } from "@/lib/auth-api";
 import { getAdminBookings, type AdminBooking } from "@/lib/admin-api";
+import type { ChartDataPoint } from "./AdminSalesChart";
+
+const AdminSalesChart = dynamic(() => import("./AdminSalesChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="skeleton h-56 w-full rounded-2xl" aria-label="Memuat grafik..." />
+  ),
+});
 
 const formatRupiah = (value: number) => `Rp ${value.toLocaleString("id-ID")}`;
 
@@ -36,6 +46,7 @@ export default function AdminPage() {
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [adminName, setAdminName] = useState("Admin");
   const [adminEmail, setAdminEmail] = useState("");
+  const [chartView, setChartView] = useState<"daily" | "monthly" | "yearly">("monthly");
 
   useEffect(() => {
     const auth = isAuthenticated();
@@ -85,11 +96,33 @@ export default function AdminPage() {
     return { total: bookings.length, paid, issued, pending, cancelled, revenue, today: todayCount };
   }, [bookings]);
 
-  // Monthly chart data for last 6 months
-  const chartData = useMemo(() => {
+  // Daily chart: last 30 days
+  const dailyChartData = useMemo(() => {
     const now = new Date();
-    const months: { label: string; paid: number; pending: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
+    const days: { label: string; fullLabel: string; paid: number; pending: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dateStr = d.toDateString();
+      const paidCount = bookings.filter((b) => {
+        const lbl = paymentLabel(b);
+        return new Date(b.createdAt).toDateString() === dateStr && (lbl === "PAID" || lbl === "ISSUED");
+      }).length;
+      const pendingCount = bookings.filter((b) =>
+        new Date(b.createdAt).toDateString() === dateStr && paymentLabel(b) === "PENDING"
+      ).length;
+      // Show label every 5 days or on 1st of month
+      const showLabel = d.getDate() % 5 === 0 || d.getDate() === 1;
+      const label = showLabel ? (d.getDate() === 1 ? `1 ${MONTHS_ID[d.getMonth()]}` : `${d.getDate()}`) : "";
+      days.push({ label, fullLabel: `${d.getDate()} ${MONTHS_ID[d.getMonth()]}`, paid: paidCount, pending: pendingCount });
+    }
+    return days;
+  }, [bookings]);
+
+  // Monthly chart: last 12 months
+  const monthlyChartData = useMemo(() => {
+    const now = new Date();
+    const months: { label: string; fullLabel: string; paid: number; pending: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const year = d.getFullYear();
       const month = d.getMonth();
@@ -102,12 +135,30 @@ export default function AdminPage() {
         const bd = new Date(b.createdAt);
         return bd.getFullYear() === year && bd.getMonth() === month && paymentLabel(b) === "PENDING";
       }).length;
-      months.push({ label: `${MONTHS_ID[month]}`, paid: paidCount, pending: pendingCount });
+      months.push({ label: MONTHS_ID[month], fullLabel: `${MONTHS_ID[month]} ${year}`, paid: paidCount, pending: pendingCount });
     }
     return months;
   }, [bookings]);
 
-  const maxBar = useMemo(() => Math.max(...chartData.map((d) => d.paid + d.pending), 1), [chartData]);
+  // Yearly chart: last 5 years
+  const yearlyChartData = useMemo(() => {
+    const now = new Date();
+    const years: { label: string; fullLabel: string; paid: number; pending: number }[] = [];
+    for (let i = 4; i >= 0; i--) {
+      const year = now.getFullYear() - i;
+      const paidCount = bookings.filter((b) => {
+        const lbl = paymentLabel(b);
+        return new Date(b.createdAt).getFullYear() === year && (lbl === "PAID" || lbl === "ISSUED");
+      }).length;
+      const pendingCount = bookings.filter((b) =>
+        new Date(b.createdAt).getFullYear() === year && paymentLabel(b) === "PENDING"
+      ).length;
+      years.push({ label: `${year}`, fullLabel: `${year}`, paid: paidCount, pending: pendingCount });
+    }
+    return years;
+  }, [bookings]);
+
+  const activeChartData: ChartDataPoint[] = chartView === "daily" ? dailyChartData : chartView === "monthly" ? monthlyChartData : yearlyChartData;
 
   const recentBookings = useMemo(
     () => [...bookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8),
@@ -121,14 +172,29 @@ export default function AdminPage() {
       )}
 
       {loading ? (
-        <section className="rounded-3xl border border-blue-100 bg-white p-6 text-center text-xs text-slate-600 shadow-sm sm:p-8 sm:text-sm">
-          Memuat dashboard admin...
+        <section className="space-y-6 page-enter">
+          {/* Stat cards skeleton */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="skeleton mb-3 h-3.5 w-20 rounded" />
+                <div className="skeleton h-9 w-24 rounded-lg" />
+                <div className="skeleton mt-2 h-3 w-32 rounded" />
+              </div>
+            ))}
+          </div>
+          {/* Chart skeleton */}
+          <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+            <div className="skeleton mb-4 h-6 w-36 rounded-lg" />
+            <div className="skeleton h-56 w-full rounded-2xl" />
+          </div>
         </section>
       ) : (
-        <section className="space-y-6">
+        <section className="space-y-6 page-enter">
 
           {/* ── Stat Cards ── */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <LazySection>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <p className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 uppercase tracking-wide">
                 <UserCircle2 className="h-3.5 w-3.5" /> Admin
@@ -155,62 +221,80 @@ export default function AdminPage() {
               <p className="mt-1 text-xs text-slate-500">Pending: {stats.pending} · Batal: {stats.cancelled}</p>
             </div>
           </div>
+          </LazySection>
 
           {/* ── Bar Chart & Status Side-by-Side ── */}
+          <LazySection delay={1}>
           <div className="grid gap-4 lg:grid-cols-3">
 
-            {/* Monthly bar chart */}
+            {/* Sales chart with Daily / Monthly / Yearly tabs */}
             <section className="col-span-2 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-5 inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
-                <TrendingUp className="h-5 w-5 text-blue-700" /> Penjualan 6 Bulan Terakhir
-              </h2>
-              <div className="flex items-end gap-2 h-36">
-                {chartData.map((d) => {
-                  const total = d.paid + d.pending;
-                  const paidH = total > 0 ? Math.max(4, Math.round((d.paid / maxBar) * 130)) : 0;
-                  const pendingH = total > 0 ? Math.max(4, Math.round((d.pending / maxBar) * 130)) : 0;
-                  return (
-                    <div key={d.label} className="flex flex-1 flex-col items-center gap-1 min-w-0">
-                      <span className="text-[11px] font-bold text-slate-600">{total > 0 ? total : ""}</span>
-                      <div className="w-full flex flex-col justify-end" style={{ height: 130 }}>
-                        {pendingH > 0 && <div className="w-full rounded-t bg-amber-300" style={{ height: pendingH }} title={`Pending: ${d.pending}`} />}
-                        {paidH > 0 && <div className={`w-full bg-blue-500 ${pendingH > 0 ? "" : "rounded-t"}`} style={{ height: paidH }} title={`Paid/Issued: ${d.paid}`} />}
-                        {total === 0 && <div className="w-full rounded-t bg-slate-100" style={{ height: 6 }} />}
-                      </div>
-                      <span className="text-[10px] text-slate-500 text-center leading-none">{d.label}</span>
-                    </div>
-                  );
-                })}
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
+                  <TrendingUp className="h-5 w-5 text-blue-600" /> Grafik Penjualan
+                </h2>
+                <div className="flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1">
+                  {(["daily", "monthly", "yearly"] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setChartView(v)}
+                      className={`rounded-lg px-4 py-1.5 transition-all duration-200 ${
+                        chartView === v
+                          ? "bg-blue-600 text-white shadow"
+                          : "text-slate-500 hover:text-slate-700 hover:bg-white"
+                      }`}
+                    >
+                      {v === "daily" ? "Harian" : v === "monthly" ? "Bulanan" : "Tahunan"}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs">
-                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-500 inline-block" /> Paid / Issued</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-300 inline-block" /> Pending</span>
+              <p className="mb-4 text-xs text-slate-400">
+                {chartView === "daily" ? "30 hari terakhir" : chartView === "monthly" ? "12 bulan terakhir" : "5 tahun terakhir"}
+              </p>
+
+              <div className="w-full">
+                <AdminSalesChart data={activeChartData} view={chartView} />
               </div>
             </section>
 
             {/* Status breakdown */}
-            <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm flex flex-col gap-3">
-              <h2 className="mb-1 text-base font-black text-slate-900 sm:text-lg">Status Booking</h2>
-              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 flex items-center gap-3">
-                <Ticket className="h-5 w-5 text-blue-600 shrink-0" />
-                <div><p className="text-xs text-slate-500">Issued</p><p className="text-2xl font-black text-blue-700">{stats.issued}</p></div>
+            <section className="rounded-3xl border border-blue-100 bg-white p-4 sm:p-6 shadow-sm flex flex-col gap-3">
+              <h2 className="mb-1 text-sm font-black text-slate-900 sm:text-base md:text-lg">Status Booking</h2>
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
+                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
+                <div>
+                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Issued</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-blue-700 leading-tight">{stats.issued}</p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                <div><p className="text-xs text-slate-500">Paid</p><p className="text-2xl font-black text-emerald-700">{stats.paid}</p></div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Paid</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 leading-tight">{stats.paid}</p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 flex items-center gap-3">
-                <Clock3 className="h-5 w-5 text-amber-600 shrink-0" />
-                <div><p className="text-xs text-slate-500">Pending</p><p className="text-2xl font-black text-amber-700">{stats.pending}</p></div>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
+                <Clock3 className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Pending</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-amber-700 leading-tight">{stats.pending}</p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-red-100 bg-red-50 p-4 flex items-center gap-3">
-                <XCircle className="h-5 w-5 text-red-600 shrink-0" />
-                <div><p className="text-xs text-slate-500">Dibatalkan</p><p className="text-2xl font-black text-red-700">{stats.cancelled}</p></div>
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
+                <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0" />
+                <div>
+                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Dibatalkan</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-red-700 leading-tight">{stats.cancelled}</p>
+                </div>
               </div>
             </section>
           </div>
+          </LazySection>
 
           {/* ── Recent Bookings Table ── */}
+          <LazySection delay={2}>
           <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 inline-flex items-center gap-2 text-lg font-black text-slate-900 sm:text-xl">
               <ReceiptText className="h-5 w-5 text-blue-700" /> Booking Terbaru
@@ -261,6 +345,7 @@ export default function AdminPage() {
               </table>
             </div>
           </section>
+          </LazySection>
 
         </section>
       )}

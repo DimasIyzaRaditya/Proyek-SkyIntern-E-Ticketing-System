@@ -5,6 +5,8 @@ import Image from "next/image";
 import { type ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import MainNav from "@/components/MainNav";
+import LazySection from "@/components/LazySection";
+import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
@@ -18,6 +20,7 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const showSkeleton = useMinDelay(loading);
   const [message, setMessage] = useState("");
   const authenticated = isAuthenticated();
 
@@ -99,14 +102,37 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   };
 
-  if (!authenticated || loading) {
+  if (!authenticated || showSkeleton) {
     return (
       <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
         <MainNav />
         <main className="mx-auto max-w-6xl px-6 py-10">
-          <section className="rounded-3xl border border-blue-100 bg-white p-8 text-center text-sm font-semibold text-slate-600 shadow-lg">
-            Memeriksa sesi login...
-          </section>
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
+              {/* Avatar + name */}
+              <div className="flex items-center gap-4">
+                <div className="skeleton h-20 w-20 rounded-full" />
+                <div className="space-y-2">
+                  <div className="skeleton h-6 w-40 rounded-lg" />
+                  <div className="skeleton h-3.5 w-56 rounded" />
+                </div>
+              </div>
+              {/* Fields */}
+              <div className="mt-6 space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="skeleton h-3.5 w-24 rounded" />
+                    <div className="skeleton h-11 w-full rounded-2xl" />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 skeleton h-11 w-32 rounded-2xl" />
+            </div>
+            <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-lg">
+              <div className="skeleton mb-4 h-6 w-32 rounded-lg" />
+              <div className="skeleton h-24 w-full rounded-2xl" />
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -116,6 +142,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <LazySection>
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <section className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6 md:p-8">
             <h1 className="text-xl font-black text-slate-900 sm:text-2xl md:text-3xl">Profile Dashboard</h1>
@@ -241,6 +268,7 @@ export default function ProfilePage() {
             </section>
           </aside>
         </div>
+        </LazySection>
       </main>
     </div>
   );

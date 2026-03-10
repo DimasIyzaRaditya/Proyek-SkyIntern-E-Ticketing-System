@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
+import LazySection from "@/components/LazySection";
 import { isAuthenticated } from "@/lib/auth";
 import { getMyBookingsFromApi, createPaymentFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 
@@ -330,7 +331,7 @@ function MyBookingsPageContent() {
         strategy="afterInteractive"
       />
       <MainNav />
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10 page-enter">
         <h1 className="inline-flex items-center gap-2 text-3xl font-black text-slate-900">
           <Ticket className="h-7 w-7 text-blue-700" /> My Bookings
         </h1>
@@ -355,8 +356,25 @@ function MyBookingsPageContent() {
 
         <section className="mt-6 space-y-4">
           {loading ? (
-            <div className="rounded-2xl border border-blue-100 bg-white p-8 text-center text-sm text-slate-500">
-              Memuat booking...
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-3xl border border-blue-100 bg-white p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-2">
+                      <div className="skeleton h-5 w-36 rounded-lg" />
+                      <div className="skeleton h-4 w-52 rounded" />
+                      <div className="skeleton h-3.5 w-28 rounded" />
+                      <div className="skeleton h-3.5 w-44 rounded" />
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="skeleton h-6 w-20 rounded-full" />
+                      <div className="flex gap-2">
+                        <div className="skeleton h-9 w-28 rounded-xl" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : bookingList.length === 0 ? (
             <div className="rounded-2xl border border-blue-100 bg-white p-8 text-center text-sm text-slate-500">

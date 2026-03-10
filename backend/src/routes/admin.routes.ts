@@ -9,7 +9,7 @@ import * as airlineController from "../controllers/airline.controller"
 import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
 import * as bookingController from "../controllers/booking.controller"
-import { getAllUsers, deleteUser } from "../controllers/auth.controller"
+import { getAllUsers, deleteUser, blockUser } from "../controllers/auth.controller"
 
 const router = Router() // Router Express untuk semua route admin
 const upload = multer({ storage: multer.memoryStorage() }) // Middleware upload file, disimpan di memory (buffer) bukan disk
@@ -387,6 +387,7 @@ router.post("/seats/generate", seatController.generateStandardSeats)
 
 // Booking & Transaction Management
 router.get("/bookings", bookingController.getAllBookingsAdmin)
+router.put("/bookings/:id/status", bookingController.updateAdminBookingStatus)
 
 // User Management
 /**
@@ -427,6 +428,7 @@ router.get("/bookings", bookingController.getAllBookingsAdmin)
  *                         format: date-time
  */
 router.get("/users", getAllUsers)
+router.put("/users/:id/block", blockUser)
 
 /**
  * @swagger

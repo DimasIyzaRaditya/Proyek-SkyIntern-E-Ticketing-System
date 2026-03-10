@@ -94,7 +94,13 @@ export const checkTransactionStatus = async (orderId: string) => {
     const statusResponse = await snap.transaction.status(orderId) // Ambil status transaksi dari Midtrans berdasarkan orderId
     return statusResponse
   } catch (error: any) {
-    console.error("Midtrans check status error:", error)
+    // Jangan log 404 sebagai error — itu kasus normal (user belum mulai bayar / token belum digunakan)
+    const is404 =
+      error?.ApiResponse?.status_code === "404" ||
+      error?.httpStatusCode === "404"
+    if (!is404) {
+      console.error("Midtrans check status error:", error)
+    }
     throw error // lempar original error agar caller bisa cek ApiResponse & httpStatusCode
   }
 }

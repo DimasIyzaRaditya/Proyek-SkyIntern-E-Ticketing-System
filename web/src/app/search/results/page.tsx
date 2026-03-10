@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
+import LazySection from "@/components/LazySection";
 import { formatRupiah } from "@/lib/currency";
 import { type FlightCardItem, searchFlightsFromApi } from "@/lib/flight-api";
 
@@ -111,7 +112,7 @@ function SearchResultsPageContent() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <main className="mx-auto max-w-7xl px-6 py-10 page-enter">
         <h1 className="text-3xl font-black text-slate-900">Hasil Pencarian Penerbangan</h1>
         <p className="mt-1 text-sm text-slate-600">
           {origin} → {destination} • {departureDate} - {returnDate} • {adult} Adult / {child} Child
@@ -130,7 +131,47 @@ function SearchResultsPageContent() {
 
           <section className="space-y-4">
             {isLoadingFlights && (
-              <div className="rounded-2xl border border-blue-100 bg-white p-4 text-sm text-slate-600">Memuat data penerbangan dari backend...</div>
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        {/* Airline name + time grid */}
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="skeleton h-6 w-36 rounded-lg" />
+                          <div className="grid min-w-60 grid-cols-[auto_1fr_auto] items-center gap-4 text-center">
+                            <div className="space-y-1">
+                              <div className="skeleton h-9 w-16 rounded" />
+                              <div className="skeleton mx-auto h-3.5 w-10 rounded" />
+                            </div>
+                            <div className="space-y-2">
+                              <div className="skeleton mx-auto h-3.5 w-14 rounded" />
+                              <div className="skeleton mx-auto h-0.5 w-14 rounded-full" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="skeleton h-9 w-16 rounded" />
+                              <div className="skeleton mx-auto h-3.5 w-10 rounded" />
+                            </div>
+                          </div>
+                        </div>
+                        {/* Tabs */}
+                        <div className="mt-4 flex flex-wrap items-center gap-5 border-t border-slate-200 pt-4">
+                          {Array.from({ length: 5 }).map((_, j) => (
+                            <div key={j} className="skeleton h-4 w-14 rounded" />
+                          ))}
+                        </div>
+                        {/* Tab content */}
+                        <div className="skeleton mt-3 h-14 w-full rounded-xl" />
+                      </div>
+                      {/* Price + button */}
+                      <div className="w-full lg:w-auto lg:min-w-42.5 lg:text-right">
+                        <div className="skeleton h-9 w-32 rounded-lg" />
+                        <div className="skeleton mt-4 h-10 w-full rounded-xl lg:w-36" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
 
             {flightError && !isLoadingFlights && (
@@ -143,11 +184,12 @@ function SearchResultsPageContent() {
               </div>
             )}
 
-            {sortedFlights.map((flight) => {
+            {sortedFlights.map((flight, idx) => {
               const query = new URLSearchParams({ origin, destination, departureDate, returnDate, adult, child });
 
               return (
-                <article key={flight.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <LazySection key={flight.id} delay={Math.min(5, (idx % 5) + 1) as 1 | 2 | 3 | 4 | 5}>
+                <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -200,6 +242,7 @@ function SearchResultsPageContent() {
                     </div>
                   </div>
                 </article>
+                </LazySection>
               );
             })}
           </section>

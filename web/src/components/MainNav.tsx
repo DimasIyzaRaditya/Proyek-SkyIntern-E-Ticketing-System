@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useSyncExternalStore } from "react";
-import { Plane } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Menu, Plane, X } from "lucide-react";
 import { clearSession, getUserSession, isAuthenticated } from "@/lib/auth";
 
 const publicMenus = [
@@ -22,16 +22,27 @@ const adminMenus = [
   { href: "/admin", label: "Admin Dashboard" },
 ];
 
-/*
-  NOTE:
-  - Navbar tetap satu baris di semua ukuran layar.
-  - Semua tombol (Flights, Bookings, Masuk, Daftar) rata kanan.
-  - Grup tombol tetap fleksibel (bisa scroll di layar kecil) agar tidak tabrakan.
-  - Di layar besar, scroll otomatis nonaktif dan layout kembali normal.
-*/
 export default function MainNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Close on route change
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [menuOpen]);
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [menuOpen]);
 
   const authSnapshot = useSyncExternalStore(
     () => () => {},
@@ -51,31 +62,45 @@ export default function MainNav() {
       loggedIn: role !== null,
       role,
       displayName: nameRaw || "User",
-    } as {
-      loggedIn: boolean;
-      role: "user" | "admin" | null;
-      displayName: string;
-    };
+    } as { loggedIn: boolean; role: "user" | "admin" | null; displayName: string };
   }, [authSnapshot]);
 
-  const activeMenus = !authState.loggedIn ? publicMenus : authState.role === "admin" ? adminMenus : userMenus;
+  const activeMenus = !authState.loggedIn
+    ? publicMenus
+    : authState.role === "admin"
+    ? adminMenus
+    : userMenus;
+
+  const handleLogout = () => {
+    clearSession();
+    setMenuOpen(false);
+    router.push("/auth/login");
+  };
+
+  const isActive = (href: string) =>
+    pathname === href || (href === "/admin" && pathname.startsWith("/admin"));
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-blue-100 bg-[linear-gradient(120deg,#0b2f61_0%,#114a8f_45%,#0a2349_100%)] text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-2.5 py-2.5 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-3 md:px-5 md:py-3.5">
-        <Link href="/" className="inline-flex shrink-0 items-center gap-1.5 text-base font-black tracking-tight sm:gap-2 sm:text-lg md:text-xl lg:text-2xl">
-          <Plane className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />
-          <span>SkyIntern</span>
-        </Link>
+    <>
+      <nav className="sticky top-0 z-40 border-b border-blue-100 bg-[linear-gradient(120deg,#0b2f61_0%,#114a8f_45%,#0a2349_100%)] text-white shadow-lg">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-5 md:py-3.5">
+          {/* Logo */}
+          <Link
+            href="/"
+            className="inline-flex shrink-0 items-center gap-2 text-lg font-black tracking-tight md:text-xl lg:text-2xl"
+          >
+            <Plane className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />
+            <span>SkyIntern</span>
+          </Link>
 
-        <div className="w-full min-w-0 sm:ml-auto sm:w-auto">
-          <div className="flex flex-wrap items-center justify-start gap-1 sm:justify-end sm:gap-1.5 md:gap-2">
+          {/* Desktop menu — hidden on mobile */}
+          <div className="hidden items-center gap-1.5 sm:flex md:gap-2">
             {activeMenus.map((item) => (
               <Link
-                key={`stable-${item.href}`}
+                key={item.href}
                 href={item.href}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-xl border px-2 py-1 text-[10px] font-semibold transition sm:px-2.5 sm:py-1.5 sm:text-[11px] md:px-3 md:py-1.5 md:text-xs lg:px-4 lg:py-2 lg:text-sm ${
-                  pathname === item.href || (item.href === "/admin" && pathname.startsWith("/admin"))
+                className={`inline-flex items-center whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-semibold transition md:px-3.5 md:text-sm lg:px-4 lg:py-2 ${
+                  isActive(item.href)
                     ? "border-white/80 bg-white/20 text-white"
                     : "border-white/25 bg-white/5 text-blue-100 hover:bg-white/15 hover:text-white"
                 }`}
@@ -86,32 +111,132 @@ export default function MainNav() {
 
             {authState.loggedIn ? (
               <>
-                <span className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-white/95 px-2.5 text-[10px] font-semibold text-blue-700 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-4 lg:py-2 lg:text-sm">
+                <span className="inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-white/95 px-3 text-xs font-semibold text-blue-700 md:h-9 md:px-3.5 md:text-sm lg:px-4">
                   {authState.displayName}
                 </span>
                 <button
-                  onClick={() => {
-                    clearSession();
-                    router.push("/auth/login");
-                  }}
-                  className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-rose-600 px-2.5 text-[10px] font-semibold text-white transition hover:bg-rose-700 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-5 lg:py-2 lg:text-sm"
+                  onClick={handleLogout}
+                  className="inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 md:h-9 md:px-3.5 md:text-sm lg:px-5"
                 >
                   Logout
                 </button>
               </>
             ) : (
               <>
-                <Link href="/auth/login" className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-white/95 px-2.5 text-[10px] font-semibold text-blue-600 transition hover:bg-blue-50 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-4 lg:py-2 lg:text-sm">
+                <Link
+                  href="/auth/login"
+                  className="inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-white/95 px-3 text-xs font-semibold text-blue-600 transition hover:bg-blue-50 md:h-9 md:px-3.5 md:text-sm lg:px-4"
+                >
                   Masuk
                 </Link>
-                <Link href="/auth/register" className="inline-flex h-7 items-center whitespace-nowrap rounded-xl bg-blue-600 px-2.5 text-[10px] font-semibold text-white transition hover:bg-blue-700 sm:h-8 sm:px-3 sm:text-[11px] md:h-9 md:px-3.5 md:text-xs lg:h-auto lg:px-5 lg:py-2 lg:text-sm">
+                <Link
+                  href="/auth/register"
+                  className="inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 md:h-9 md:px-3.5 md:text-sm lg:px-5"
+                >
                   Daftar
                 </Link>
               </>
             )}
           </div>
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "Tutup menu" : "Buka menu"}
+            aria-expanded={menuOpen}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/20 sm:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Mobile slide-in drawer (right half) ── */}
+      {/* Backdrop */}
+      <div
+        onClick={() => setMenuOpen(false)}
+        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 sm:hidden ${
+          menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        aria-hidden="true"
+      />
+
+      {/* Drawer panel — slides in from right, ~70% wide */}
+      <div
+        className={`fixed right-0 top-0 z-50 flex h-full w-[72vw] max-w-xs flex-col bg-[linear-gradient(160deg,#0b2f61_0%,#0d3b7a_60%,#0a2349_100%)] shadow-2xl transition-transform duration-300 ease-out sm:hidden ${
+          menuOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+        aria-hidden={!menuOpen}
+      >
+        {/* Drawer header */}
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+          <Link href="/" className="flex items-center gap-2 text-base font-black text-white">
+            <Plane className="h-4 w-4" />
+            SkyIntern
+          </Link>
+          <button
+            onClick={() => setMenuOpen(false)}
+            aria-label="Tutup menu"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Nav links */}
+        <nav className="flex-1 overflow-y-auto px-3 py-3">
+          <div className="space-y-1">
+            {activeMenus.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  isActive(item.href)
+                    ? "bg-white/20 text-white"
+                    : "text-blue-100 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
+        {/* Auth section pinned to bottom */}
+        <div className="border-t border-white/10 px-3 py-4 space-y-2">
+          {authState.loggedIn ? (
+            <>
+              <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5">
+                <span className="text-base">👤</span>
+                <span className="truncate text-sm font-semibold text-white">
+                  {authState.displayName}
+                </span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700 active:scale-95"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/auth/login"
+                className="block rounded-xl bg-white/95 px-4 py-2.5 text-center text-sm font-bold text-blue-700 transition hover:bg-white active:scale-95"
+              >
+                Masuk
+              </Link>
+              <Link
+                href="/auth/register"
+                className="block rounded-xl bg-blue-600 px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-blue-700 active:scale-95"
+              >
+                Daftar
+              </Link>
+            </>
+          )}
         </div>
       </div>
-    </nav>
+    </>
   );
 }
