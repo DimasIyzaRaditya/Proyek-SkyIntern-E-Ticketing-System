@@ -112,7 +112,7 @@ function SearchResultsPageContent() {
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
       <main className="mx-auto max-w-7xl px-6 py-10">
-        <h1 className="text-3xl font-black text-slate-900">Flight Result Page</h1>
+        <h1 className="text-3xl font-black text-slate-900">Hasil Pencarian Penerbangan</h1>
         <p className="mt-1 text-sm text-slate-600">
           {origin} → {destination} • {departureDate} - {returnDate} • {adult} Adult / {child} Child
         </p>
@@ -145,8 +145,6 @@ function SearchResultsPageContent() {
 
             {sortedFlights.map((flight) => {
               const query = new URLSearchParams({ origin, destination, departureDate, returnDate, adult, child });
-              const stopCount = Number(flight.id) % 2 === 0 ? "Direct" : "1 stop";
-              const promoBadge = Number(flight.id) % 3 === 0;
 
               return (
                 <article key={flight.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -155,20 +153,6 @@ function SearchResultsPageContent() {
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                           <p className="text-xl font-bold text-slate-900">{flight.logo} {flight.airline}</p>
-                          <p className="mt-1 text-sm text-slate-500">Partially operated by partner airline</p>
-
-                          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700">
-                            <span>🧳 46kg</span>
-                            <span>🍴</span>
-                            <span>🖥️</span>
-                            <span>+2</span>
-                          </div>
-
-                          {promoBadge && (
-                            <p className="mt-3 inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-600">
-                              🏝️ First Flight Promo
-                            </p>
-                          )}
                         </div>
 
                         <div className="grid min-w-60 grid-cols-[auto_1fr_auto] items-center gap-4 text-center text-slate-900">
@@ -179,7 +163,6 @@ function SearchResultsPageContent() {
                           <div>
                             <p className="text-sm text-slate-500">{flight.duration}</p>
                             <div className="mx-auto mt-1 h-0.5 w-16 bg-slate-300" />
-                            <p className="text-sm text-slate-500">{stopCount}</p>
                           </div>
                           <div>
                             <p className="text-3xl font-black">{flight.arrivalTime}</p>
@@ -207,7 +190,6 @@ function SearchResultsPageContent() {
 
                     <div className="w-full lg:w-auto lg:min-w-42.5 lg:text-right">
                       <p className="text-3xl font-black text-orange-600">{formatRupiah(flight.price)}<span className="text-sm font-semibold text-slate-500">/pax</span></p>
-                      <p className="mt-1 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">Round-trip Combo</p>
 
                       <Link
                         href={`/search/detail/${flight.id}?${query.toString()}`}

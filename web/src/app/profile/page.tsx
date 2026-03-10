@@ -14,7 +14,6 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(() => getUserSession()?.fullName ?? "User SkyIntern");
   const [phoneNumber, setPhoneNumber] = useState(() => getUserSession()?.phoneNumber ?? "");
   const [avatarUrl, setAvatarUrl] = useState(() => getUserSession()?.avatarUrl ?? "");
-  const [city, setCity] = useState("Jakarta");
   const [email, setEmail] = useState(() => getUserSession()?.email ?? "user@skyintern.com");
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -151,10 +150,6 @@ export default function ProfilePage() {
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Phone Number</label>
                   <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">City</label>
-                  <input value={city} onChange={(event) => setCity(event.target.value)} className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3" />
                 </div>
               </div>
               <div>

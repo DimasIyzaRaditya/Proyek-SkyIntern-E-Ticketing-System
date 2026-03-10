@@ -46,6 +46,7 @@ function PassengerFormPageContent() {
       adult: searchParams.get("adult") ?? "1",
       child: searchParams.get("child") ?? "0",
       seats: searchParams.get("seats") ?? "",
+      seatFlightIds: searchParams.get("seatFlightIds") ?? "",
       extraPrice: searchParams.get("extraPrice") ?? "0",
       pTitle: title,
       pFirstName: firstName,

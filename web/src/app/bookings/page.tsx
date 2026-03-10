@@ -31,6 +31,7 @@ type BookingStatus = "Pending" | "Processing" | "Paid" | "Cancelled";
 
 type BookingView = {
   id: string;
+  bookingCode: string;
   airline: string;
   route: string;
   date: string;
@@ -95,11 +96,12 @@ function MyBookingsPageContent() {
           else if (item.status === "PAID") status = "Processing";
           return {
             id: String(item.id),
+            bookingCode: item.bookingCode,
             airline: item.flight.airline.name,
             route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
             date: formatDate(item.flight.departureTime),
             status,
-            seat: "-",
+            seat: item.selectedSeats ?? "-",
             passenger,
             flightNumber: item.flight.flightNumber,
             pdfUrl: item.ticket?.pdfUrl ?? "",
@@ -159,11 +161,12 @@ function MyBookingsPageContent() {
             else if (item.status === "PAID") status = "Processing";
             return {
               id: String(item.id),
+              bookingCode: item.bookingCode,
               airline: item.flight.airline.name,
               route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
               date: formatDate(item.flight.departureTime),
               status,
-              seat: "-",
+              seat: item.selectedSeats ?? "-",
               passenger,
               flightNumber: item.flight.flightNumber,
               pdfUrl: item.ticket?.pdfUrl ?? "",
@@ -218,38 +221,6 @@ function MyBookingsPageContent() {
     }
   };
 
-  const dynamicBooking = useMemo<BookingView | null>(() => {
-    const flightNumber = searchParams.get("flightNumber");
-    if (!flightNumber) return null;
-
-    const origin = searchParams.get("origin") ?? "CGK";
-    const destination = searchParams.get("destination") ?? "DPS";
-    const departureDate = searchParams.get("departureDate") ?? "2026-03-15";
-
-    return {
-      id: `BK-${flightNumber}-${departureDate}-${origin}-${destination}`,
-      airline: searchParams.get("airline") ?? "SkyIntern Airline",
-      route: `${origin} → ${destination}`,
-      date: departureDate,
-      status: "Paid",
-      seat: searchParams.get("seat") ?? "12A",
-      passenger: searchParams.get("fullName") ?? "Passenger",
-      flightNumber,
-      pdfUrl: searchParams.get("pdfUrl") ?? `https://minio.skyintern.local/e-ticket/${flightNumber}.pdf`,
-      tab: "Upcoming",
-      flightId: "",
-      origin,
-      destination,
-      departureDate,
-      pTitle: "Mr",
-      pFirstName: searchParams.get("fullName")?.split(" ")[0] ?? "Passenger",
-      pLastName: searchParams.get("fullName")?.split(" ").slice(1).join(" ") ?? "",
-      pIdType: "KTP",
-      pIdNumber: "",
-      pNationality: "Indonesian",
-    };
-  }, [searchParams]);
-
   useEffect(() => {
     const auth = isAuthenticated();
     setAuthenticated(auth);
@@ -285,11 +256,12 @@ function MyBookingsPageContent() {
 
           return {
             id: String(item.id),
+            bookingCode: item.bookingCode,
             airline: item.flight.airline.name,
             route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
             date: formatDate(item.flight.departureTime),
             status,
-            seat: "-",
+            seat: item.selectedSeats ?? "-",
             passenger,
             flightNumber: item.flight.flightNumber,
             pdfUrl: item.ticket?.pdfUrl ?? "",
@@ -307,13 +279,7 @@ function MyBookingsPageContent() {
           };
         });
 
-        const merged = dynamicBooking ? [dynamicBooking, ...mapped] : mapped;
-        const uniqueBookings = new Map<string, BookingView>();
-        for (const booking of merged) {
-          uniqueBookings.set(booking.id, booking);
-        }
-
-        setLiveBookings(Array.from(uniqueBookings.values()));
+        setLiveBookings(mapped);
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Gagal memuat data booking.");
       } finally {
@@ -322,7 +288,7 @@ function MyBookingsPageContent() {
     };
 
     void loadBookings();
-  }, [authenticated, dynamicBooking, router, searchParams]);
+  }, [authenticated, router, searchParams]);
 
   const bookingList = useMemo(
     () => liveBookings.filter((item) => item.tab === activeTab),
@@ -366,7 +332,7 @@ function MyBookingsPageContent() {
       <MainNav />
       <main className="mx-auto max-w-6xl px-6 py-10">
         <h1 className="inline-flex items-center gap-2 text-3xl font-black text-slate-900">
-          <Ticket className="h-7 w-7 text-blue-700" /> My Bookings Page
+          <Ticket className="h-7 w-7 text-blue-700" /> My Bookings
         </h1>
         {message && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{message}</p>}
         {payError && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{payError}</p>}
@@ -406,6 +372,7 @@ function MyBookingsPageContent() {
                 date: booking.date,
                 status: booking.status,
                 pdfUrl: booking.pdfUrl,
+                bookingCode: booking.bookingCode,
               });
 
               return (

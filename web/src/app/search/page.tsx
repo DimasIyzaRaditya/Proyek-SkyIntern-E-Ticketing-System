@@ -252,7 +252,6 @@ export default function SearchPage() {
             if (!code || !city || !country || !airportName || !label) {
               return null;
             }
-// tess
             return {
               code,
               city,

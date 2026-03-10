@@ -6,6 +6,7 @@ type BackendBooking = {
   id: number;
   bookingCode: string;
   status: BookingStatusApi;
+  selectedSeats?: string | null;
   createdAt: string;
   flightId: number;
   totalPrice: number;
@@ -115,4 +116,31 @@ export const syncPaymentFromApi = async (bookingId: number) => {
     method: "POST",
     auth: true,
   });
+};
+
+export type VerifyBookingResult = {
+  booking: {
+    id: number;
+    bookingCode: string;
+    status: string;
+    selectedSeats: string | null;
+    flight: {
+      flightNumber: string;
+      departureTime: string;
+      arrivalTime: string;
+      airline: { name: string };
+      origin: { city: string; country: string };
+      destination: { city: string; country: string };
+    };
+    passengers: Array<{
+      title?: string;
+      firstName: string;
+      lastName: string;
+      type?: string;
+    }>;
+  };
+};
+
+export const verifyBookingFromApi = async (code: string) => {
+  return apiRequest<VerifyBookingResult>(`/api/bookings/verify?code=${encodeURIComponent(code)}`);
 };

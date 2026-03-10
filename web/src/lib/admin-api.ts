@@ -354,3 +354,18 @@ export const updateAdminSeat = async (seatId: number, payload: { status?: string
   });
   return response.seat;
 };
+export const holdFlightSeats = async (flightId: number, seatIds: number[]) => {
+  return apiRequest<{ message: string }>(`/api/flights/${flightId}/seats/hold`, {
+    method: "POST",
+    auth: true,
+    body: { seatIds },
+  });
+};
+
+export const releaseFlightSeats = async (flightId: number, seatIds: number[]) => {
+  return apiRequest<{ message: string }>(`/api/flights/${flightId}/seats/release`, {
+    method: "POST",
+    auth: true,
+    body: { seatIds },
+  });
+};

@@ -1,10 +1,3 @@
-export type RegisteredUser = {
-  fullName: string;
-  email: string;
-  phoneNumber: string;
-  password: string;
-};
-
 export type UserSession = {
   id: number;
   fullName: string;
@@ -14,12 +7,10 @@ export type UserSession = {
   role: "user" | "admin";
 };
 
-const REGISTERED_USER_KEY = "skyintern_registered_user";
 const SESSION_KEY = "skyintern_session";
 const ROLE_KEY = "skyintern_role";
 const TOKEN_KEY = "skyintern_token";
 
-const LEGACY_REGISTERED_USER_KEY = "skybook_registered_user";
 const LEGACY_SESSION_KEY = "skybook_session";
 const LEGACY_ROLE_KEY = "skybook_role";
 const LEGACY_TOKEN_KEY = "skybook_token";
@@ -28,25 +19,6 @@ const readWithLegacyFallback = (key: string, legacyKey: string) => {
   const nextValue = window.localStorage.getItem(key);
   if (nextValue) return nextValue;
   return window.localStorage.getItem(legacyKey);
-};
-
-export const getRegisteredUser = (): RegisteredUser | null => {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const raw = readWithLegacyFallback(REGISTERED_USER_KEY, LEGACY_REGISTERED_USER_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as RegisteredUser;
-  } catch {
-    return null;
-  }
-};
-
-export const saveRegisteredUser = (user: RegisteredUser) => {
-  if (typeof window === "undefined") return;
-  const payload = JSON.stringify(user);
-  window.localStorage.setItem(REGISTERED_USER_KEY, payload);
-  window.localStorage.setItem(LEGACY_REGISTERED_USER_KEY, payload);
 };
 
 export const setUserSession = (session: UserSession, token?: string) => {
@@ -61,12 +33,6 @@ export const setUserSession = (session: UserSession, token?: string) => {
     window.localStorage.setItem(TOKEN_KEY, token);
     window.localStorage.setItem(LEGACY_TOKEN_KEY, token);
   }
-};
-
-export const setAdminSession = () => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ROLE_KEY, "admin");
-  window.localStorage.setItem(LEGACY_ROLE_KEY, "admin");
 };
 
 export const getAuthToken = (): string | null => {

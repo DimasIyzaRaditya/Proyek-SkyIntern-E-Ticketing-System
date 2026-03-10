@@ -252,3 +252,95 @@ export const generateStandardSeats = async (req: AuthRequest, res: Response) => 
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
+
+// User: Hold Seats Temporarily (kunci kursi saat memilih di halaman seat selection)
+export const holdSeats = async (req: AuthRequest, res: Response) => {
+  try {
+    const { flightId } = req.params
+    const { seatIds } = req.body // Array of FlightSeat IDs to hold
+
+    if (!seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
+      return res.status(400).json({ message: "seatIds wajib diisi" })
+    }
+
+    const parsedFlightId = parseInt(flightId as string)
+    if (isNaN(parsedFlightId)) {
+      return res.status(400).json({ message: "flightId tidak valid" })
+    }
+
+    // Atomically check availability and hold in a transaction
+    await prisma.$transaction(async (tx) => {
+      const available = await tx.flightSeat.findMany({
+        where: {
+          id: { in: seatIds as number[] },
+          flightId: parsedFlightId,
+          status: "AVAILABLE"
+        },
+        include: { seat: true }
+      })
+
+      if (available.length !== (seatIds as number[]).length) {
+        const takenIds = (seatIds as number[]).filter(id => !available.find(s => s.id === id))
+        const takenSeats = await tx.flightSeat.findMany({
+          where: { id: { in: takenIds } },
+          include: { seat: true }
+        })
+        const takenNumbers = takenSeats.map(s => s.seat.seatNumber)
+        throw Object.assign(new Error("SEATS_TAKEN"), { takenNumbers })
+      }
+
+      await tx.flightSeat.updateMany({
+        where: {
+          id: { in: seatIds as number[] },
+          flightId: parsedFlightId,
+          status: "AVAILABLE"
+        },
+        data: { status: "RESERVED" }
+      })
+    })
+
+    res.json({ message: "Kursi berhasil dipesan sementara" })
+  } catch (error: any) {
+    if (error.message === "SEATS_TAKEN") {
+      return res.status(409).json({
+        message: `Kursi ${(error.takenNumbers as string[])?.join(", ")} sudah diambil pengguna lain`,
+        takenNumbers: error.takenNumbers
+      })
+    }
+    console.error("Hold seats error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+// User: Release Held Seats (lepas kunci kursi saat deselect atau keluar halaman)
+export const releaseSeats = async (req: AuthRequest, res: Response) => {
+  try {
+    const { flightId } = req.params
+    const { seatIds } = req.body // Array of FlightSeat IDs to release
+
+    if (!seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
+      return res.status(400).json({ message: "seatIds wajib diisi" })
+    }
+
+    const parsedFlightId = parseInt(flightId as string)
+    if (isNaN(parsedFlightId)) {
+      return res.status(400).json({ message: "flightId tidak valid" })
+    }
+
+    // Hanya lepas kursi yang RESERVED tanpa bookingId (hold sementara, bukan booking nyata)
+    await prisma.flightSeat.updateMany({
+      where: {
+        id: { in: seatIds as number[] },
+        flightId: parsedFlightId,
+        status: "RESERVED",
+        bookingId: null
+      },
+      data: { status: "AVAILABLE" }
+    })
+
+    res.json({ message: "Kursi berhasil dilepas" })
+  } catch (error) {
+    console.error("Release seats error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}

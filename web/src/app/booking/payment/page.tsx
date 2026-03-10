@@ -293,9 +293,16 @@ function PaymentSummaryPageContent() {
           return passengers.slice(0, Math.max(1, totalPassengers));
         };
 
+        // Ambil FlightSeat IDs dari URL (dikirim oleh halaman seat selection)
+        const seatFlightIdsParam = searchParams.get("seatFlightIds") ?? "";
+        const seatIds = seatFlightIdsParam
+          ? seatFlightIdsParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0)
+          : [];
+
         const bookingResult = await createBookingFromApi({
           flightId: Number(flightId),
           passengers: buildPassengers(),
+          seatIds: seatIds.length > 0 ? seatIds : undefined,
         });
         bookingId = bookingResult.booking.id;
         setBookingIdForPayment(bookingId);
@@ -362,7 +369,7 @@ function PaymentSummaryPageContent() {
       <main className="mx-auto max-w-3xl px-6 py-12">
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-3xl font-black text-slate-900">Payment Summary Page</h1>
+            <h1 className="text-3xl font-black text-slate-900">Ringkasan Pembayaran</h1>
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-mono text-xl font-bold text-red-600">{countdownText}</div>
           </div>
 

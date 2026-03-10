@@ -81,6 +81,9 @@ const router = Router() // Router Express untuk semua route pemesanan
  */
 router.post("/payment/notification", bookingController.paymentNotification)
 
+// Public: verify booking by code (for QR code scanning — no auth required)
+router.get("/verify", bookingController.verifyBookingByCode)
+
 // All other booking routes require authentication
 router.use(authenticate)
 

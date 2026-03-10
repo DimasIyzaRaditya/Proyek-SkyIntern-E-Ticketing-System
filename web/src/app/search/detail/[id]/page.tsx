@@ -89,7 +89,7 @@ function FlightDetailPageContent() {
       <MainNav />
       <main className="mx-auto max-w-5xl px-6 py-12">
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
-          <h1 className="text-3xl font-black text-slate-900">Flight Detail Page</h1>
+          <h1 className="text-3xl font-black text-slate-900">Detail Penerbangan</h1>
 
           <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div>

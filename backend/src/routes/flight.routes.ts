@@ -97,5 +97,7 @@ router.get("/:id", flightController.getFlightDetail)
  *         description: Seat map retrieved
  */
 router.get("/:flightId/seats", authenticate, seatController.getSeatMap)
+router.post("/:flightId/seats/hold", authenticate, seatController.holdSeats)
+router.post("/:flightId/seats/release", authenticate, seatController.releaseSeats)
 
 export default router

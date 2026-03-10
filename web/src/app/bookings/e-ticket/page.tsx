@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, Download, QrCode, Ticket, UserRound } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { CheckCircle2, Download, Ticket, UserRound } from "lucide-react";
 import MainNav from "@/components/MainNav";
 
 type BookingStatus = "Pending" | "Processing" | "Paid" | "Cancelled";
@@ -17,22 +18,19 @@ const getStatusClass = (status: BookingStatus) => {
 function ETicketPageContent() {
   const searchParams = useSearchParams();
 
-  const passenger = searchParams.get("passenger") ?? "Abimanyu Pratama";
-  const flightNumber = searchParams.get("flightNumber") ?? "GA-123";
-  const seat = searchParams.get("seat") ?? "12A";
-  const route = searchParams.get("route") ?? "CGK → DPS";
-  const date = searchParams.get("date") ?? "15 Mar 2026";
+  const passenger = searchParams.get("passenger") ?? "";
+  const flightNumber = searchParams.get("flightNumber") ?? "";
+  const seat = searchParams.get("seat") ?? "-";
+  const route = searchParams.get("route") ?? "";
+  const date = searchParams.get("date") ?? "";
   const pdfUrl = searchParams.get("pdfUrl") ?? "";
   const status = (searchParams.get("status") as BookingStatus | null) ?? "Paid";
+  const bookingCode = searchParams.get("bookingCode") ?? flightNumber;
 
-  const qrData = useMemo(
-    () =>
-      Array.from({ length: 121 }, (_, i) => {
-        const seed = (i * 17 + 31) % 9;
-        return seed === 0 || seed === 3 || seed === 5;
-      }),
-    [],
-  );
+  const [qrValue, setQrValue] = useState("");
+  useEffect(() => {
+    setQrValue(`${window.location.origin}/bookings/verify?code=${encodeURIComponent(bookingCode)}`);
+  }, [bookingCode]);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
@@ -70,14 +68,21 @@ function ETicketPageContent() {
             </div>
 
             <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-center">
-              <p className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700"><QrCode className="h-4 w-4" /> QR Code</p>
-              <div className="mx-auto w-fit rounded-xl bg-white p-2">
-                <div className="grid grid-cols-11 gap-0.5">
-                  {qrData.map((filled, index) => (
-                    <div key={index} className={`h-2.5 w-2.5 ${filled ? "bg-slate-900" : "bg-white"}`} />
-                  ))}
-                </div>
+              <p className="mb-3 text-sm font-semibold text-blue-700">QR Code Booking</p>
+              <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-sm">
+                {qrValue ? (
+                  <QRCodeSVG
+                    value={qrValue}
+                    size={160}
+                    level="M"
+                    includeMargin={false}
+                  />
+                ) : (
+                  <div className="h-40 w-40 animate-pulse rounded-xl bg-slate-100" />
+                )}
               </div>
+              <p className="mt-3 text-xl font-black tracking-widest text-slate-900">{bookingCode}</p>
+              <p className="mt-1 text-xs text-slate-500">Scan QR code ini untuk verifikasi booking.</p>
             </div>
 
             {pdfUrl ? (

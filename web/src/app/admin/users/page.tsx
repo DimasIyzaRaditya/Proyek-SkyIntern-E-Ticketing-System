@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCcw, ShieldBan, ShieldCheck } from "lucide-react";
+import { RefreshCcw } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import { getAdminBookings, type AdminBooking } from "@/lib/admin-api";
+import { formatRupiah } from "@/lib/currency";
 
 type UserView = {
   id: number;
@@ -11,17 +12,14 @@ type UserView = {
   email: string;
   bookingCount: number;
   totalSpent: number;
-  blocked: boolean;
 };
-
-const formatRupiah = (value: number) => `Rp ${value.toLocaleString("id-ID")}`;
 
 const buildUsers = (bookings: AdminBooking[]): UserView[] => {
   const map = new Map<number, UserView>();
   for (const b of bookings) {
     const u = b.user;
     if (!map.has(u.id)) {
-      map.set(u.id, { id: u.id, name: u.name, email: u.email, bookingCount: 0, totalSpent: 0, blocked: false });
+      map.set(u.id, { id: u.id, name: u.name, email: u.email, bookingCount: 0, totalSpent: 0 });
     }
     const entry = map.get(u.id)!;
     entry.bookingCount += 1;
@@ -33,7 +31,6 @@ const buildUsers = (bookings: AdminBooking[]): UserView[] => {
 
 export default function AdminUsersPage() {
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
-  const [blockedIds, setBlockedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [rowsPerView, setRowsPerView] = useState(20);
@@ -56,10 +53,7 @@ export default function AdminUsersPage() {
     void loadData();
   }, []);
 
-  const users = useMemo(() => {
-    const base = buildUsers(bookings);
-    return base.map((u) => ({ ...u, blocked: blockedIds.has(u.id) }));
-  }, [bookings, blockedIds]);
+  const users = useMemo(() => buildUsers(bookings), [bookings]);
 
   const totalPages = Math.max(1, Math.ceil(users.length / rowsPerView));
 
@@ -84,21 +78,6 @@ export default function AdminUsersPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [rowsPerView]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const toggleBlock = (id: number) => {
-    setBlockedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   return (
     <AdminShell title="User Management" description="Daftar user terdaftar berdasarkan riwayat booking dari API.">
@@ -128,16 +107,14 @@ export default function AdminUsersPage() {
                 <th className="p-3">Nama</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Booking</th>
-                <th className="p-3">Total Spent</th>
-                <th className="p-3">Status</th>
-                <th className="rounded-r-xl p-3">Aksi</th>
+                <th className="rounded-r-xl p-3">Total Spent</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-4 text-center text-slate-500">Memuat data user...</td></tr>
+                <tr><td colSpan={5} className="p-4 text-center text-slate-500">Memuat data user...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={7} className="p-4 text-center text-slate-500">Belum ada data user.</td></tr>
+                <tr><td colSpan={5} className="p-4 text-center text-slate-500">Belum ada data user.</td></tr>
               ) : visibleUsers.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3 font-semibold text-slate-700">#{item.id}</td>
@@ -147,20 +124,6 @@ export default function AdminUsersPage() {
                     <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">{item.bookingCount}x</span>
                   </td>
                   <td className="p-3 text-slate-700">{formatRupiah(item.totalSpent)}</td>
-                  <td className="p-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.blocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
-                      {item.blocked ? "Blocked" : "Active"}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => toggleBlock(item.id)}
-                      className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${item.blocked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
-                    >
-                      {item.blocked ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldBan className="h-3.5 w-3.5" />}
-                      {item.blocked ? "Unblock" : "Block"}
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>

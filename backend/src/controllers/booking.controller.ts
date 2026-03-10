@@ -26,27 +26,33 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Penerbangan tidak ditemukan" })
     }
 
-    // Check seat availability
+    // Check seat availability — terima kursi AVAILABLE atau RESERVED tanpa bookingId (hold sementara)
     if (seatIds && seatIds.length > 0) {
       const seats = await prisma.flightSeat.findMany({
         where: {
           id: { in: seatIds },
-          status: "AVAILABLE"
+          OR: [
+            { status: "AVAILABLE" },
+            { status: "RESERVED", bookingId: null }
+          ]
         }
       })
 
       if (seats.length !== seatIds.length) {
-        return res.status(400).json({ message: "Beberapa kursi tidak tersedia" })
+        return res.status(400).json({ message: "Beberapa kursi tidak tersedia atau sudah dipesan pengguna lain" })
       }
     }
 
     // Calculate total price
     let seatPrice = 0 // Total harga tambahan dari kursi yang dipilih
+    let selectedSeatNumbers: string[] = [] // Nomor kursi untuk disimpan di booking
     if (seatIds && seatIds.length > 0) {
       const seats = await prisma.flightSeat.findMany({
-        where: { id: { in: seatIds } }
-      }) // Ambil data kursi terpilih untuk menghitung harga tambahan
-      seatPrice = seats.reduce((sum, seat) => sum + seat.additionalPrice, 0) // Jumlah seluruh harga tambahan kursi
+        where: { id: { in: seatIds } },
+        include: { seat: true }
+      }) // Ambil data kursi terpilih untuk menghitung harga tambahan dan nomor kursi
+      seatPrice = seats.reduce((sum, s) => sum + s.additionalPrice, 0) // Jumlah seluruh harga tambahan kursi
+      selectedSeatNumbers = seats.map(s => s.seat.seatNumber) // Simpan nomor kursi (misal ["7A","7B"])
     }
 
     const totalPrice = calculateTotalPrice( // Hitung total harga: (base + seat) x penumpang + pajak + admin fee
@@ -67,6 +73,7 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
         userId: req.user!.id,
         flightId,
         totalPrice,
+        selectedSeats: selectedSeatNumbers.length > 0 ? selectedSeatNumbers.join(",") : null,
         expiresAt,
         status: "PENDING",
         passengers: {
@@ -307,6 +314,49 @@ export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
     res.json({ bookings })
   } catch (error) {
     console.error("Get all bookings admin error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+// Public: Verify Booking by Code (no auth required — for QR code scanning)
+export const verifyBookingByCode = async (req: AuthRequest, res: Response) => {
+  try {
+    const { code } = req.query
+
+    if (!code || typeof code !== "string") {
+      return res.status(400).json({ message: "Kode booking diperlukan" })
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { bookingCode: code.toUpperCase() },
+      select: {
+        id: true,
+        bookingCode: true,
+        status: true,
+        selectedSeats: true,
+        flight: {
+          select: {
+            flightNumber: true,
+            departureTime: true,
+            arrivalTime: true,
+            airline: { select: { name: true } },
+            origin: { select: { city: true, country: true } },
+            destination: { select: { city: true, country: true } }
+          }
+        },
+        passengers: {
+          select: { title: true, firstName: true, lastName: true, type: true }
+        }
+      }
+    })
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking tidak ditemukan" })
+    }
+
+    res.json({ booking })
+  } catch (error) {
+    console.error("Verify booking error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
