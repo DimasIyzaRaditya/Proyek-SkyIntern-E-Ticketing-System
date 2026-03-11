@@ -22,9 +22,18 @@ export type ChartDataPoint = {
 interface AdminSalesChartProps {
   data: ChartDataPoint[];
   view: "daily" | "monthly" | "yearly";
+  isRevenue?: boolean;
 }
 
-export default function AdminSalesChart({ data, view }: AdminSalesChartProps) {
+const formatYAxis = (value: number, isRevenue: boolean) => {
+  if (!isRevenue) return String(value);
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}M`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}jt`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}rb`;
+  return String(value);
+};
+
+export default function AdminSalesChart({ data, view, isRevenue = false }: AdminSalesChartProps) {
   return (
     <div className="w-full" style={{ height: 240 }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -56,7 +65,8 @@ export default function AdminSalesChart({ data, view }: AdminSalesChartProps) {
             tick={{ fontSize: 11, fill: "#94a3b8" }}
             axisLine={false}
             tickLine={false}
-            width={36}
+            width={isRevenue ? 52 : 36}
+            tickFormatter={(v) => formatYAxis(v as number, isRevenue)}
           />
           <Tooltip
             cursor={{ fill: "#f1f5f9", radius: 6 }}
@@ -72,7 +82,7 @@ export default function AdminSalesChart({ data, view }: AdminSalesChartProps) {
               return item?.fullLabel ?? label;
             }}
             formatter={(value, name) => [
-              String(value),
+              isRevenue ? `Rp ${Number(value).toLocaleString("id-ID")}` : String(value),
               name === "paid" ? "Paid / Issued" : "Pending",
             ]}
           />
