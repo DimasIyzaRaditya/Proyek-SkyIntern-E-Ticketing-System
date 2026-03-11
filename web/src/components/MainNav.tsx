@@ -40,8 +40,12 @@ export default function MainNav() {
 
   // Lock body scroll when drawer is open
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (menuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.removeProperty("overflow");
+    }
+    return () => { document.body.style.removeProperty("overflow"); };
   }, [menuOpen]);
 
   const authSnapshot = useSyncExternalStore(

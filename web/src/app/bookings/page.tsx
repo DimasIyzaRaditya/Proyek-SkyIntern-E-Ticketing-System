@@ -5,7 +5,7 @@ import Script from "next/script";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
+import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { isAuthenticated } from "@/lib/auth";
@@ -79,6 +79,7 @@ function MyBookingsPageContent() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   const handleSyncPayment = async (bookingId: string) => {
     setSyncingId(bookingId);
@@ -291,10 +292,12 @@ function MyBookingsPageContent() {
     void loadBookings();
   }, [authenticated, router, searchParams]);
 
-  const bookingList = useMemo(
-    () => liveBookings.filter((item) => item.tab === activeTab),
-    [activeTab, liveBookings],
-  );
+  const bookingList = useMemo(() => {
+    const filtered = liveBookings.filter((item) => item.tab === activeTab);
+    return [...filtered].sort((a, b) =>
+      sortOrder === "newest" ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)
+    );
+  }, [activeTab, liveBookings, sortOrder]);
 
   const getStatusClass = (status: BookingStatus) => {
     if (status === "Paid") return "bg-emerald-100 text-emerald-700";
@@ -338,20 +341,46 @@ function MyBookingsPageContent() {
         {message && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{message}</p>}
         {payError && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{payError}</p>}
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          {(["Upcoming", "Completed", "Cancelled"] as const).map((tab) => (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-1.5 rounded-2xl border border-blue-100 bg-white p-1 shadow-sm">
+            {(["Upcoming", "Completed", "Cancelled"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                  activeTab === tab
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-blue-50"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 rounded-2xl border border-blue-100 bg-white p-1 shadow-sm">
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                activeTab === tab
-                  ? "bg-blue-600 text-white"
-                  : "border border-blue-100 bg-white text-slate-700 hover:bg-blue-50"
+              onClick={() => setSortOrder("newest")}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                sortOrder === "newest"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-800 hover:bg-blue-50"
               }`}
             >
-              {tab}
+              <ArrowDownUp className="h-3 w-3" />
+              Terbaru
             </button>
-          ))}
+            <button
+              onClick={() => setSortOrder("oldest")}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                sortOrder === "oldest"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-800 hover:bg-blue-50"
+              }`}
+            >
+              <ArrowDownUp className="h-3 w-3 rotate-180" />
+              Terlama
+            </button>
+          </div>
         </div>
 
         <section className="mt-6 space-y-4">

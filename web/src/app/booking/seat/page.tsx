@@ -288,20 +288,20 @@ function SeatSelectionPageContent() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
-          <h1 className="text-3xl font-black text-slate-900">Pilih Kursi</h1>
-          <p className="mt-1 text-sm text-slate-600">{activeFlight.airline} • {activeFlight.flightNumber} • Pilih kursi yang tersedia.</p>
+      <main className="mx-auto max-w-7xl px-3 sm:px-6 py-6 sm:py-10">
+        <section className="rounded-2xl sm:rounded-3xl border border-blue-100 bg-white p-4 sm:p-6 lg:p-8 shadow-lg">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900">Pilih Kursi</h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600">{activeFlight.airline} • {activeFlight.flightNumber} • Pilih kursi yang tersedia.</p>
           <p className="mt-1 text-xs text-slate-500">{adult} Dewasa{child > 0 ? ` + ${child} Anak` : ""} — Pilih tepat <span className="font-semibold text-blue-700">{totalPassengers} kursi</span></p>
           {flightError && <p className="mt-2 text-xs text-amber-700">{flightError}</p>}
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 md:grid-cols-[1fr_260px] lg:grid-cols-[1fr_320px]">
             <div>
-              <div className="mb-4 flex flex-wrap gap-4 text-sm">
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-green-500" /> Available</span>
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-blue-600" /> Selected</span>
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-slate-400" /> Occupied</span>
-                <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded bg-amber-500" /> Special Seat (+extra)</span>
+              <div className="mb-3 sm:mb-4 flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-green-500" /> Available</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-blue-600" /> Selected</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-slate-400" /> Occupied</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-amber-500" /> Special Seat (+extra)</span>
               </div>
 
               {seatLoading ? (
@@ -324,7 +324,8 @@ function SeatSelectionPageContent() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-6 gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <div className="rounded-xl sm:rounded-2xl border border-blue-100 bg-blue-50 p-2 sm:p-4">
+                  <div className="grid grid-cols-6 gap-1 sm:gap-2">
                   {allSeatNumbers.map((seatId) => {
                     const isOccupied = occupiedSeats.has(seatId);
                     const isSelected = selectedSeats.includes(seatId);
@@ -346,18 +347,19 @@ function SeatSelectionPageContent() {
                         disabled={isOccupied || isHolding || isFull}
                         onClick={() => { void toggleSeat(seatId); }}
                         title={isOccupied ? "Sudah terisi" : isFull ? `Batas ${totalPassengers} kursi tercapai` : isSpecial ? `+${formatRupiah(extraAmt)}` : seatId}
-                        className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${className}`}
+                        className={`flex items-center justify-center rounded-md sm:rounded-lg px-0.5 py-1 text-[9px] xs:text-[10px] sm:px-2 sm:py-2 sm:text-xs font-semibold leading-none transition ${className}`}
                       >
                         {isHolding ? "..." : seatId}
                       </button>
                     );
                   })}
+                  </div>
                 </div>
               )}
             </div>
 
-            <aside className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">Selected Seat Info</h2>
+            <aside className="rounded-xl sm:rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">Selected Seat Info</h2>
 
               {/* Passenger seat counter */}
               <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
@@ -398,7 +400,7 @@ function SeatSelectionPageContent() {
               <button
                 onClick={continueToPassenger}
                 disabled={selectedSeats.length !== totalPassengers}
-                className="mt-4 w-full rounded-xl bg-blue-600 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-4 w-full rounded-xl bg-blue-600 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Continue
               </button>
