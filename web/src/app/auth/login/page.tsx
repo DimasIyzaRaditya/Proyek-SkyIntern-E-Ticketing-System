@@ -16,6 +16,8 @@ function LoginPageContent() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const [isError, setIsError] = useState(false);
 
   const isBlocked = searchParams.get("blocked") === "1";
 
@@ -47,9 +49,12 @@ function LoginPageContent() {
         session.token,
       );
 
+      setIsError(false);
       setMessage("Login berhasil. Mengarahkan...");
+      setRedirecting(true);
       router.push(session.user.role === "admin" ? "/admin" : redirectTarget);
     } catch (error) {
+      setIsError(true);
       setMessage(error instanceof Error ? error.message : "Login gagal. Silakan coba lagi.");
     } finally {
       setLoading(false);
@@ -107,10 +112,10 @@ function LoginPageContent() {
               <Link href="/auth/forgot-password" className="font-semibold text-blue-600 hover:text-blue-700">Forgot Password?</Link>
             </div>
 
-            <button disabled={loading} onClick={handleLogin} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Login"}</button>
+            {!redirecting && <button disabled={loading} onClick={handleLogin} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Login"}</button>}
           </form>
 
-          {message && <p className="mt-3 text-center text-sm font-medium text-blue-700">{message}</p>}
+          {message && <p className={`mt-3 text-center text-sm font-medium ${isError ? "text-red-600" : "text-blue-700"}`}>{message}</p>}
 
           <p className="mt-5 text-center text-sm text-slate-600">
             Belum punya akun? <Link href="/auth/register" className="font-semibold text-blue-600 hover:text-blue-700">Create Account</Link>

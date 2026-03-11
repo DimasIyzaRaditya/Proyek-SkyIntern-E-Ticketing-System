@@ -28,7 +28,7 @@ declare global {
 }
 
 type TabKey = "Upcoming" | "Completed" | "Cancelled";
-type BookingStatus = "Pending" | "Processing" | "Paid" | "Cancelled";
+type BookingStatus = "Pending" | "Processing" | "Paid" | "Issued" | "Cancelled";
 
 type BookingView = {
   id: string;
@@ -57,7 +57,7 @@ type BookingView = {
 
 const getTabByStatus = (status: BookingStatus): TabKey => {
   if (status === "Cancelled") return "Cancelled";
-  if (status === "Paid") return "Completed";
+  if (status === "Paid" || status === "Issued") return "Completed";
   return "Upcoming";
 };
 
@@ -94,8 +94,8 @@ function MyBookingsPageContent() {
             : "Passenger";
           let status: BookingStatus = "Pending";
           if (item.status === "CANCELLED" || item.status === "EXPIRED") status = "Cancelled";
-          else if (item.ticket) status = "Paid";
-          else if (item.status === "PAID") status = "Processing";
+          else if (item.ticket) status = "Issued";
+          else if (item.status === "PAID") status = "Paid";
           return {
             id: String(item.id),
             bookingCode: item.bookingCode,
@@ -159,8 +159,8 @@ function MyBookingsPageContent() {
               : "Passenger";
             let status: BookingStatus = "Pending";
             if (item.status === "CANCELLED" || item.status === "EXPIRED") status = "Cancelled";
-            else if (item.ticket) status = "Paid";
-            else if (item.status === "PAID") status = "Processing";
+            else if (item.ticket) status = "Issued";
+            else if (item.status === "PAID") status = "Paid";
             return {
               id: String(item.id),
               bookingCode: item.bookingCode,
@@ -251,9 +251,9 @@ function MyBookingsPageContent() {
           if (item.status === "CANCELLED" || item.status === "EXPIRED") {
             status = "Cancelled";
           } else if (item.ticket) {
-            status = "Paid";
+            status = "Issued";
           } else if (item.status === "PAID") {
-            status = "Processing";
+            status = "Paid";
           }
 
           return {
@@ -290,6 +290,10 @@ function MyBookingsPageContent() {
     };
 
     void loadBookings();
+
+    // Poll every 10 seconds so admin status changes (Tandai Paid/Issued/Batalkan) are reflected in real-time
+    const pollInterval = setInterval(() => { void loadBookings(); }, 10000);
+    return () => clearInterval(pollInterval);
   }, [authenticated, router, searchParams]);
 
   const bookingList = useMemo(() => {
@@ -300,8 +304,9 @@ function MyBookingsPageContent() {
   }, [activeTab, liveBookings, sortOrder]);
 
   const getStatusClass = (status: BookingStatus) => {
-    if (status === "Paid") return "bg-emerald-100 text-emerald-700";
-    if (status === "Processing") return "bg-blue-100 text-blue-700";
+    if (status === "Issued") return "bg-emerald-100 text-emerald-700";
+    if (status === "Paid") return "bg-blue-100 text-blue-700";
+    if (status === "Processing") return "bg-violet-100 text-violet-700";
     if (status === "Cancelled") return "bg-rose-100 text-rose-700";
     return "bg-amber-100 text-amber-700";
   };
@@ -443,7 +448,7 @@ function MyBookingsPageContent() {
                         <CheckCircle2 className="h-3.5 w-3.5" /> {booking.status}
                       </span>
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
-                        {(booking.status === "Pending" || booking.status === "Processing") && (
+                        {booking.status === "Pending" && (
                           <>
                             <Link
                               href={`/booking/seat?${new URLSearchParams({ flightId: booking.flightId, origin: booking.origin, destination: booking.destination, departureDate: booking.departureDate, flightNumber: booking.flightNumber, existingBookingId: booking.id }).toString()}`}
@@ -473,14 +478,20 @@ function MyBookingsPageContent() {
                             </button>
                           </>
                         )}
-                        {booking.status === "Paid" ? (
+                        {booking.status === "Paid" && (
+                          <span className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600">
+                            Menunggu Penerbitan Tiket...
+                          </span>
+                        )}
+                        {booking.status === "Issued" && (
                           <Link
                             href={`/bookings/e-ticket?${query.toString()}`}
-                            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                           >
                             View E-Ticket
                           </Link>
-                        ) : (booking.status !== "Pending" && booking.status !== "Processing") && (
+                        )}
+                        {booking.status === "Cancelled" && (
                           <span className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-500">
                             E-Ticket belum tersedia
                           </span>
