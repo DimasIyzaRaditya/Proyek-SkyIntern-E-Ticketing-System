@@ -47,6 +47,7 @@ export default function AdminPage() {
   const [adminName, setAdminName] = useState("Admin");
   const [adminEmail, setAdminEmail] = useState("");
   const [chartView, setChartView] = useState<"daily" | "monthly" | "yearly">("monthly");
+  const [chartTypeTab, setChartTypeTab] = useState<"penjualan" | "tiket">("tiket");
 
   useEffect(() => {
     const auth = isAuthenticated();
@@ -158,7 +159,77 @@ export default function AdminPage() {
     return years;
   }, [bookings]);
 
-  const activeChartData: ChartDataPoint[] = chartView === "daily" ? dailyChartData : chartView === "monthly" ? monthlyChartData : yearlyChartData;
+  // Revenue chart data (paid/pending amounts in Rupiah)
+  const dailyRevenueData = useMemo(() => {
+    const now = new Date();
+    const days: ChartDataPoint[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dateStr = d.toDateString();
+      const paidRevenue = bookings
+        .filter((b) => { const lbl = paymentLabel(b); return new Date(b.createdAt).toDateString() === dateStr && (lbl === "PAID" || lbl === "ISSUED"); })
+        .reduce((sum, b) => sum + b.totalPrice, 0);
+      const pendingRevenue = bookings
+        .filter((b) => new Date(b.createdAt).toDateString() === dateStr && paymentLabel(b) === "PENDING")
+        .reduce((sum, b) => sum + b.totalPrice, 0);
+      const showLabel = d.getDate() % 5 === 0 || d.getDate() === 1;
+      const label = showLabel ? (d.getDate() === 1 ? `1 ${MONTHS_ID[d.getMonth()]}` : `${d.getDate()}`) : "";
+      days.push({ label, fullLabel: `${d.getDate()} ${MONTHS_ID[d.getMonth()]}`, paid: paidRevenue, pending: pendingRevenue });
+    }
+    return days;
+  }, [bookings]);
+
+  const monthlyRevenueData = useMemo(() => {
+    const now = new Date();
+    const months: ChartDataPoint[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const paidRevenue = bookings
+        .filter((b) => { const bd = new Date(b.createdAt); const lbl = paymentLabel(b); return bd.getFullYear() === year && bd.getMonth() === month && (lbl === "PAID" || lbl === "ISSUED"); })
+        .reduce((sum, b) => sum + b.totalPrice, 0);
+      const pendingRevenue = bookings
+        .filter((b) => { const bd = new Date(b.createdAt); return bd.getFullYear() === year && bd.getMonth() === month && paymentLabel(b) === "PENDING"; })
+        .reduce((sum, b) => sum + b.totalPrice, 0);
+      months.push({ label: MONTHS_ID[month], fullLabel: `${MONTHS_ID[month]} ${year}`, paid: paidRevenue, pending: pendingRevenue });
+    }
+    return months;
+  }, [bookings]);
+
+  const yearlyRevenueData = useMemo(() => {
+    const now = new Date();
+    const years: ChartDataPoint[] = [];
+    for (let i = 4; i >= 0; i--) {
+      const year = now.getFullYear() - i;
+      const paidRevenue = bookings
+        .filter((b) => { const lbl = paymentLabel(b); return new Date(b.createdAt).getFullYear() === year && (lbl === "PAID" || lbl === "ISSUED"); })
+        .reduce((sum, b) => sum + b.totalPrice, 0);
+      const pendingRevenue = bookings
+        .filter((b) => new Date(b.createdAt).getFullYear() === year && paymentLabel(b) === "PENDING")
+        .reduce((sum, b) => sum + b.totalPrice, 0);
+      years.push({ label: `${year}`, fullLabel: `${year}`, paid: paidRevenue, pending: pendingRevenue });
+    }
+    return years;
+  }, [bookings]);
+
+  const activeTicketData: ChartDataPoint[] = chartView === "daily" ? dailyChartData : chartView === "monthly" ? monthlyChartData : yearlyChartData;
+  const activeRevenueData: ChartDataPoint[] = chartView === "daily" ? dailyRevenueData : chartView === "monthly" ? monthlyRevenueData : yearlyRevenueData;
+  const activeChartData: ChartDataPoint[] = chartTypeTab === "penjualan" ? activeRevenueData : activeTicketData;
+
+  // All tickets ranked by total sold (paid + issued)
+  const topTickets = useMemo(() => {
+    const map = new Map<string, { flightNumber: string; airline: string; sold: number; pending: number }>();
+    for (const b of bookings) {
+      const key = `${b.flight.airline.name}||${b.flight.flightNumber}`;
+      const entry = map.get(key) ?? { flightNumber: b.flight.flightNumber, airline: b.flight.airline.name, sold: 0, pending: 0 };
+      const lbl = paymentLabel(b);
+      if (lbl === "PAID" || lbl === "ISSUED") entry.sold++;
+      else if (lbl === "PENDING") entry.pending++;
+      map.set(key, entry);
+    }
+    return [...map.values()].sort((a, b) => b.sold - a.sold);
+  }, [bookings]);
 
   const recentBookings = useMemo(
     () => [...bookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8),
@@ -229,9 +300,10 @@ export default function AdminPage() {
 
             {/* Sales chart with Daily / Monthly / Yearly tabs */}
             <section className="col-span-2 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
-                  <TrendingUp className="h-5 w-5 text-blue-600" /> Grafik Penjualan
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                  {chartTypeTab === "penjualan" ? "Grafik Penjualan" : "Grafik Penjualan Tiket"}
                 </h2>
                 <div className="flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1">
                   {(["daily", "monthly", "yearly"] as const).map((v) => (
@@ -249,13 +321,70 @@ export default function AdminPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Chart type tabs */}
+              <div className="mb-4 flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1 w-fit">
+                {(["tiket", "penjualan"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setChartTypeTab(t)}
+                    className={`rounded-lg px-4 py-1.5 transition-all duration-200 ${
+                      chartTypeTab === t
+                        ? "bg-blue-600 text-white shadow"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-white"
+                    }`}
+                  >
+                    {t === "tiket" ? "Grafik Penjualan Tiket" : "Grafik Penjualan"}
+                  </button>
+                ))}
+              </div>
+
               <p className="mb-4 text-xs text-slate-400">
                 {chartView === "daily" ? "30 hari terakhir" : chartView === "monthly" ? "12 bulan terakhir" : "5 tahun terakhir"}
               </p>
 
               <div className="w-full">
-                <AdminSalesChart data={activeChartData} view={chartView} />
+                <AdminSalesChart data={activeChartData} view={chartView} isRevenue={chartTypeTab === "penjualan"} />
               </div>
+
+              {/* Top tickets list – only on tiket tab */}
+              {chartTypeTab === "tiket" && (
+                <div className="mt-5">
+                  <h3 className="mb-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Semua Tiket Terjual</h3>
+                  {topTickets.length === 0 ? (
+                    <p className="text-xs text-slate-400">Belum ada data tiket terjual.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {topTickets.map((t, i) => {
+                        const total = topTickets.reduce((s, x) => s + x.sold, 0);
+                        const pct = total > 0 ? Math.round((t.sold / total) * 100) : 0;
+                        return (
+                          <div key={`${t.airline}-${t.flightNumber}`} className="flex items-center gap-3">
+                            <span className="w-5 shrink-0 text-right text-xs font-bold text-slate-400">{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="truncate text-xs font-semibold text-slate-800">
+                                  {t.airline} · {t.flightNumber}
+                                </span>
+                                <span className="ml-2 shrink-0 text-xs font-bold text-blue-700">{t.sold} terjual</span>
+                              </div>
+                              <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                <div
+                                  className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              {t.pending > 0 && (
+                                <p className="mt-0.5 text-[10px] text-amber-500">{t.pending} pending</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             {/* Status breakdown */}
