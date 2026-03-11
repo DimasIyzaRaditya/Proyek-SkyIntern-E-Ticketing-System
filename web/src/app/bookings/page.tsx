@@ -53,6 +53,14 @@ type BookingView = {
   pIdType: string;
   pIdNumber: string;
   pNationality: string;
+  // e-ticket display fields
+  departureIso: string;
+  arrivalIso: string;
+  originAirportName: string;
+  destAirportName: string;
+  originCity: string;
+  destCity: string;
+  totalPriceAmt: number;
 };
 
 const getTabByStatus = (status: BookingStatus): TabKey => {
@@ -118,6 +126,13 @@ function MyBookingsPageContent() {
             pIdType: item.passengers[0]?.documentType ?? "KTP",
             pIdNumber: item.passengers[0]?.documentNumber ?? "",
             pNationality: item.passengers[0]?.nationality ?? "Indonesian",
+            departureIso: item.flight.departureTime,
+            arrivalIso: item.flight.arrivalTime,
+            originAirportName: item.flight.origin.name,
+            destAirportName: item.flight.destination.name,
+            originCity: item.flight.origin.city,
+            destCity: item.flight.destination.city,
+            totalPriceAmt: item.totalPrice,
           };
         });
         setLiveBookings(mapped);
@@ -183,6 +198,13 @@ function MyBookingsPageContent() {
               pIdType: item.passengers[0]?.documentType ?? "KTP",
               pIdNumber: item.passengers[0]?.documentNumber ?? "",
               pNationality: item.passengers[0]?.nationality ?? "Indonesian",
+              departureIso: item.flight.departureTime,
+              arrivalIso: item.flight.arrivalTime,
+              originAirportName: item.flight.origin.name,
+              destAirportName: item.flight.destination.name,
+              originCity: item.flight.origin.city,
+              destCity: item.flight.destination.city,
+              totalPriceAmt: item.totalPrice,
             };
           });
           setLiveBookings(mapped);
@@ -278,6 +300,13 @@ function MyBookingsPageContent() {
             pIdType: item.passengers[0]?.documentType ?? "KTP",
             pIdNumber: item.passengers[0]?.documentNumber ?? "",
             pNationality: item.passengers[0]?.nationality ?? "Indonesian",
+            departureIso: item.flight.departureTime,
+            arrivalIso: item.flight.arrivalTime,
+            originAirportName: item.flight.origin.name,
+            destAirportName: item.flight.destination.name,
+            originCity: item.flight.origin.city,
+            destCity: item.flight.destination.city,
+            totalPriceAmt: item.totalPrice,
           };
         });
 
@@ -425,6 +454,19 @@ function MyBookingsPageContent() {
                 status: booking.status,
                 pdfUrl: booking.pdfUrl,
                 bookingCode: booking.bookingCode,
+                airline: booking.airline,
+                departureIso: booking.departureIso,
+                arrivalIso: booking.arrivalIso,
+                originAirportName: booking.originAirportName,
+                destAirportName: booking.destAirportName,
+                originCity: booking.originCity,
+                destCity: booking.destCity,
+                originCode: booking.origin,
+                destCode: booking.destination,
+                pTitle: booking.pTitle,
+                pDocType: booking.pIdType,
+                pDocNumber: booking.pIdNumber,
+                totalPrice: String(booking.totalPriceAmt),
               });
 
               return (

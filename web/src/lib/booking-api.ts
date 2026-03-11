@@ -13,15 +13,18 @@ type BackendBooking = {
   flight: {
     flightNumber: string;
     departureTime: string;
+    arrivalTime: string;
     airline: {
       name: string;
     };
     origin: {
       code?: string;
+      name: string;
       city: string;
     };
     destination: {
       code?: string;
+      name: string;
       city: string;
     };
   };
