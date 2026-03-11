@@ -1,8 +1,17 @@
 // Route autentikasi. Mendaftarkan endpoint untuk register, login, verifikasi token,
 // profil user, lupa/reset password, dan hapus akun. Dilengkapi dokumentasi Swagger.
 import { Router } from "express"
+import rateLimit from "express-rate-limit"
 import { register, login, verifyToken, getProfile, updateProfile, forgotPassword, resetPassword, deleteAccount } from "../controllers/auth.controller"
 import { authenticate } from "../middleware/auth.middleware"
+
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 menit
+  max: 5,                    // maks 5 percobaan per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Terlalu banyak percobaan login, coba lagi setelah 10 menit" }
+})
 
 const router = Router() // Router Express untuk semua route autentikasi
 
@@ -92,7 +101,7 @@ router.post("/register", register)
  *       500:
  *         description: Internal server error
  */
-router.post("/login", login)
+router.post("/login", loginLimiter, login)
 
 /**
  * @swagger
