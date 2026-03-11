@@ -17,17 +17,29 @@ const transporter = nodemailer.createTransport({
 
 export const sendResetPasswordEmail = async (
   email: string,
-  resetToken: string
+  resetToken: string,
+  isMobile: boolean = false
 ) => {
   try {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       console.warn("⚠️  SMTP not configured - Email not sent")
       console.log(`🔑 Reset token for ${email}: ${resetToken}`)
       console.log(`⏰ Token expires in 60 minutes`)
+      console.log(`📱 Platform: ${isMobile ? 'Mobile' : 'Web'}`)
       return
     }
 
-    const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}` // URL tautan reset password yang dikirimkan ke email user
+    // Generate platform-specific reset URL
+    let resetUrl: string
+    if (isMobile) {
+      // For mobile apps - use deep link or mobile-specific URL
+      resetUrl = `${process.env.MOBILE_URL || process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
+    } else {
+      // For web - use regular web URL  
+      resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`
+    }
+
+    const platformText = isMobile ? 'aplikasi mobile' : 'website'
 
     await transporter.sendMail({
       from: process.env.SMTP_FROM || "noreply@skyintern.com",
@@ -59,7 +71,7 @@ export const sendResetPasswordEmail = async (
                         Hello,
                       </p>
                       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-                        We received a request to reset your password for your SkyIntern account. Click the button below to create a new password:
+                        We received a request to reset your password for your SkyIntern account from the ${platformText}. Click the button below to create a new password:
                       </p>
                       
                       <!-- Button -->

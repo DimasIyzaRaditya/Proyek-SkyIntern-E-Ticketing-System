@@ -1,5 +1,3 @@
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../models/user_model.dart';
 import 'api_client.dart';
 

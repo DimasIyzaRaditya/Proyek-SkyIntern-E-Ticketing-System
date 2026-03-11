@@ -1,304 +1,262 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
-import '../widgets/common_widgets.dart';
+import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
+import '../widgets/common_widgets.dart';
 
 class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animCtrl;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
-    });
+    _animCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
+    _animCtrl.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
     try {
-      final bookingProvider = context.read<BookingProvider>();
-      await bookingProvider.loadBookings();
-    } catch (e) {
-      showSnackBar(context, 'Gagal memuat data', isError: true);
+      await context.read<BookingProvider>().loadBookings();
+    } catch (_) {
+      if (mounted) showSnackBar(context, 'Gagal memuat data', isError: true);
     }
   }
 
+  Animation<double> _fade(double start, double end) => CurvedAnimation(
+        parent: _animCtrl,
+        curve: Interval(start, end, curve: Curves.easeOut),
+      );
+
+  Animation<Offset> _slide(double start, double end) =>
+      Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+        CurvedAnimation(
+            parent: _animCtrl,
+            curve: Interval(start, end, curve: Curves.easeOutCubic)),
+      );
+
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width > 600;
+
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Dashboard',
-        showBackButton: false,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text('Logout'),
-                  content: Text('Anda yakin ingin logout?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('Batal'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        context.read<AuthProvider>().logout();
-                        Navigator.pushReplacementNamed(context, '/login');
-                      },
-                      child: Text('Logout'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
+      backgroundColor: AppColors.background,
+      appBar: _buildAppBar(context),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, '/search'),
+        icon: const Icon(Icons.search_rounded),
+        label: const Text('Cari Penerbangan',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 4,
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,
+        color: AppColors.primary,
         child: SingleChildScrollView(
-          physics: AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(isWide ? 32 : 16, 0, isWide ? 32 : 16, 100),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildProfileSection(),
-              SizedBox(height: 16),
-              _buildBookingsSection(),
+              // Welcome card
+              FadeTransition(
+                opacity: _fade(0.0, 0.5),
+                child: SlideTransition(
+                    position: _slide(0.0, 0.5),
+                    child: _buildWelcomeCard(isWide)),
+              ),
+              const SizedBox(height: 20),
+
+              // Quick actions
+              FadeTransition(
+                opacity: _fade(0.15, 0.6),
+                child: SlideTransition(
+                    position: _slide(0.15, 0.6),
+                    child: _buildQuickActions(context, isWide)),
+              ),
+              const SizedBox(height: 20),
+
+              // Stats
+              FadeTransition(
+                opacity: _fade(0.3, 0.75),
+                child: SlideTransition(
+                    position: _slide(0.3, 0.75),
+                    child: _buildStats(isWide)),
+              ),
+              const SizedBox(height: 20),
+
+              // Recent bookings
+              FadeTransition(
+                opacity: _fade(0.45, 1.0),
+                child: SlideTransition(
+                    position: _slide(0.45, 1.0),
+                    child: _buildRecentBookings(context, isWide)),
+              ),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).pushNamed('/search');
-        },
-        child: Icon(Icons.search),
-        tooltip: 'Cari Penerbangan',
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+                color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))
+          ],
+        ),
+        child: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Row(
+            children: const [
+              Icon(Icons.flight_rounded, size: 26, color: Colors.white),
+              SizedBox(width: 8),
+              Text('SkyIntern',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20)),
+            ],
+          ),
+          actions: [
+            Consumer<AuthProvider>(
+              builder: (_, auth, __) => PopupMenuButton<String>(
+                offset: const Offset(0, 50),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                icon: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.white.withOpacity(0.25),
+                  child: Text(
+                    StringHelper.getInitials(auth.user?.fullName ?? 'U'),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14),
+                  ),
+                ),
+                onSelected: (v) {
+                  if (v == 'profile') Navigator.pushNamed(context, '/edit-profile');
+                  if (v == 'bookings') Navigator.pushNamed(context, '/bookings');
+                  if (v == 'logout') _showLogoutDialog();
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'profile',
+                    child: Row(children: [
+                      Icon(Icons.person_outline, size: 20),
+                      SizedBox(width: 10),
+                      Text('Profil')
+                    ]),
+                  ),
+                  const PopupMenuItem(
+                    value: 'bookings',
+                    child: Row(children: [
+                      Icon(Icons.confirmation_number_outlined, size: 20),
+                      SizedBox(width: 10),
+                      Text('Booking Saya')
+                    ]),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Row(children: [
+                      Icon(Icons.logout, color: AppColors.error, size: 20),
+                      SizedBox(width: 10),
+                      Text('Keluar',
+                          style: TextStyle(color: AppColors.error))
+                    ]),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProfileSection() {
+  Widget _buildWelcomeCard(bool isWide) {
     return Consumer<AuthProvider>(
-      builder: (context, authProvider, _) {
-        final user = authProvider.user;
-
-        if (user == null) {
-          return SizedBox();
-        }
-
-        return Container(
-          color: Colors.blue.shade600,
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (_, auth, __) {
+        final user = auth.user;
+        if (user == null) return const SizedBox();
+        return GradientCard(
+          padding: const EdgeInsets.all(20),
+          margin: const EdgeInsets.only(top: 16),
+          borderRadius: 24,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: Colors.blue.shade300,
-                    child: Text(
-                      StringHelper.getInitials(user.fullName),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.fullName,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          user.email,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.blue.shade100,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.edit, color: Colors.white),
-                    onPressed: () {
-                      Navigator.of(context).pushNamed('/edit-profile');
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildBookingsSection() {
-    return Consumer<BookingProvider>(
-      builder: (context, bookingProvider, _) {
-        return Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Pemesanan Saya',
-                    style: TextStyle(
-                      fontSize: 18,
+              CircleAvatar(
+                radius: isWide ? 36 : 30,
+                backgroundColor: Colors.white.withOpacity(0.25),
+                child: Text(
+                  StringHelper.getInitials(user.fullName),
+                  style: TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (bookingProvider.bookings.isNotEmpty)
-                    Text(
-                      '${bookingProvider.bookings.length} Pemesanan',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                      fontSize: isWide ? 22 : 18),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Halo, selamat datang!',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text(user.fullName,
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isWide ? 22 : 18,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        DateFormatter.formatDate(DateTime.now()),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 11),
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
-              SizedBox(height: 12),
-              bookingProvider.isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : bookingProvider.error != null
-                      ? Center(
-                          child: Text(
-                            bookingProvider.error ?? 'Terjadi kesalahan',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        )
-                      : bookingProvider.bookings.isEmpty
-                          ? Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(32),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.flight_takeoff,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      'Belum ada pemesanan',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    PrimaryButton(
-                                      label: 'Cari Penerbangan',
-                                      width: 200,
-                                      onPressed: () {
-                                        Navigator.of(context).pushNamed('/search');
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: NeverScrollableScrollPhysics(),
-                              itemCount: bookingProvider.bookings.length,
-                              itemBuilder: (context, index) {
-                                final booking = bookingProvider.bookings[index];
-                                return Card(
-                                  margin: EdgeInsets.only(bottom: 12),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  booking.bookingCode,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                SizedBox(height: 4),
-                                                Text(
-                                                  booking.flight.airline,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 6,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: _getStatusColor(booking.status),
-                                                borderRadius: BorderRadius.circular(20),
-                                              ),
-                                              child: Text(
-                                                booking.status,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 12),
-                                        Text(
-                                          '${booking.flight.originCode} → ${booking.flight.destinationCode}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        Text(
-                                          DateFormatter.formatTime(booking.flight.departureTime),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
             ],
           ),
         );
@@ -306,16 +264,260 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'PAID':
-        return Colors.green;
-      case 'PENDING':
-        return Colors.orange;
-      case 'CANCELLED':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  Widget _buildQuickActions(BuildContext context, bool isWide) {
+    final actions = [
+      {
+        'label': 'Cari Penerbangan',
+        'icon': Icons.flight_takeoff_rounded,
+        'gradient': AppColors.primaryGradient,
+        'route': '/search',
+      },
+      {
+        'label': 'Booking Saya',
+        'icon': Icons.confirmation_number_outlined,
+        'gradient': const LinearGradient(
+            colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]),
+        'route': '/bookings',
+      },
+      {
+        'label': 'Edit Profil',
+        'icon': Icons.person_outline_rounded,
+        'gradient': const LinearGradient(
+            colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
+        'route': '/edit-profile',
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(
+            title: 'Aksi Cepat', subtitle: 'Apa yang ingin kamu lakukan?'),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: isWide ? 3 : 3,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.0,
+          ),
+          itemCount: actions.length,
+          itemBuilder: (ctx, i) {
+            final a = actions[i];
+            return TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 400 + i * 100),
+              tween: Tween(begin: 0.0, end: 1.0),
+              curve: Curves.easeOutBack,
+              builder: (_, v, child) =>
+                  Transform.scale(scale: v, child: child),
+              child: GradientCard(
+                gradient: a['gradient'] as Gradient,
+                padding: const EdgeInsets.all(16),
+                borderRadius: 18,
+                onTap: () => Navigator.pushNamed(ctx, a['route'] as String),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(a['icon'] as IconData,
+                        color: Colors.white, size: 28),
+                    const SizedBox(height: 8),
+                    Text(a['label'] as String,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.center,
+                        maxLines: 2),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStats(bool isWide) {
+    return Consumer<BookingProvider>(
+      builder: (_, bp, __) {
+        final all = bp.bookings.length;
+        final active = bp.bookings
+            .where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase()))
+            .length;
+        final done = bp.bookings
+            .where((b) =>
+                ['SETTLEMENT', 'COMPLETED'].contains(b.status.toUpperCase()))
+            .length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionHeader(
+                title: 'Statistik Kamu',
+                subtitle: 'Ringkasan perjalananmu'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                    child: StatCard(
+                        label: 'Total',
+                        value: '$all',
+                        icon: Icons.airplane_ticket_outlined,
+                        gradient: AppColors.primaryGradient)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: StatCard(
+                        label: 'Aktif',
+                        value: '$active',
+                        icon: Icons.schedule_rounded,
+                        gradient: const LinearGradient(
+                            colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]))),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: StatCard(
+                        label: 'Selesai',
+                        value: '$done',
+                        icon: Icons.check_circle_outline_rounded,
+                        gradient: const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]))),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRecentBookings(BuildContext context, bool isWide) {
+    return Consumer<BookingProvider>(
+      builder: (_, bp, __) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              title: 'Booking Terbaru',
+              action: TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/bookings'),
+                child: const Text('Lihat Semua',
+                    style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (bp.isLoading)
+              ...List.generate(
+                  2,
+                  (i) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ShimmerBox(
+                            width: double.infinity,
+                            height: 80,
+                            borderRadius: 16),
+                      )),
+            if (!bp.isLoading && bp.bookings.isEmpty)
+              EmptyState(
+                title: 'Belum ada booking',
+                subtitle: 'Mulai perjalananmu dengan memesan tiket pertama!',
+                icon: Icons.flight_takeoff_outlined,
+                action: PrimaryButton(
+                  label: 'Cari Penerbangan',
+                  icon: Icons.search_rounded,
+                  onPressed: () => Navigator.pushNamed(context, '/search'),
+                  width: 200,
+                ),
+              ),
+            if (!bp.isLoading && bp.bookings.isNotEmpty)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: bp.bookings.take(3).length,
+                itemBuilder: (ctx, i) {
+                  final b = bp.bookings[i];
+                  return TweenAnimationBuilder<double>(
+                    duration: Duration(milliseconds: 350 + i * 80),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    curve: Curves.easeOut,
+                    builder: (_, v, child) =>
+                        Opacity(opacity: v, child: child),
+                    child: GlassCard(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.flight_rounded,
+                                color: Colors.white, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(b.bookingCode,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: AppColors.textPrimary)),
+                                const SizedBox(height: 4),
+                                Text(
+                                    '${b.flight.originCode} → ${b.flight.destinationCode}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                          StatusBadge.fromStatus(b.status),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Keluar',
+            style:
+                TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        content: const Text('Anda yakin ingin keluar dari akun?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal',
+                  style: TextStyle(color: AppColors.textSecondary))),
+          ElevatedButton(
+            onPressed: () {
+              context.read<AuthProvider>().logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
   }
 }

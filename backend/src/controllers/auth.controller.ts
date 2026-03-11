@@ -164,7 +164,9 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body // Email yang meminta reset password
-
+    const userAgent = req.get('User-Agent') || ''
+    const isMobile = /iPhone|iPad|iPod|Android|BlackBerry|Windows Phone/i.test(userAgent) ||
+                     req.headers['x-platform'] === 'mobile'
     const user = await prisma.user.findUnique({
       where: { email }
     }) // Cari user dengan email tersebut
@@ -184,7 +186,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       }
     })
 
-    await sendResetPasswordEmail(email, resetToken)
+    await sendResetPasswordEmail(email, resetToken, isMobile)
 
     res.json({
       message: "Tautan reset password telah dikirim ke email Anda"

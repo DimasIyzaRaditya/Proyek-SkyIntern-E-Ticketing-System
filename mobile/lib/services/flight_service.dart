@@ -45,7 +45,7 @@ class FlightService {
     }
   }
 
-  static Future<FlightCardItem> getFlightDetail(int flightId) async {
+  static Future<FlightCardItem> getFlightDetail(String flightId) async {
     final response = await ApiClient.get('/api/flights/$flightId');
 
     final flightJson = response['flight'] as Map<String, dynamic>?;

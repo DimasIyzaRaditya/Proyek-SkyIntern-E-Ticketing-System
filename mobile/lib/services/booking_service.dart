@@ -58,4 +58,16 @@ class BookingService {
       requireAuth: true,
     );
   }
+
+  static Future<Map<String, dynamic>> syncPayment(int bookingId) async {
+    return await ApiClient.post(
+      '/api/bookings/$bookingId/sync-payment',
+      body: {},
+      requireAuth: true,
+    );
+  }
+
+  static Future<Map<String, dynamic>> verifyBooking(String code) async {
+    return await ApiClient.get('/api/bookings/verify?code=$code');
+  }
 }

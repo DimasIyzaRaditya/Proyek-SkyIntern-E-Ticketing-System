@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 
 class LocalStorage {
@@ -7,22 +9,31 @@ class LocalStorage {
   static const String tokenKey = 'skyintern_token';
 
   static Future<void> saveUser(UserSession user, String token) async {
-    // Implementation would require shared_preferences package
-    // For now, this is a placeholder
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(userKey, json.encode(user.toJson()));
+    await prefs.setString(tokenKey, token);
   }
 
   static Future<UserSession?> getUser() async {
-    // Implementation would require shared_preferences package
-    return null;
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString(userKey);
+    if (userJson == null) return null;
+    try {
+      return UserSession.fromJson(json.decode(userJson) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<String?> getToken() async {
-    // Implementation would require shared_preferences package
-    return null;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(tokenKey);
   }
 
   static Future<void> clearAll() async {
-    // Implementation would require shared_preferences package
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(userKey);
+    await prefs.remove(tokenKey);
   }
 }
 

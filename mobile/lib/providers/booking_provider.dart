@@ -27,7 +27,7 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createBooking({
+  Future<int?> createBooking({
     required int flightId,
     required List<Map<String, dynamic>> passengers,
     List<int>? seatIds,
@@ -45,6 +45,7 @@ class BookingProvider extends ChangeNotifier {
       await loadBookings();
       _isLoading = false;
       notifyListeners();
+      return result['booking']?['id'] as int? ?? result['id'] as int?;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;

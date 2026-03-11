@@ -25,6 +25,7 @@ class ApiClient {
     try {
       final headers = {
         'Content-Type': 'application/json',
+        'X-Platform': 'mobile',
         if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
       };
 
@@ -57,6 +58,7 @@ class ApiClient {
     try {
       final headers = {
         'Content-Type': 'application/json',
+        'X-Platform': 'mobile',
         if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
       };
 
@@ -66,7 +68,7 @@ class ApiClient {
         body: json.encode(body),
       );
 
-      if (response.statusCode == 401) {
+      if (response.statusCode == 401 && requireAuth) {
         clearAuthToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
       }
@@ -74,9 +76,9 @@ class ApiClient {
       if (response.statusCode != 200 && response.statusCode != 201) {
         try {
           final errorBody = json.decode(response.body);
-          throw Exception(errorBody['message'] ?? 'Request failed');
-        } catch (e) {
-          throw Exception('Request failed with status ${response.statusCode}');
+          throw Exception(errorBody['message'] ?? 'Request gagal');
+        } on FormatException {
+          throw Exception('Request gagal (status ${response.statusCode})');
         }
       }
 
@@ -94,6 +96,7 @@ class ApiClient {
     try {
       final headers = {
         'Content-Type': 'application/json',
+        'X-Platform': 'mobile',
         if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
       };
 
@@ -111,13 +114,47 @@ class ApiClient {
       if (response.statusCode != 200) {
         try {
           final errorBody = json.decode(response.body);
-          throw Exception(errorBody['message'] ?? 'Request failed');
-        } catch (e) {
-          throw Exception('Request failed with status ${response.statusCode}');
+          throw Exception(errorBody['message'] ?? 'Request gagal');
+        } on FormatException {
+          throw Exception('Request gagal (status ${response.statusCode})');
         }
       }
 
       return json.decode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  static Future<void> delete(
+    String endpoint, {
+    bool requireAuth = false,
+  }) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        'X-Platform': 'mobile',
+        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+      };
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 401) {
+        clearAuthToken();
+        throw Exception('Sesi login tidak valid. Silakan login kembali.');
+      }
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        try {
+          final errorBody = json.decode(response.body);
+          throw Exception(errorBody['message'] ?? 'Hapus gagal');
+        } on FormatException {
+          throw Exception('Hapus gagal (status ${response.statusCode})');
+        }
+      }
     } catch (e) {
       rethrow;
     }

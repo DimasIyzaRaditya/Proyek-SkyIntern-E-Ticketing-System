@@ -75,10 +75,17 @@ class FlightProvider extends ChangeNotifier {
         _flights.sort((a, b) => b.price.compareTo(a.price));
         break;
       case 'duration':
-        // Sort by duration (simplified)
+        _flights.sort((a, b) {
+          int parseMins(String dur) {
+            final h = int.tryParse(RegExp(r'(\d+)h').firstMatch(dur)?.group(1) ?? '0') ?? 0;
+            final m = int.tryParse(RegExp(r'(\d+)m').firstMatch(dur)?.group(1) ?? '0') ?? 0;
+            return h * 60 + m;
+          }
+          return parseMins(a.duration).compareTo(parseMins(b.duration));
+        });
         break;
       case 'departure':
-        // Sort by departure time
+        _flights.sort((a, b) => a.departureTime.compareTo(b.departureTime));
         break;
     }
     notifyListeners();

@@ -1,162 +1,324 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/common_widgets.dart';
+import '../utils/app_theme.dart';
 import '../utils/helpers.dart';
+import '../widgets/common_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  bool showPassword = false;
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  bool _showPass = false;
+  String? _loginError;
+  late AnimationController _animCtrl;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
+    _fadeAnim =
+        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
+    _animCtrl.forward();
+    _emailCtrl.addListener(_clearError);
+    _passCtrl.addListener(_clearError);
+  }
+
+  void _clearError() {
+    if (_loginError != null) setState(() => _loginError = null);
+  }
 
   @override
   void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
+    _emailCtrl.removeListener(_clearError);
+    _passCtrl.removeListener(_clearError);
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    _animCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> handleLogin() async {
-    final email = emailController.text.trim().toLowerCase();
-    final password = passwordController.text;
+  String _parseError(Object e) {
+    final msg = e.toString();
+    if (msg.startsWith('Exception: ')) return msg.substring(11);
+    return msg;
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailCtrl.text.trim().toLowerCase();
+    final password = _passCtrl.text;
 
     if (email.isEmpty || password.isEmpty) {
-      showSnackBar(context, 'Isi email dan password terlebih dahulu', isError: true);
+      setState(() => _loginError = 'Isi email dan password terlebih dahulu');
       return;
     }
 
-    try {
-      final authProvider = context.read<AuthProvider>();
-      await authProvider.login(email: email, password: password);
+    setState(() => _loginError = null);
 
+    try {
+      final auth = context.read<AuthProvider>();
+      await auth.login(email: email, password: password);
       if (mounted) {
-        showSnackBar(context, 'Login berhasil!');
-        Navigator.of(context).pushReplacementNamed('/dashboard');
+        showSnackBar(context, 'Selamat datang kembali!');
+        final user = context.read<AuthProvider>().user;
+        if (user?.role == 'admin') {
+          Navigator.of(context).pushReplacementNamed('/admin');
+        } else {
+          Navigator.of(context).pushReplacementNamed('/dashboard');
+        }
       }
     } catch (e) {
-      showSnackBar(
-        context,
-        e.toString(),
-        isError: true,
-      );
+      if (mounted) setState(() => _loginError = _parseError(e));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isWide = size.width > 600;
+
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              children: [
-                SizedBox(height: 40),
-                Icon(Icons.flight, size: 60, color: Colors.blue.shade600),
-                SizedBox(height: 16),
-                Text(
-                  'SkyIntern',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade600,
-                  ),
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          // Sky gradient background header
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: size.height * 0.38,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
                 ),
-                Text(
-                  'E-Ticketing System',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                SizedBox(height: 40),
-                Text(
-                  'Login',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Masuk ke akun SkyIntern Anda',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                SizedBox(height: 32),
-                InputField(
-                  label: 'Email',
-                  hint: 'nama@gmail.com',
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                SizedBox(height: 16),
-                InputField(
-                  label: 'Password',
-                  hint: '••••••••',
-                  controller: passwordController,
-                  obscureText: !showPassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      showPassword ? Icons.visibility : Icons.visibility_off,
-                      color: Colors.grey.shade500,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        showPassword = !showPassword;
-                      });
-                    },
-                  ),
-                ),
-                SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushNamed('/forgot-password');
-                    },
-                    child: Text('Lupa Password?'),
-                  ),
-                ),
-                SizedBox(height: 24),
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, _) {
-                    return PrimaryButton(
-                      label: authProvider.isLoading ? 'Memproses...' : 'Login',
-                      isLoading: authProvider.isLoading,
-                      isDisabled: authProvider.isLoading,
-                      onPressed: () async {
-                        if (!authProvider.isLoading) {
-                          await handleLogin();
-                        }
-                      },
-                    );
-                  },
-                ),
-                SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Belum punya akun? ', style: TextStyle(color: Colors.grey.shade600)),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushNamed('/register');
-                      },
-                      child: Text('Buat Akun'),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                    horizontal: isWide ? size.width * 0.2 : 24,
+                    vertical: 24),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 24),
+                        // Logo
+                        Center(
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Colors.white.withOpacity(0.4),
+                                      width: 2),
+                                ),
+                                child: const Icon(Icons.flight_rounded,
+                                    size: 48, color: Colors.white),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'SkyIntern',
+                                style: TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'E-Ticketing System',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white.withOpacity(0.85),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // Card form
+                        GlassCard(
+                          padding: const EdgeInsets.all(28),
+                          borderRadius: 24,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'Masuk ke Akun',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Selamat datang kembali di SkyIntern',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 28),
+
+                              InputField(
+                                label: 'Email',
+                                hint: 'nama@gmail.com',
+                                controller: _emailCtrl,
+                                keyboardType: TextInputType.emailAddress,
+                                prefixIcon: const Icon(Icons.email_outlined,
+                                    color: AppColors.textHint, size: 20),
+                                textInputAction: TextInputAction.next,
+                              ),
+                              const SizedBox(height: 16),
+
+                              InputField(
+                                label: 'Password',
+                                hint: '••••••••',
+                                controller: _passCtrl,
+                                obscureText: !_showPass,
+                                prefixIcon: const Icon(Icons.lock_outline,
+                                    color: AppColors.textHint, size: 20),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _showPass
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: AppColors.textHint,
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => _showPass = !_showPass),
+                                ),
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) => _handleLogin(),
+                              ),
+
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () => Navigator.pushNamed(
+                                      context, '/forgot-password'),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.primary),
+                                  child: const Text('Lupa Password?',
+                                      style:
+                                          TextStyle(fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                              // Inline error banner
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOut,
+                                child: _loginError != null
+                                    ? Container(
+                                        margin: const EdgeInsets.only(
+                                            top: 8, bottom: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF2F2),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: const Color(0xFFFCA5A5)),
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Icon(
+                                              Icons.error_outline_rounded,
+                                              color: Color(0xFFEF4444),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                _loginError!,
+                                                style: const TextStyle(
+                                                  color: Color(0xFFB91C1C),
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              Consumer<AuthProvider>(
+                                builder: (_, auth, __) => PrimaryButton(
+                                  label: 'Masuk',
+                                  isLoading: auth.isLoading,
+                                  onPressed: _handleLogin,
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+                              const LabelDivider(label: 'atau'),
+                              const SizedBox(height: 20),
+
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text('Belum punya akun?',
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary)),
+                                  TextButton(
+                                    onPressed: () => Navigator.pushNamed(
+                                        context, '/register'),
+                                    style: TextButton.styleFrom(
+                                        foregroundColor: AppColors.primary),
+                                    child: const Text('Daftar Sekarang',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
