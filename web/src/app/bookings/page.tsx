@@ -89,6 +89,32 @@ function MyBookingsPageContent() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
+  const handleViewETicket = (booking: BookingView) => {
+    const data = {
+      passenger: booking.passenger,
+      flightNumber: booking.flightNumber,
+      seat: booking.seat,
+      route: booking.route,
+      date: booking.date,
+      status: booking.status,
+      pdfUrl: booking.pdfUrl,
+      bookingCode: booking.bookingCode,
+      airline: booking.airline,
+      departureIso: booking.departureIso,
+      arrivalIso: booking.arrivalIso,
+      originAirportName: booking.originAirportName,
+      destAirportName: booking.destAirportName,
+      originCity: booking.originCity,
+      destCity: booking.destCity,
+      pTitle: booking.pTitle,
+      pDocType: booking.pIdType,
+      pDocNumber: booking.pIdNumber,
+      totalPrice: String(booking.totalPriceAmt),
+    };
+    sessionStorage.setItem(`eticket_${booking.bookingCode}`, JSON.stringify(data));
+    router.push(`/bookings/e-ticket/${booking.bookingCode}`);
+  };
+
   const handleSyncPayment = async (bookingId: string) => {
     setSyncingId(bookingId);
     setPayError(null);
@@ -445,30 +471,6 @@ function MyBookingsPageContent() {
             </div>
           ) : (
             bookingList.map((booking) => {
-              const query = new URLSearchParams({
-                passenger: booking.passenger,
-                flightNumber: booking.flightNumber,
-                seat: booking.seat,
-                route: booking.route,
-                date: booking.date,
-                status: booking.status,
-                pdfUrl: booking.pdfUrl,
-                bookingCode: booking.bookingCode,
-                airline: booking.airline,
-                departureIso: booking.departureIso,
-                arrivalIso: booking.arrivalIso,
-                originAirportName: booking.originAirportName,
-                destAirportName: booking.destAirportName,
-                originCity: booking.originCity,
-                destCity: booking.destCity,
-                originCode: booking.origin,
-                destCode: booking.destination,
-                pTitle: booking.pTitle,
-                pDocType: booking.pIdType,
-                pDocNumber: booking.pIdNumber,
-                totalPrice: String(booking.totalPriceAmt),
-              });
-
               return (
                 <article key={booking.id} className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -526,12 +528,12 @@ function MyBookingsPageContent() {
                           </span>
                         )}
                         {booking.status === "Issued" && (
-                          <Link
-                            href={`/bookings/e-ticket?${query.toString()}`}
+                          <button
+                            onClick={() => handleViewETicket(booking)}
                             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                           >
                             View E-Ticket
-                          </Link>
+                          </button>
                         )}
                         {booking.status === "Cancelled" && (
                           <span className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-500">

@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { type ChangeEvent, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Plane, Ticket } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Plane, ReceiptText, Ticket, TrendingUp, Wallet, XCircle } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
-import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
+import { getProfileFromApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 type BookingCard = {

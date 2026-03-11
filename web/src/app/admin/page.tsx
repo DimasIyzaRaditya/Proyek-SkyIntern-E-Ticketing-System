@@ -294,131 +294,139 @@ export default function AdminPage() {
           </div>
           </LazySection>
 
-          {/* ── Bar Chart & Status Side-by-Side ── */}
+          {/* ── Bar Chart & Status Side-by-Side (Combined Card) ── */}
           <LazySection delay={1}>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-3xl border border-blue-100 bg-white shadow-sm overflow-hidden">
+            <div className="flex flex-col lg:flex-row">
 
-            {/* Sales chart with Daily / Monthly / Yearly tabs */}
-            <section className="col-span-2 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
-                  {chartTypeTab === "penjualan" ? "Grafik Penjualan" : "Grafik Penjualan Tiket"}
-                </h2>
-                <div className="flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1">
-                  {(["daily", "monthly", "yearly"] as const).map((v) => (
+              {/* Sales chart with Daily / Monthly / Yearly tabs */}
+              <div className="flex-1 min-w-0 p-5 sm:p-6">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    {chartTypeTab === "penjualan" ? "Grafik Penjualan" : "Grafik Penjualan Tiket"}
+                  </h2>
+                  <div className="flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1">
+                    {(["daily", "monthly", "yearly"] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setChartView(v)}
+                        className={`rounded-lg px-4 py-1.5 transition-all duration-200 ${
+                          chartView === v
+                            ? "bg-blue-600 text-white shadow"
+                            : "text-slate-500 hover:text-slate-700 hover:bg-white"
+                        }`}
+                      >
+                        {v === "daily" ? "Harian" : v === "monthly" ? "Bulanan" : "Tahunan"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Chart type tabs */}
+                <div className="mb-4 flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1 w-fit">
+                  {(["tiket", "penjualan"] as const).map((t) => (
                     <button
-                      key={v}
-                      onClick={() => setChartView(v)}
+                      key={t}
+                      onClick={() => setChartTypeTab(t)}
                       className={`rounded-lg px-4 py-1.5 transition-all duration-200 ${
-                        chartView === v
+                        chartTypeTab === t
                           ? "bg-blue-600 text-white shadow"
                           : "text-slate-500 hover:text-slate-700 hover:bg-white"
                       }`}
                     >
-                      {v === "daily" ? "Harian" : v === "monthly" ? "Bulanan" : "Tahunan"}
+                      {t === "tiket" ? "Grafik Penjualan Tiket" : "Grafik Penjualan"}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Chart type tabs */}
-              <div className="mb-4 flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1 w-fit">
-                {(["tiket", "penjualan"] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setChartTypeTab(t)}
-                    className={`rounded-lg px-4 py-1.5 transition-all duration-200 ${
-                      chartTypeTab === t
-                        ? "bg-blue-600 text-white shadow"
-                        : "text-slate-500 hover:text-slate-700 hover:bg-white"
-                    }`}
-                  >
-                    {t === "tiket" ? "Grafik Penjualan Tiket" : "Grafik Penjualan"}
-                  </button>
-                ))}
-              </div>
+                <p className="mb-4 text-xs text-slate-400">
+                  {chartView === "daily" ? "30 hari terakhir" : chartView === "monthly" ? "12 bulan terakhir" : "5 tahun terakhir"}
+                </p>
 
-              <p className="mb-4 text-xs text-slate-400">
-                {chartView === "daily" ? "30 hari terakhir" : chartView === "monthly" ? "12 bulan terakhir" : "5 tahun terakhir"}
-              </p>
+                <div className="w-full">
+                  <AdminSalesChart data={activeChartData} view={chartView} isRevenue={chartTypeTab === "penjualan"} />
+                </div>
 
-              <div className="w-full">
-                <AdminSalesChart data={activeChartData} view={chartView} isRevenue={chartTypeTab === "penjualan"} />
-              </div>
-
-              {/* Top tickets list – only on tiket tab */}
-              {chartTypeTab === "tiket" && (
-                <div className="mt-5">
-                  <h3 className="mb-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Semua Tiket Terjual</h3>
-                  {topTickets.length === 0 ? (
-                    <p className="text-xs text-slate-400">Belum ada data tiket terjual.</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {topTickets.map((t, i) => {
-                        const total = topTickets.reduce((s, x) => s + x.sold, 0);
-                        const pct = total > 0 ? Math.round((t.sold / total) * 100) : 0;
-                        return (
-                          <div key={`${t.airline}-${t.flightNumber}`} className="flex items-center gap-3">
-                            <span className="w-5 shrink-0 text-right text-xs font-bold text-slate-400">{i + 1}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="truncate text-xs font-semibold text-slate-800">
-                                  {t.airline} · {t.flightNumber}
-                                </span>
-                                <span className="ml-2 shrink-0 text-xs font-bold text-blue-700">{t.sold} terjual</span>
+                {/* Top tickets list – only on tiket tab */}
+                {chartTypeTab === "tiket" && (
+                  <div className="mt-5">
+                    <h3 className="mb-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Semua Tiket Terjual</h3>
+                    {topTickets.length === 0 ? (
+                      <p className="text-xs text-slate-400">Belum ada data tiket terjual.</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {topTickets.map((t, i) => {
+                          const total = topTickets.reduce((s, x) => s + x.sold, 0);
+                          const pct = total > 0 ? Math.round((t.sold / total) * 100) : 0;
+                          return (
+                            <div key={`${t.airline}-${t.flightNumber}`} className="flex items-center gap-3">
+                              <span className="w-5 shrink-0 text-right text-xs font-bold text-slate-400">{i + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="truncate text-xs font-semibold text-slate-800">
+                                    {t.airline} · {t.flightNumber}
+                                  </span>
+                                  <span className="ml-2 shrink-0 text-xs font-bold text-blue-700">{t.sold} terjual</span>
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                  <div
+                                    className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                {t.pending > 0 && (
+                                  <p className="mt-0.5 text-[10px] text-amber-500">{t.pending} pending</p>
+                                )}
                               </div>
-                              <div className="h-1.5 w-full rounded-full bg-slate-100">
-                                <div
-                                  className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              {t.pending > 0 && (
-                                <p className="mt-0.5 text-[10px] text-amber-500">{t.pending} pending</p>
-                              )}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
-            {/* Status breakdown */}
-            <section className="rounded-3xl border border-blue-100 bg-white p-4 sm:p-6 shadow-sm flex flex-col gap-3">
-              <h2 className="mb-1 text-sm font-black text-slate-900 sm:text-base md:text-lg">Status Booking</h2>
-              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
-                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
-                <div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Issued</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-blue-700 leading-tight">{stats.issued}</p>
+              {/* Divider */}
+              <div className="border-t border-blue-100 lg:border-t-0 lg:border-l" />
+
+              {/* Status breakdown */}
+              <div className="w-full lg:w-64 xl:w-72 shrink-0 p-5 sm:p-6 flex flex-col gap-3">
+                <h2 className="mb-1 text-sm font-black text-slate-900 sm:text-base">Status Booking</h2>
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+                  <div className="status-card rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4 flex items-center gap-3">
+                    <Ticket className="status-card-icon h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Issued</p>
+                      <p className="text-lg sm:text-xl font-black text-blue-700 leading-tight">{stats.issued}</p>
+                    </div>
+                  </div>
+                  <div className="status-card rounded-2xl border border-emerald-100 bg-emerald-50 p-3 sm:p-4 flex items-center gap-3">
+                    <CheckCircle2 className="status-card-icon h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Paid</p>
+                      <p className="text-lg sm:text-xl font-black text-emerald-700 leading-tight">{stats.paid}</p>
+                    </div>
+                  </div>
+                  <div className="status-card rounded-2xl border border-amber-100 bg-amber-50 p-3 sm:p-4 flex items-center gap-3">
+                    <Clock3 className="status-card-icon h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Pending</p>
+                      <p className="text-lg sm:text-xl font-black text-amber-700 leading-tight">{stats.pending}</p>
+                    </div>
+                  </div>
+                  <div className="status-card rounded-2xl border border-red-100 bg-red-50 p-3 sm:p-4 flex items-center gap-3">
+                    <XCircle className="status-card-icon h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0" />
+                    <div>
+                      <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Dibatalkan</p>
+                      <p className="text-lg sm:text-xl font-black text-red-700 leading-tight">{stats.cancelled}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
-                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Paid</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 leading-tight">{stats.paid}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
-                <Clock3 className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
-                <div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Pending</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-amber-700 leading-tight">{stats.pending}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-red-100 bg-red-50 p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01]">
-                <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0" />
-                <div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 leading-snug">Dibatalkan</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-red-700 leading-tight">{stats.cancelled}</p>
-                </div>
-              </div>
-            </section>
+
+            </div>
           </div>
           </LazySection>
 

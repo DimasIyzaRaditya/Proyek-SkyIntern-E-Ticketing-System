@@ -1,9 +1,12 @@
 // Route autentikasi. Mendaftarkan endpoint untuk register, login, verifikasi token,
 // profil user, lupa/reset password, dan hapus akun. Dilengkapi dokumentasi Swagger.
 import { Router } from "express"
+import multer from "multer"
 import rateLimit from "express-rate-limit"
-import { register, login, verifyToken, getProfile, updateProfile, forgotPassword, resetPassword, deleteAccount } from "../controllers/auth.controller"
+import { register, login, verifyToken, getProfile, updateProfile, uploadAvatar, forgotPassword, resetPassword, deleteAccount } from "../controllers/auth.controller"
 import { authenticate } from "../middleware/auth.middleware"
+
+const upload = multer({ storage: multer.memoryStorage() }) // File avatar disimpan di memori sebelum dikirim ke MinIO
 
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 menit
@@ -270,5 +273,36 @@ router.post("/reset-password", resetPassword)
  *         description: User not found
  */
 router.delete("/account/:email", authenticate, deleteAccount)
+
+/**
+ * @swagger
+ * /api/auth/avatar:
+ *   post:
+ *     summary: Upload foto profil ke MinIO
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - avatar
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: File gambar (JPEG/PNG/WebP, maks 5MB)
+ *     responses:
+ *       200:
+ *         description: Foto profil berhasil diperbarui
+ *       400:
+ *         description: File tidak valid
+ *       503:
+ *         description: MinIO tidak tersedia
+ */
+router.post("/avatar", authenticate, upload.single("avatar"), uploadAvatar)
 
 export default router

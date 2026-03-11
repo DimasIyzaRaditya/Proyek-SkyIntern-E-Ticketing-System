@@ -8,6 +8,7 @@ import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateResetToken, addMinutes } from "../utils/helpers"
 import { sendResetPasswordEmail } from "../utils/email"
+import { uploadFile, deleteFile } from "../utils/minio"
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -157,6 +158,54 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     })
   } catch (error) {
     console.error("Update profile error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const uploadAvatar = async (req: AuthRequest, res: Response) => {
+  try {
+    const file = req.file // File avatar dari multipart/form-data
+
+    if (!file) {
+      return res.status(400).json({ message: "File gambar wajib dikirimkan" })
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowedTypes.includes(file.mimetype)) {
+      return res.status(400).json({ message: "Format file tidak didukung. Gunakan JPEG, PNG, atau WebP" })
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: "Ukuran file maksimal 5MB" })
+    }
+
+    const ext = file.mimetype.split("/")[1].replace("jpeg", "jpg")
+    const fileName = `avatars/user-${req.user?.id}-${Date.now()}.${ext}` // Nama file unik di MinIO
+
+    // Hapus avatar lama jika ada & tersimpan di MinIO
+    const existing = await prisma.user.findUnique({
+      where: { id: req.user?.id },
+      select: { avatarUrl: true }
+    })
+    if (existing?.avatarUrl && existing.avatarUrl.includes("/avatars/")) {
+      const oldKey = existing.avatarUrl.split(`/skyintern/`)[1]
+      if (oldKey) await deleteFile(oldKey).catch(() => { /* silent */ })
+    }
+
+    const avatarUrl = await uploadFile(fileName, file.buffer, file.mimetype) // Upload ke MinIO
+
+    const user = await prisma.user.update({
+      where: { id: req.user?.id },
+      data: { avatarUrl },
+      select: { id: true, name: true, email: true, phone: true, avatarUrl: true, role: true }
+    })
+
+    res.json({ message: "Foto profil berhasil diperbarui", user })
+  } catch (error: any) {
+    console.error("Upload avatar error:", error)
+    if (error.message?.includes("MinIO") || error.code === "ECONNREFUSED") {
+      return res.status(503).json({ message: "Server penyimpanan file tidak tersedia. Pastikan MinIO berjalan di port 9000." })
+    }
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

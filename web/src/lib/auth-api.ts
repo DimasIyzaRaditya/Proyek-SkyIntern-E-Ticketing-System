@@ -70,6 +70,30 @@ export const updateProfileFromApi = async (payload: { name?: string; phone?: str
   return toUserSession(response.user);
 };
 
+export const uploadAvatarToApi = async (file: File): Promise<UserSession> => {
+  const { getAuthToken } = await import("@/lib/auth");
+  const { API_BASE_URL } = await import("@/lib/api-client");
+  const token = getAuthToken();
+  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const res = await fetch(`${API_BASE_URL}/api/auth/avatar`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(err.message ?? "Gagal mengupload foto profil.");
+  }
+
+  const data = (await res.json()) as AuthProfileResponse & { message: string };
+  return toUserSession(data.user);
+};
+
 export const forgotPasswordFromApi = async (payload: { email: string }) => {
   return apiRequest<{ message: string }>("/api/auth/forgot-password", {
     method: "POST",

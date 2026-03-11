@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { type ChangeEvent, useEffect, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
-import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
+import { getProfileFromApi, updateProfileFromApi, uploadAvatarToApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 export default function ProfilePage() {
@@ -20,6 +20,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const showSkeleton = useMinDelay(loading);
   const [message, setMessage] = useState("");
   const authenticated = isAuthenticated();
@@ -51,8 +53,8 @@ export default function ProfilePage() {
 
     const loadUpcomingTrip = async () => {
       try {
-        const bookings = await getMyBookingsFromApi();
-        const upcoming = bookings.find(
+        const allBookings = await getMyBookingsFromApi();
+        const upcoming = allBookings.find(
           (b) => b.status === "PENDING" || b.status === "PAID",
         );
         if (upcoming) {
@@ -84,22 +86,29 @@ export default function ProfilePage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Ukuran file maksimal 5MB.");
+      return;
+    }
 
-      try {
-        const profile = await updateProfileFromApi({ avatarUrl: result });
-        setUserSession(profile);
-        setAvatarUrl(profile.avatarUrl ?? "");
-        setSaved(true);
-        setMessage("Foto profil berhasil diperbarui.");
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Gagal upload foto profil.");
-      }
-    };
-    reader.readAsDataURL(file);
+    setAvatarUploading(true);
+    setMessage("");
+
+    try {
+      // 1. Upload file ke MinIO via backend, dapat URL MinIO kembali
+      const profile = await uploadAvatarToApi(file);
+      // 2. Update session lokal dengan data terbaru (avatarUrl sudah disimpan di DB)
+      setUserSession(profile);
+      setAvatarUrl(profile.avatarUrl ?? "");
+      setSaved(true);
+      setMessage("Foto profil berhasil diperbarui.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gagal upload foto profil.");
+    } finally {
+      setAvatarUploading(false);
+      // Reset input agar file yang sama bisa dipilih ulang
+      if (event.target) event.target.value = "";
+    }
   };
 
   if (!authenticated || showSkeleton) {
@@ -148,23 +157,53 @@ export default function ProfilePage() {
             <h1 className="text-xl font-black text-slate-900 sm:text-2xl md:text-3xl">Profile Dashboard</h1>
             <p className="mt-1 text-xs text-slate-600 sm:text-sm">Kelola akun dan update data pribadi Anda.</p>
 
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:mt-6 sm:gap-4 sm:p-4">
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-blue-200 bg-white sm:h-20 sm:w-20">
+            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:mt-6 sm:gap-5 sm:p-4">
+              {/* Clickable avatar with camera overlay */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                title="Klik untuk ganti foto profil"
+                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-blue-300 bg-white shadow-sm transition hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 sm:h-20 sm:w-20"
+              >
                 {avatarUrl ? (
                   <Image src={avatarUrl} alt="Foto profil" width={80} height={80} className="h-full w-full object-cover" unoptimized />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-2xl">👤</div>
                 )}
-              </div>
+                {/* Dark overlay on hover */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 rounded-full bg-black/0 transition-all duration-200 group-hover:bg-black/40">
+                  {avatarUploading ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-[9px] font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">Ubah Foto</span>
+                    </>
+                  )}
+                </div>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-black text-slate-900 sm:text-xl">{fullName}</p>
                 <p className="text-xs text-slate-600 sm:text-sm">{email}</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="mt-2 block text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:font-semibold file:text-white hover:file:bg-blue-700"
-                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="mt-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {avatarUploading ? "Mengupload..." : "Ganti Foto Profil"}
+                </button>
               </div>
             </div>
 
@@ -261,7 +300,7 @@ export default function ProfilePage() {
                 <Link href="/bookings" className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 sm:px-4 sm:py-3 sm:text-sm">
                   Kelola Pesanan
                 </Link>
-                <Link href="/bookings/e-ticket" className="rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 sm:px-4 sm:py-3 sm:text-sm">
+                <Link href="/bookings" className="rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 sm:px-4 sm:py-3 sm:text-sm">
                   Lihat E-Ticket
                 </Link>
               </div>
@@ -269,6 +308,7 @@ export default function ProfilePage() {
           </aside>
         </div>
         </LazySection>
+
       </main>
     </div>
   );
