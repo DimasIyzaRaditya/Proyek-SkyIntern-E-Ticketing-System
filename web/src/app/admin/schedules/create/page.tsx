@@ -29,6 +29,9 @@ type ScheduleForm = {
 
 const toIsoDateTime = (value: string) => new Date(value).toISOString();
 
+const formatRp = (n: number) => n === 0 ? "" : "Rp " + n.toLocaleString("id-ID");
+const parseRp = (s: string) => { const d = s.replace(/[^\d]/g, ""); return d ? parseInt(d, 10) : 0; };
+
 const formatAirportOption = (airport: AdminAirport) => `${airport.city} - ${airport.name}`;
 
 const splitLocalDateTime = (value: string) => {
@@ -65,6 +68,7 @@ export default function AdminScheduleCreatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [priceDisplay, setPriceDisplay] = useState({ basePrice: "", tax: "", adminFee: "" });
 
   const airlineOptions = useMemo(
     () => airlines.map((item) => ({ value: item.id, label: `${item.code} - ${item.name}` })),
@@ -170,15 +174,39 @@ export default function AdminScheduleCreatePage() {
             </div>
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-600">Base Price (Rp)</label>
-              <input type="number" value={form.basePrice} onChange={(event) => setForm((prev) => ({ ...prev, basePrice: Number(event.target.value) || 0 }))} placeholder="Base Price" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={priceDisplay.basePrice}
+                onChange={(e) => { const n = parseRp(e.target.value); setForm((p) => ({ ...p, basePrice: n })); setPriceDisplay((p) => ({ ...p, basePrice: e.target.value.replace(/[^\d]/g, "") === "" ? "" : "Rp " + n.toLocaleString("id-ID") })); }}
+                onBlur={() => setPriceDisplay((p) => ({ ...p, basePrice: formatRp(form.basePrice) }))}
+                placeholder="Rp 0"
+                className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+              />
             </div>
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-600">Tax (Rp)</label>
-              <input type="number" value={form.tax} onChange={(event) => setForm((prev) => ({ ...prev, tax: Number(event.target.value) || 0 }))} placeholder="Tax" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={priceDisplay.tax}
+                onChange={(e) => { const n = parseRp(e.target.value); setForm((p) => ({ ...p, tax: n })); setPriceDisplay((p) => ({ ...p, tax: e.target.value.replace(/[^\d]/g, "") === "" ? "" : "Rp " + n.toLocaleString("id-ID") })); }}
+                onBlur={() => setPriceDisplay((p) => ({ ...p, tax: formatRp(form.tax) }))}
+                placeholder="Rp 0"
+                className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+              />
             </div>
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-600">Admin Fee (Rp)</label>
-              <input type="number" value={form.adminFee} onChange={(event) => setForm((prev) => ({ ...prev, adminFee: Number(event.target.value) || 0 }))} placeholder="Admin Fee" className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={priceDisplay.adminFee}
+                onChange={(e) => { const n = parseRp(e.target.value); setForm((p) => ({ ...p, adminFee: n })); setPriceDisplay((p) => ({ ...p, adminFee: e.target.value.replace(/[^\d]/g, "") === "" ? "" : "Rp " + n.toLocaleString("id-ID") })); }}
+                onBlur={() => setPriceDisplay((p) => ({ ...p, adminFee: formatRp(form.adminFee) }))}
+                placeholder="Rp 0"
+                className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+              />
             </div>
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-600">Departure Time</label>
