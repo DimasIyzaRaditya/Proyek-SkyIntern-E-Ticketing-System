@@ -334,12 +334,12 @@ function SeatSelectionPageContent() {
                     const isFull = !isSelected && selectedSeats.length >= totalPassengers;
                     const extraAmt = specialPriceMap.get(seatId) ?? 0;
 
-                    let className = "bg-green-500 text-white hover:bg-green-600 ring-1 ring-green-600";
-                    if (isOccupied) className = "cursor-not-allowed bg-red-400 text-white ring-1 ring-red-500";
+                    let className = "bg-green-500 text-white hover:bg-green-600";
+                    if (isOccupied) className = "cursor-not-allowed bg-slate-400 text-white";
                     else if (isHolding) className = "cursor-wait bg-yellow-300 text-slate-700";
-                    else if (isSelected) className = "bg-blue-600 text-white ring-2 ring-blue-800 scale-105";
-                    else if (isFull) className = "cursor-not-allowed bg-slate-200 text-slate-400 ring-1 ring-slate-300";
-                    else if (isSpecial) className = "bg-orange-500 text-white hover:bg-orange-600 ring-1 ring-orange-700";
+                    else if (isSelected) className = "bg-blue-600 text-white";
+                    else if (isFull) className = "cursor-not-allowed bg-green-200 text-green-600 opacity-50";
+                    else if (isSpecial) className = "bg-amber-500 text-white hover:bg-amber-600";
 
                     return (
                       <button
