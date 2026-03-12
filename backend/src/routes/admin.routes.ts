@@ -10,6 +10,7 @@ import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
 import * as bookingController from "../controllers/booking.controller"
 import { getAllUsers, deleteUser, blockUser } from "../controllers/auth.controller"
+import * as promoController from "../controllers/promo.controller"
 
 const router = Router() // Router Express untuk semua route admin
 const upload = multer({ storage: multer.memoryStorage() }) // Middleware upload file, disimpan di memory (buffer) bukan disk
@@ -62,6 +63,7 @@ router.get("/airports", airportController.getAllAirports)
 router.get("/airports/:id", airportController.getAirport)
 router.put("/airports/:id", airportController.updateAirport)
 router.delete("/airports/:id", airportController.deleteAirport)
+router.post("/airports/:id/city-image", upload.single("image"), airportController.uploadAirportCityImage)
 
 // Airline Management
 /**
@@ -455,5 +457,11 @@ router.put("/users/:id/block", blockUser)
  *         description: User not found
  */
 router.delete("/users/:email", deleteUser)
+
+// Promo Management
+router.get("/promos", promoController.getAllPromos)
+router.post("/promos", promoController.createPromo)
+router.put("/promos/:id", promoController.updatePromo)
+router.delete("/promos/:id", promoController.deletePromo)
 
 export default router

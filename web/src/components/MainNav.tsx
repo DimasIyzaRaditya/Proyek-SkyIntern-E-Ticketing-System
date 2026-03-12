@@ -26,6 +26,14 @@ export default function MainNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Scroll listener for navbar animation
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Close on route change
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -86,7 +94,15 @@ export default function MainNav() {
 
   return (
     <>
-      <nav className="sticky top-0 z-40 border-b border-blue-100 bg-[linear-gradient(120deg,#0b2f61_0%,#114a8f_45%,#0a2349_100%)] text-white shadow-lg">
+      {/* Spacer so content is never hidden under the fixed nav */}
+      <div className="h-13 md:h-15" aria-hidden="true" />
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 text-white transition-all duration-300 ${
+          scrolled
+            ? "border-b border-white/10 bg-[linear-gradient(120deg,rgba(11,47,97,0.88)_0%,rgba(17,74,143,0.88)_45%,rgba(10,35,73,0.88)_100%)] shadow-2xl backdrop-blur-md"
+            : "border-b border-blue-100 bg-[linear-gradient(120deg,#0b2f61_0%,#114a8f_45%,#0a2349_100%)] shadow-lg"
+        }`}
+      >
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-5 md:py-3.5">
           {/* Logo */}
           <Link

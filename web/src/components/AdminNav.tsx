@@ -12,6 +12,7 @@ const menus = [
   { href: "/admin/seats", label: "Seat Config" },
   { href: "/admin/transactions", label: "Transactions" },
   { href: "/admin/users", label: "Users" },
+  { href: "/admin/promos", label: "Promos" },
 ];
 
 export default function AdminNav() {

@@ -14,6 +14,7 @@ export type AdminAirport = {
   city: string;
   country: string;
   timezone: string;
+  cityImageUrl: string | null;
 };
 
 export type AdminFlight = {
@@ -186,6 +187,7 @@ export const createAdminAirport = async (payload: {
   city: string;
   country: string;
   timezone: string;
+  cityImageUrl?: string;
 }) => {
   const response = await apiRequest<{ airport: AdminAirport }>("/api/admin/airports", {
     method: "POST",
@@ -203,6 +205,7 @@ export const updateAdminAirport = async (
     city: string;
     country: string;
     timezone: string;
+    cityImageUrl?: string;
   },
 ) => {
   const response = await apiRequest<{ airport: AdminAirport }>(`/api/admin/airports/${id}`, {
@@ -219,6 +222,30 @@ export const deleteAdminAirport = async (id: number) => {
     method: "DELETE",
     auth: true,
   });
+};
+
+export const uploadAdminAirportCityImage = async (id: number, file: File): Promise<string> => {
+  const { getAuthToken } = await import("@/lib/auth");
+  const { API_BASE_URL } = await import("@/lib/api-client");
+  const token = getAuthToken();
+  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/admin/airports/${id}/city-image`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errData = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new Error(errData.message ?? "Gagal mengupload foto kota.");
+  }
+
+  const data = (await response.json()) as { cityImageUrl: string };
+  return data.cityImageUrl;
 };
 
 export const getAdminFlights = async () => {
@@ -407,4 +434,70 @@ export const blockAdminUser = async (userId: number): Promise<AdminUser> => {
     auth: true,
   });
   return response.user;
+};
+
+// ── Promo ────────────────────────────────────────────────────────────────────
+
+export type Promo = {
+  id: number;
+  title: string;
+  description: string | null;
+  discount: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  flightId: number | null;
+  flight?: {
+    id: number;
+    flightNumber: string;
+    origin: { city: string };
+    destination: { city: string };
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PromoPayload = {
+  title: string;
+  description?: string;
+  discount?: number;
+  startDate: string;
+  endDate: string;
+  isActive?: boolean;
+  flightId?: number | null;
+};
+
+export const getActivePromos = async (): Promise<Promo[]> => {
+  const { API_BASE_URL } = await import("@/lib/api-client");
+  const res = await fetch(`${API_BASE_URL}/api/promos`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal memuat promo.");
+  const data = (await res.json()) as { promos: Promo[] };
+  return data.promos;
+};
+
+export const getAdminPromos = async (): Promise<Promo[]> => {
+  const response = await apiRequest<{ promos: Promo[] }>("/api/admin/promos", { auth: true });
+  return response.promos;
+};
+
+export const createAdminPromo = async (payload: PromoPayload): Promise<Promo> => {
+  const response = await apiRequest<{ promo: Promo }>("/api/admin/promos", {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+  return response.promo;
+};
+
+export const updateAdminPromo = async (id: number, payload: Partial<PromoPayload>): Promise<Promo> => {
+  const response = await apiRequest<{ promo: Promo }>(`/api/admin/promos/${id}`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
+  });
+  return response.promo;
+};
+
+export const deleteAdminPromo = async (id: number): Promise<void> => {
+  await apiRequest(`/api/admin/promos/${id}`, { method: "DELETE", auth: true });
 };

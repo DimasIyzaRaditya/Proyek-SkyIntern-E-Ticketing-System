@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowUpDown, CalendarDays, ChevronLeft, ChevronRight, Plane, PlaneLanding, PlaneTakeoff, Search, Users } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
+import HomePromoSection from "@/components/HomePromoSection";
 import { getAirportOptionsFromApi } from "@/lib/airport-api";
 
 
@@ -475,15 +476,16 @@ export default function SearchPage() {
   }, [triggerClosePanel]);
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage:
-          "linear-gradient(160deg, rgba(6,24,44,0.58) 0%, rgba(12,45,84,0.42) 45%, rgba(8,20,36,0.62) 100%), url('/bg.jpg'), url('/home-hero.svg')",
-      }}
-    >
-      <MainNav />
-      <main className="mx-auto w-full max-w-7xl overflow-x-clip px-4 pb-10 pt-6 md:px-6 md:pt-8">
+    <>
+      <div
+        className="min-h-screen bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage:
+            "linear-gradient(160deg, rgba(6,24,44,0.58) 0%, rgba(12,45,84,0.42) 45%, rgba(8,20,36,0.62) 100%), url('/bg.jpg'), url('/home-hero.svg')",
+        }}
+      >
+        <MainNav />
+        <main className="mx-auto w-full max-w-7xl overflow-x-clip px-4 pb-10 pt-6 md:px-6 md:pt-8">
         <LazySection>
         <section
           className="relative overflow-visible rounded-[28px] bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-8 text-white shadow-xl md:px-8 md:py-10"
@@ -842,7 +844,9 @@ export default function SearchPage() {
           </div>
         </section>
         </LazySection>
-      </main>
-    </div>
+        </main>
+      </div>
+      <HomePromoSection />
+    </>
   );
 }

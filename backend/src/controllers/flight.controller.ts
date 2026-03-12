@@ -220,7 +220,8 @@ export const searchFlights = async (req: Request, res: Response) => {
       minPrice,
       maxPrice,
       departureTimeStart,
-      departureTimeEnd
+      departureTimeEnd,
+      limit
     } = req.query
 
     const where: any = {
@@ -285,7 +286,8 @@ export const searchFlights = async (req: Request, res: Response) => {
             id: true,
             name: true,
             city: true,
-            country: true
+            country: true,
+            cityImageUrl: true
           }
         },
         destination: {
@@ -293,7 +295,8 @@ export const searchFlights = async (req: Request, res: Response) => {
             id: true,
             name: true,
             city: true,
-            country: true
+            country: true,
+            cityImageUrl: true
           }
         },
         _count: {
@@ -304,9 +307,23 @@ export const searchFlights = async (req: Request, res: Response) => {
               }
             }
           }
+        },
+        promos: {
+          where: {
+            isActive: true,
+            startDate: { lte: new Date() },
+            endDate: { gte: new Date() },
+          },
+          select: {
+            id: true,
+            title: true,
+            discount: true,
+            description: true,
+          },
         }
       },
-      orderBy
+      orderBy,
+      ...(limit ? { take: Math.min(parseInt(limit as string), 5000) } : {})
     })
 
     res.json({

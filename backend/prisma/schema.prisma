@@ -82,6 +82,7 @@ model Airport {
   city             String    @db.VarChar(100)
   country          String    @db.VarChar(100)
   timezone         String?   @db.VarChar(50)
+  cityImageUrl     String?   @db.VarChar(500)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   departureFlights Flight[]  @relation("DepartureAirport")
@@ -123,6 +124,7 @@ model Flight {
   destination     Airport      @relation("ArrivalAirport", fields: [destinationId], references: [id])
   bookings        Booking[]
   flightSeats     FlightSeat[]
+  promos          Promo[]
 }
 
 model Seat {
@@ -169,6 +171,21 @@ model Booking {
   payment       Payment?
   ticket        Ticket?
   flightSeats   FlightSeat[]
+}
+
+model Promo {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  discount    Int      @default(0)
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(true)
+  flightId    Int?     // null = global (semua tiket), set = khusus penerbangan ini
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  flight      Flight?  @relation(fields: [flightId], references: [id], onDelete: SetNull)
 }
 
 model Passenger {

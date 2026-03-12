@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth.routes"
 import adminRoutes from "./routes/admin.routes"
 import flightRoutes from "./routes/flight.routes"
 import bookingRoutes from "./routes/booking.routes"
+import { getActivePromos } from "./controllers/promo.controller"
 import swaggerSpec from "./config/swagger"
 import { initializeBucket } from "./utils/minio"
 
@@ -46,6 +47,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/admin", adminRoutes)
 app.use("/api/flights", flightRoutes)
 app.use("/api/bookings", bookingRoutes)
+app.get("/api/promos", getActivePromos)
 
 // API Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec))
