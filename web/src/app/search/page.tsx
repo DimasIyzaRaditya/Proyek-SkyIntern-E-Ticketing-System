@@ -6,6 +6,7 @@ import { ArrowUpDown, CalendarDays, ChevronLeft, ChevronRight, Plane, PlaneLandi
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import HomePromoSection from "@/components/HomePromoSection";
+import ChatBot from "@/components/ChatBot";
 import { getAirportOptionsFromApi } from "@/lib/airport-api";
 
 
@@ -847,6 +848,7 @@ export default function SearchPage() {
         </main>
       </div>
       <HomePromoSection />
+      <ChatBot />
     </>
   );
 }
