@@ -6,6 +6,7 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    String? phone,
   }) async {
     return await ApiClient.post(
       '/api/auth/register',
@@ -13,6 +14,7 @@ class AuthService {
         'name': name,
         'email': email,
         'password': password,
+        if (phone != null) 'phone': phone,
       },
     );
   }

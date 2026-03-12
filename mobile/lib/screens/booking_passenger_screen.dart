@@ -27,8 +27,10 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   int _extraPrice = 0;
   FlightCardItem? _flight;
   String _flightId = '';
+  int? _existingBookingId;
 
   final List<Map<String, TextEditingController>> _controllers = [];
+  final List<String> _titles = [];
   final List<String> _idTypes = [];
   final List<String> _nationalities = [];
   final List<DateTime?> _dobs = [];
@@ -51,6 +53,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
         List<Seat>.from((args['selectedSeats'] as List?) ?? []);
     _seatIds = List<int>.from((args['seatIds'] as List?) ?? []);
     _extraPrice = (args['extraPrice'] as int?) ?? 0;
+    _existingBookingId = args['existingBookingId'] as int?;
 
     final user = context.read<AuthProvider>().user;
     final nameParts = user?.fullName.split(' ') ?? [''];
@@ -66,6 +69,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
         'lastName': TextEditingController(text: i == 0 ? lastName : ''),
         'idNumber': TextEditingController(),
       });
+      _titles.add(i < _adults ? 'Mr.' : 'Mstr.');
       _idTypes.add('KTP');
       _nationalities.add('Indonesia');
       _dobs.add(null);
@@ -106,13 +110,14 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     final passengers = <Map<String, dynamic>>[];
     for (int i = 0; i < _controllers.length; i++) {
       passengers.add({
+        'title': _titles[i],
         'firstName': _controllers[i]['firstName']!.text.trim(),
         'lastName': _controllers[i]['lastName']!.text.trim(),
         'type': i < _adults ? 'ADULT' : 'CHILD',
         'nationality': _nationalities[i],
         'idType': _idTypes[i],
         'idNumber': _controllers[i]['idNumber']!.text.trim(),
-        'dob': DateFormatter.formatDate(_dobs[i]!),
+        'dateOfBirth': DateFormatter.formatDate(_dobs[i]!),
       });
     }
 
@@ -126,6 +131,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
       'passengers': passengers,
       'seatIds': _seatIds,
       'totalPrice': totalPrice,
+      if (_existingBookingId != null) 'existingBookingId': _existingBookingId,
     });
   }
 
@@ -137,7 +143,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -189,7 +195,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     return Card(
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.blue.shade50,
+      color: AppColors.surfaceVariant,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -201,8 +207,8 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
             Text('${f.origin} â†’ ${f.destination}',
                 style: const TextStyle(fontSize: 13)),
             Text('${f.departureTime} - ${f.arrivalTime}',
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade600)),
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
             if (_seatIds.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
@@ -219,9 +225,9 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     final inputDecoration = InputDecoration(
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.blue.shade200)),
+          borderSide: const BorderSide(color: AppColors.border)),
       filled: true,
-      fillColor: Colors.blue.shade50,
+      fillColor: AppColors.surfaceVariant,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     );
 
@@ -240,6 +246,28 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
                   fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+            _labelText('Gelar / Sapaan'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _titles[i],
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border)),
+                filled: true,
+                fillColor: AppColors.surfaceVariant,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              items: isAdult
+                  ? ['Mr.', 'Mrs.', 'Ms.']
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList()
+                  : ['Mstr.', 'Miss']
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
+              onChanged: (v) => setState(() => _titles[i] = v ?? _titles[i]),
+            ),
+            const SizedBox(height: 12),
             InputField(
               label: 'Nama Depan',
               controller: _controllers[i]['firstName'],
@@ -306,9 +334,9 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   children: [
@@ -319,12 +347,12 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
                           : 'Pilih tanggal lahir',
                       style: TextStyle(
                           color: _dobs[i] != null
-                              ? Colors.black87
-                              : Colors.grey.shade400),
+                              ? AppColors.textPrimary
+                              : AppColors.textHint),
                     ),
                     const Spacer(),
-                    Icon(Icons.calendar_today,
-                        size: 16, color: Colors.blue.shade600),
+                    const Icon(Icons.calendar_today,
+                        size: 16, color: AppColors.primary),
                   ],
                 ),
               ),
@@ -337,10 +365,10 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
 
   Widget _labelText(String text) {
     return Text(text,
-        style: TextStyle(
+        style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700));
+            color: AppColors.textSecondary));
   }
 }
 

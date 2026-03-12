@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
@@ -131,10 +131,10 @@ class _LoginScreenState extends State<LoginScreen>
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                      color: Colors.white.withOpacity(0.4),
+                                      color: Colors.white.withValues(alpha: 0.4),
                                       width: 2),
                                 ),
                                 child: const Icon(Icons.flight_rounded,
@@ -155,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 'E-Ticketing System',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.white.withOpacity(0.85),
+                                  color: Colors.white.withValues(alpha: 0.85),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -244,11 +244,11 @@ class _LoginScreenState extends State<LoginScreen>
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 14, vertical: 12),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFFEF2F2),
+                                          color: AppColors.errorLight,
                                           borderRadius:
                                               BorderRadius.circular(12),
                                           border: Border.all(
-                                              color: const Color(0xFFFCA5A5)),
+                                              color: AppColors.error.withValues(alpha: 0.4)),
                                         ),
                                         child: Row(
                                           crossAxisAlignment:
@@ -256,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           children: [
                                             const Icon(
                                               Icons.error_outline_rounded,
-                                              color: Color(0xFFEF4444),
+                                              color: AppColors.error,
                                               size: 18,
                                             ),
                                             const SizedBox(width: 10),
@@ -264,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen>
                                               child: Text(
                                                 _loginError!,
                                                 style: const TextStyle(
-                                                  color: Color(0xFFB91C1C),
+                                                  color: AppColors.error,
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w500,
                                                 ),

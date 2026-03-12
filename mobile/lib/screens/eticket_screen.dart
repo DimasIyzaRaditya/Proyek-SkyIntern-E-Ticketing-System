@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/booking_model.dart';
 import '../utils/app_theme.dart';
-import '../widgets/common_widgets.dart';
 import '../utils/formatters.dart';
 
 class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
@@ -19,7 +18,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
           child: Container(
             decoration: const BoxDecoration(
               gradient: AppColors.primaryGradient,
-              boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+              boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
             ),
             child: AppBar(
               backgroundColor: Colors.transparent,
@@ -42,7 +41,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -80,7 +79,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade600,
+              color: AppColors.primary,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(16)),
             ),
@@ -117,7 +116,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                               fontWeight: FontWeight.bold)),
                       Text(f.originCity,
                           style:
-                              TextStyle(color: Colors.grey.shade600)),
+                              const TextStyle(color: AppColors.textSecondary)),
                       const SizedBox(height: 4),
                       Text(
                           DateFormatter.formatTime(f.departureTime),
@@ -130,14 +129,14 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                 Column(
                   children: [
                     const Icon(Icons.flight,
-                        color: Colors.blue, size: 28),
+                        color: AppColors.primary, size: 28),
                     const SizedBox(height: 4),
                     Text(
                         DateFormatter.formatShortDate(
                             f.departureTime),
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade600)),
+                            color: AppColors.textSecondary)),
                   ],
                 ),
                 Expanded(
@@ -150,7 +149,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                               fontWeight: FontWeight.bold)),
                       Text(f.destinationCity,
                           style:
-                              TextStyle(color: Colors.grey.shade600)),
+                              const TextStyle(color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -181,7 +180,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                       child: Row(
                         children: [
                           const Icon(Icons.person,
-                              size: 16, color: Colors.grey),
+                              size: 16, color: AppColors.textHint),
                           const SizedBox(width: 8),
                           Text('${p.firstName} ${p.lastName}'),
                           const Spacer(),
@@ -189,9 +188,9 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                               p.type == 'ADULT'
                                   ? 'Dewasa'
                                   : 'Anak',
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade600)),
+                                  color: AppColors.textSecondary)),
                         ],
                       ),
                     )),
@@ -237,8 +236,8 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                     letterSpacing: 3)),
             const SizedBox(height: 4),
             Text('Tunjukkan QR code ini kepada petugas bandara',
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade600),
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -251,8 +250,8 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: TextStyle(
-                fontSize: 11, color: Colors.grey.shade600)),
+            style: const TextStyle(
+                fontSize: 11, color: AppColors.textSecondary)),
         Text(value,
             style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
@@ -285,7 +284,7 @@ class _DashedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey.shade300
+      ..color = AppColors.border
       ..strokeWidth = 1;
     double x = 0;
     while (x < size.width) {

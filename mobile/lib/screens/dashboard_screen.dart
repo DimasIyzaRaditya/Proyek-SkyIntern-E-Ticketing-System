@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
@@ -127,7 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           gradient: AppColors.primaryGradient,
           boxShadow: [
             BoxShadow(
-                color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))
+                color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))
           ],
         ),
         child: AppBar(
@@ -146,21 +147,33 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           actions: [
             Consumer<AuthProvider>(
-              builder: (_, auth, __) => PopupMenuButton<String>(
-                offset: const Offset(0, 50),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-                icon: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.white.withOpacity(0.25),
-                  child: Text(
-                    StringHelper.getInitials(auth.user?.fullName ?? 'U'),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14),
+              builder: (_, auth, __) {
+                final user = auth.user;
+                ImageProvider? avatarImage;
+                if (user?.avatarUrl != null && user!.avatarUrl!.startsWith('data:image')) {
+                  final base64Data = user.avatarUrl!.split(',').last;
+                  avatarImage = MemoryImage(base64Decode(base64Data));
+                } else if (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty) {
+                  avatarImage = NetworkImage(user.avatarUrl!);
+                }
+                return PopupMenuButton<String>(
+                  offset: const Offset(0, 50),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  icon: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white.withValues(alpha: 0.25),
+                    backgroundImage: avatarImage,
+                    child: avatarImage == null
+                        ? Text(
+                            StringHelper.getInitials(auth.user?.fullName ?? 'U'),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14),
+                          )
+                        : null,
                   ),
-                ),
                 onSelected: (v) {
                   if (v == 'profile') Navigator.pushNamed(context, '/edit-profile');
                   if (v == 'bookings') Navigator.pushNamed(context, '/bookings');
@@ -194,7 +207,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ]),
                   ),
                 ],
-              ),
+              );
+            },
             ),
             const SizedBox(width: 8),
           ],
@@ -208,6 +222,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       builder: (_, auth, __) {
         final user = auth.user;
         if (user == null) return const SizedBox();
+
+        ImageProvider? avatarImage;
+        if (user.avatarUrl != null && user.avatarUrl!.startsWith('data:image')) {
+          final base64Data = user.avatarUrl!.split(',').last;
+          avatarImage = MemoryImage(base64Decode(base64Data));
+        } else if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) {
+          avatarImage = NetworkImage(user.avatarUrl!);
+        }
+
         return GradientCard(
           padding: const EdgeInsets.all(20),
           margin: const EdgeInsets.only(top: 16),
@@ -216,14 +239,17 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               CircleAvatar(
                 radius: isWide ? 36 : 30,
-                backgroundColor: Colors.white.withOpacity(0.25),
-                child: Text(
-                  StringHelper.getInitials(user.fullName),
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: isWide ? 22 : 18),
-                ),
+                backgroundColor: Colors.white.withValues(alpha: 0.25),
+                backgroundImage: avatarImage,
+                child: avatarImage == null
+                    ? Text(
+                        StringHelper.getInitials(user.fullName),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isWide ? 22 : 18),
+                      )
+                    : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -232,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   children: [
                     Text('Halo, selamat datang!',
                         style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 13)),
                     const SizedBox(height: 4),
                     Text(user.fullName,
@@ -245,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -276,7 +302,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         'label': 'Booking Saya',
         'icon': Icons.confirmation_number_outlined,
         'gradient': const LinearGradient(
-            colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]),
+            colors: [Color(0xFF10B981), Color(0xFF2563EB)]),
         'route': '/bookings',
       },
       {
@@ -382,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         value: '$done',
                         icon: Icons.check_circle_outline_rounded,
                         gradient: const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]))),
+                            colors: [Color(0xFF10B981), Color(0xFF2563EB)]))),
               ],
             ),
           ],

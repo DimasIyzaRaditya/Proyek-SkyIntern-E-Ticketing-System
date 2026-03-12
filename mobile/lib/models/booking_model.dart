@@ -1,5 +1,6 @@
 class Booking {
   final int id;
+  final int flightId;
   final String bookingCode;
   final String status;
   final String createdAt;
@@ -9,6 +10,7 @@ class Booking {
 
   Booking({
     required this.id,
+    required this.flightId,
     required this.bookingCode,
     required this.status,
     required this.createdAt,
@@ -20,6 +22,7 @@ class Booking {
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
       id: json['id'] as int,
+      flightId: json['flightId'] as int? ?? 0,
       bookingCode: json['bookingCode'] ?? '',
       status: json['status'] ?? 'PENDING',
       createdAt: json['createdAt'] ?? '',
@@ -33,6 +36,7 @@ class Booking {
 }
 
 class FlightInfo {
+  final int id;
   final String flightNumber;
   final String departureTime;
   final String airline;
@@ -42,6 +46,7 @@ class FlightInfo {
   final String destinationCode;
 
   FlightInfo({
+    required this.id,
     required this.flightNumber,
     required this.departureTime,
     required this.airline,
@@ -53,6 +58,7 @@ class FlightInfo {
 
   factory FlightInfo.fromJson(Map<String, dynamic> json) {
     return FlightInfo(
+      id: json['id'] as int? ?? 0,
       flightNumber: json['flightNumber'] ?? '',
       departureTime: json['departureTime'] ?? '',
       airline: json['airline']?['name'] ?? 'Unknown',

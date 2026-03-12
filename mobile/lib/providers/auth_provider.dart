@@ -38,13 +38,14 @@ class AuthProvider extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    String? phone,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await AuthService.register(name: name, email: email, password: password);
+      await AuthService.register(name: name, email: email, password: password, phone: phone);
       // Auto-login after registration
       await login(email: email, password: password);
     } catch (e) {

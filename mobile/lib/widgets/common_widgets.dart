@@ -25,7 +25,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         gradient: AppColors.primaryGradient,
         boxShadow: [
           BoxShadow(
-            color: Color(0x220EA5E9),
+            color: Color(0x222563EB),
             blurRadius: 12,
             offset: Offset(0, 4),
           ),
@@ -129,20 +129,20 @@ class _PrimaryButtonState extends State<PrimaryButton>
             gradient: _disabled || widget.color != null
                 ? null
                 : const LinearGradient(
-                    colors: [Color(0xFF0EA5E9), Color(0xFF6366F1)],
+                    colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
             color: _disabled
-                ? AppColors.textHint
+                ? const Color(0xFFD1D5DB)
                 : widget.color,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             boxShadow: _disabled
                 ? []
                 : [
                     BoxShadow(
                       color: (widget.color ?? AppColors.primary)
-                          .withOpacity(0.35),
+                          .withValues(alpha: 0.30),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -312,14 +312,7 @@ class GlassCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? AppColors.surface,
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: AppColors.border.withOpacity(0.5)),
+        boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
@@ -355,20 +348,14 @@ class GradientCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: AppShadows.colored,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(borderRadius),
-          splashColor: Colors.white.withOpacity(0.1),
+          splashColor: Colors.white.withValues(alpha: 0.12),
           child: Padding(
             padding: padding ?? EdgeInsets.zero,
             child: child,
@@ -408,7 +395,7 @@ class StatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: Colors.white, size: 22),
@@ -425,8 +412,8 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+            style: const TextStyle(
+              color: Color(0xCCFFFFFF),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -514,9 +501,9 @@ class _FlightCardState extends State<FlightCard>
             boxShadow: [
               BoxShadow(
                 color: Colors.black
-                    .withOpacity(0.06 + _elevation.value * 0.04),
+                    .withValues(alpha: 0.05 + _elevation.value * 0.04),
                 blurRadius: 12 + _elevation.value * 8,
-                offset: Offset(0, 4 + _elevation.value * 2),
+                offset: Offset(0, 3 + _elevation.value * 2),
               ),
             ],
           ),
@@ -566,7 +553,7 @@ class _FlightCardState extends State<FlightCard>
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF0EA5E9), Color(0xFF6366F1)],
+                          colors: [Color(0xFF2563EB), Color(0xFF6366F1)],
                         ),
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -631,7 +618,7 @@ class _FlightCardState extends State<FlightCard>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.08),
+                                color: AppColors.primaryLight,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(f,
@@ -718,7 +705,7 @@ class InfoRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: (iconColor ?? AppColors.primary).withOpacity(0.1),
+              color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: iconColor ?? AppColors.primary),
@@ -792,27 +779,37 @@ class SectionHeader extends StatelessWidget {
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 class StatusBadge extends StatelessWidget {
   final String label;
-  final Color color;
+  final Color bgColor;
   final Color textColor;
 
   const StatusBadge({
     super.key,
     required this.label,
-    required this.color,
-    this.textColor = Colors.white,
+    required this.bgColor,
+    required this.textColor,
   });
 
   factory StatusBadge.fromStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return const StatusBadge(label: 'Confirmed', color: AppColors.success);
-      case 'pending':
-        return const StatusBadge(label: 'Pending', color: AppColors.warning);
-      case 'cancelled':
-        return const StatusBadge(label: 'Cancelled', color: AppColors.error);
+    switch (status.toUpperCase()) {
+      case 'ISSUED':
+        return const StatusBadge(label: 'Issued', bgColor: Color(0xFFECFDF5), textColor: Color(0xFF059669));
+      case 'PAID':
+      case 'SETTLEMENT':
+      case 'COMPLETED':
+      case 'CONFIRMED':
+        return const StatusBadge(label: 'Terbayar', bgColor: Color(0xFFECFDF5), textColor: Color(0xFF059669));
+      case 'PENDING':
+        return const StatusBadge(label: 'Menunggu', bgColor: Color(0xFFFFFBEB), textColor: Color(0xFFD97706));
+      case 'CANCELLED':
+        return const StatusBadge(label: 'Dibatalkan', bgColor: Color(0xFFFEF2F2), textColor: Color(0xFFDC2626));
+      case 'EXPIRED':
+      case 'FAILED':
+        return const StatusBadge(label: 'Kadaluwarsa', bgColor: Color(0xFFFEF2F2), textColor: Color(0xFFDC2626));
       default:
         return StatusBadge(
-            label: status, color: AppColors.textSecondary);
+            label: status,
+            bgColor: AppColors.surfaceVariant,
+            textColor: AppColors.textSecondary);
     }
   }
 
@@ -821,14 +818,14 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: color, borderRadius: BorderRadius.circular(20)),
+          color: bgColor, borderRadius: BorderRadius.circular(20)),
       child: Text(
         label,
         style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
             color: textColor,
-            letterSpacing: 0.3),
+            letterSpacing: 0.2),
       ),
     );
   }
@@ -859,8 +856,9 @@ class EmptyState extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                  color: AppColors.background, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  shape: BoxShape.circle),
               child: Icon(icon, size: 48, color: AppColors.textHint),
             ),
             const SizedBox(height: 20),
@@ -930,7 +928,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
         height: widget.height,
         decoration: BoxDecoration(
           color: Color.lerp(
-              const Color(0xFFE2E8F0), const Color(0xFFF1F5F9), _anim.value),
+              const Color(0xFFE5E7EB), const Color(0xFFF3F4F6), _anim.value),
           borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
       ),

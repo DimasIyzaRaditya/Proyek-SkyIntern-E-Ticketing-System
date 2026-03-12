@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/flight_model.dart';
@@ -19,7 +20,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   bool _isCreating = false;
   bool _isSyncing = false;
   bool _paymentOpened = false;
+  bool _isExpired = false;
   int? _bookingId;
+  int? _existingBookingId;
   String? _redirectUrl;
   String? _error;
 
@@ -28,6 +31,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   List<int> _seatIds = [];
   int _totalPrice = 0;
   int _flightId = 0;
+
+  // Countdown timer
+  static const int _countdownSeconds = 15 * 60; // 15 minutes
+  int _remainingSeconds = _countdownSeconds;
+  Timer? _countdownTimer;
 
   @override
   void didChangeDependencies() {
@@ -43,7 +51,49 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           List<Map<String, dynamic>>.from(args['passengers'] ?? []);
       _seatIds = List<int>.from(args['seatIds'] ?? []);
       _totalPrice = (args['totalPrice'] as int?) ?? 0;
+      _existingBookingId = args['existingBookingId'] as int?;
+      if (_existingBookingId != null) {
+        _bookingId = _existingBookingId;
+      }
     }
+    _startCountdown();
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remainingSeconds <= 0) {
+        timer.cancel();
+        _handleExpired();
+        return;
+      }
+      setState(() => _remainingSeconds--);
+    });
+  }
+
+  Future<void> _handleExpired() async {
+    setState(() => _isExpired = true);
+    if (_bookingId != null) {
+      try {
+        await BookingService.cancelBooking(_bookingId!);
+      } catch (_) {}
+    }
+  }
+
+  String _formatCountdown() {
+    final m = (_remainingSeconds ~/ 60).toString().padLeft(2, '0');
+    final s = (_remainingSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   Future<void> _createBookingAndPay() async {
@@ -52,18 +102,29 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _error = null;
     });
     try {
-      final bookingResult = await BookingService.createBooking(
-        flightId: _flightId,
-        passengers: _passengers,
-        seatIds: _seatIds.isNotEmpty ? _seatIds : null,
-      );
-      final bookingId =
-          bookingResult['booking']?['id'] as int? ??
-          bookingResult['id'] as int?;
-      if (bookingId == null) throw Exception('Gagal membuat pemesanan');
+      int bookingId;
+
+      if (_existingBookingId != null) {
+        // Editing flow: reuse existing booking, skip createBooking
+        bookingId = _existingBookingId!;
+      } else {
+        // New booking flow
+        final bookingResult = await BookingService.createBooking(
+          flightId: _flightId,
+          passengers: _passengers,
+          seatIds: _seatIds.isNotEmpty ? _seatIds : null,
+        );
+        bookingId =
+            bookingResult['booking']?['id'] as int? ??
+            bookingResult['id'] as int?
+            ?? (throw Exception('Gagal membuat pemesanan'));
+      }
 
       final paymentResult = await BookingService.createPayment(bookingId);
+      // Backend wraps hasil di dalam key 'payment': { snapToken, redirectUrl, ... }
+      final paymentData = paymentResult['payment'] as Map<String, dynamic>?;
       final redirectUrl =
+          paymentData?['redirectUrl'] as String? ??
           paymentResult['redirectUrl'] as String? ??
           paymentResult['snap_redirect_url'] as String?;
       if (redirectUrl == null) throw Exception('Gagal mendapatkan link pembayaran');
@@ -139,19 +200,57 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: isError ? Colors.red : Colors.green,
+      backgroundColor: isError ? AppColors.error : AppColors.success,
     ));
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isExpired) {
+      return Scaffold(
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Container(
+            decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.timer_off_rounded, size: 72, color: AppColors.error),
+                const SizedBox(height: 16),
+                const Text('Sesi Pembayaran Kadaluwarsa',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                const Text('Waktu pembayaran telah habis dan pemesanan Anda otomatis dibatalkan.',
+                    style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                PrimaryButton(
+                  label: 'Kembali ke Beranda',
+                  onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -163,6 +262,35 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     onPressed: () => Navigator.pop(context),
                   ),
             title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _remainingSeconds <= 60
+                          ? AppColors.error.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.timer_rounded, size: 14,
+                            color: _remainingSeconds <= 60 ? AppColors.error : Colors.white),
+                        const SizedBox(width: 4),
+                        Text(_formatCountdown(),
+                            style: TextStyle(
+                                color: _remainingSeconds <= 60 ? AppColors.error : Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -174,6 +302,29 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Countdown warning
+                  if (_remainingSeconds <= 60 && !_isExpired)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Kurang dari 1 menit! Segera selesaikan pembayaran.',
+                              style: const TextStyle(color: AppColors.error, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (_flight != null) _buildFlightSummary(),
                   const SizedBox(height: 16),
                   _buildPassengerSummary(),
@@ -184,19 +335,19 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        color: AppColors.errorLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.shade200),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_outline,
-                              color: Colors.red.shade600),
+                          const Icon(Icons.error_outline,
+                              color: AppColors.error),
                           const SizedBox(width: 8),
                           Expanded(
                               child: Text(_error!,
-                                  style: TextStyle(
-                                      color: Colors.red.shade700))),
+                                  style: const TextStyle(
+                                      color: AppColors.error))),
                         ],
                       ),
                     ),
@@ -206,7 +357,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: AppColors.surfaceVariant,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -219,7 +370,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                           const Text(
                               'Selesaikan pembayaran di browser, lalu kembali ke sini untuk mengecek status.',
                               style: TextStyle(
-                                  fontSize: 13, color: Colors.black54)),
+                                  fontSize: 13, color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
@@ -233,9 +384,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  if (!_paymentOpened && _bookingId == null)
+                  if (!_paymentOpened && (_bookingId == null || _existingBookingId != null && !_paymentOpened))
                     PrimaryButton(
-                      label: 'Buat Pesanan & Bayar',
+                      label: _existingBookingId != null ? 'Bayar Sekarang' : 'Buat Pesanan & Bayar',
                       onPressed: _createBookingAndPay,
                       isLoading: _isCreating,
                     ),
@@ -284,9 +435,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                           style: const TextStyle(
                               fontWeight: FontWeight.bold)),
                       Text(f.flightNumber,
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade600)),
+                              color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -299,7 +450,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   child: Column(
                     children: [
                       const Icon(Icons.flight,
-                          size: 16, color: Colors.blue),
+                          size: 16, color: AppColors.primary),
                       Text(f.duration,
                           style: const TextStyle(fontSize: 11)),
                     ],
@@ -333,8 +484,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.person_outline,
-                          size: 18, color: Colors.blue.shade600),
+                      const Icon(Icons.person_outline,
+                          size: 18, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Text('${p['firstName']} ${p['lastName']}'),
                       const Spacer(),
@@ -342,14 +493,14 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: AppColors.surfaceVariant,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           p['type'] == 'ADULT' ? 'Dewasa' : 'Anak',
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 11,
-                              color: Colors.blue.shade700),
+                              color: AppColors.primary),
                         ),
                       ),
                     ],
@@ -365,7 +516,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return Card(
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.blue.shade50,
+      color: AppColors.surfaceVariant,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -383,10 +534,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         fontSize: 16, fontWeight: FontWeight.bold)),
                 Text(
                   CurrencyFormatter.formatPrice(_totalPrice),
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700),
+                      color: AppColors.primaryDark),
                 ),
               ],
             ),

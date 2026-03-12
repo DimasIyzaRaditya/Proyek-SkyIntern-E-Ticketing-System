@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
@@ -47,7 +47,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       {'label': 'Maskapai', 'icon': Icons.flight_rounded, 'gradient': AppColors.primaryGradient, 'route': '/admin/airlines'},
       {'label': 'Bandara', 'icon': Icons.location_city_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]), 'route': '/admin/airports'},
       {'label': 'Jadwal', 'icon': Icons.schedule_rounded, 'gradient': const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]), 'route': '/admin/schedules'},
-      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]), 'route': '/admin/seats'},
+      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]), 'route': '/admin/schedules'},
       {'label': 'Transaksi', 'icon': Icons.receipt_long_rounded, 'gradient': const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFF59E0B)]), 'route': '/admin/transactions'},
       {'label': 'Pengguna', 'icon': Icons.group_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF0D9488), Color(0xFF6366F1)]), 'route': '/admin/users'},
     ];
@@ -60,7 +60,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
             boxShadow: [
-              BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))
+              BoxShadow(color: Color(0x221A56DB), blurRadius: 12, offset: Offset(0, 4))
             ],
           ),
           child: AppBar(
@@ -98,7 +98,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.admin_panel_settings_rounded,
@@ -117,12 +117,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                             const SizedBox(height: 4),
                             Text(user?.fullName ?? 'Administrator',
                                 style: TextStyle(
-                                    color: Colors.white.withOpacity(0.85),
+                                    color: Colors.white.withValues(alpha: 0.85),
                                     fontSize: 13)),
                             const SizedBox(height: 4),
                             Text('SkyIntern Admin Dashboard',
                                 style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Colors.white.withValues(alpha: 0.7),
                                     fontSize: 12)),
                           ],
                         ),
@@ -176,7 +176,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(m['icon'] as IconData,

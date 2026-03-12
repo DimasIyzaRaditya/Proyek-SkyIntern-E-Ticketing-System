@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/flight_provider.dart';
 import '../utils/app_theme.dart';
@@ -37,7 +37,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -128,7 +128,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
-                                    color: AppColors.error.withOpacity(0.1),
+                                    color: AppColors.error.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.signal_wifi_bad_rounded, size: 48, color: AppColors.error),

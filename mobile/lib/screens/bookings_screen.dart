@@ -1,6 +1,9 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/booking_provider.dart';
+import '../services/booking_service.dart';
 import '../models/booking_model.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
@@ -17,6 +20,9 @@ class BookingsScreen extends StatefulWidget {
 class _BookingsScreenState extends State<BookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final Set<int> _payingIds = {};
+  final Set<int> _syncingIds = {};
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -24,11 +30,20 @@ class _BookingsScreenState extends State<BookingsScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().loadBookings();
+      _startPolling();
+    });
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) context.read<BookingProvider>().loadBookings();
     });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -38,11 +53,52 @@ class _BookingsScreenState extends State<BookingsScreen>
       case 'active':
         return all.where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase())).toList();
       case 'completed':
-        return all.where((b) => ['SETTLEMENT', 'COMPLETED'].contains(b.status.toUpperCase())).toList();
+        return all.where((b) => ['SETTLEMENT', 'COMPLETED', 'ISSUED'].contains(b.status.toUpperCase())).toList();
       case 'cancelled':
         return all.where((b) => ['CANCELLED', 'EXPIRED', 'FAILED'].contains(b.status.toUpperCase())).toList();
       default:
         return all;
+    }
+  }
+
+  Future<void> _payBooking(int bookingId) async {
+    setState(() => _payingIds.add(bookingId));
+    try {
+      final result = await BookingService.createPayment(bookingId);
+      final url = result['redirectUrl'] as String? ?? result['snap_redirect_url'] as String?;
+      if (url == null) throw Exception('Gagal mendapatkan link pembayaran');
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Tidak dapat membuka halaman pembayaran');
+      }
+    } catch (e) {
+      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+    } finally {
+      if (mounted) setState(() => _payingIds.remove(bookingId));
+    }
+  }
+
+  Future<void> _syncBooking(int bookingId) async {
+    setState(() => _syncingIds.add(bookingId));
+    try {
+      final result = await BookingService.syncPayment(bookingId);
+      final status = (result['booking']?['status'] ?? result['status'] ?? '').toString().toUpperCase();
+      if (!mounted) return;
+      if (status == 'PAID' || status == 'SETTLEMENT') {
+        showSnackBar(context, 'Pembayaran berhasil dikonfirmasi!');
+        await context.read<BookingProvider>().loadBookings();
+      } else if (status == 'PENDING') {
+        showSnackBar(context, 'Pembayaran masih diproses. Silakan coba lagi nanti.');
+      } else if (['CANCELLED', 'EXPIRED', 'FAILED'].contains(status)) {
+        showSnackBar(context, 'Pembayaran gagal atau kadaluwarsa.', isError: true);
+        await context.read<BookingProvider>().loadBookings();
+      }
+    } catch (e) {
+      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+    } finally {
+      if (mounted) setState(() => _syncingIds.remove(bookingId));
     }
   }
 
@@ -86,7 +142,7 @@ class _BookingsScreenState extends State<BookingsScreen>
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: Column(
             children: [
@@ -178,6 +234,11 @@ class _BookingsScreenState extends State<BookingsScreen>
   Widget _buildCard(BuildContext context, Booking booking) {
     final isPending = booking.status.toUpperCase() == 'PENDING';
     final isPaid = ['PAID', 'SETTLEMENT', 'COMPLETED'].contains(booking.status.toUpperCase());
+    final isIssued = booking.status.toUpperCase() == 'ISSUED';
+
+    // Count adult/child from passenger list
+    final adults = booking.passengers.where((p) => p.type.toUpperCase() == 'ADULT').length;
+    final children = booking.passengers.where((p) => p.type.toUpperCase() == 'CHILD').length;
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -281,17 +342,114 @@ class _BookingsScreenState extends State<BookingsScreen>
             ),
           ),
 
-          if (isPaid || isPending) ...[
+          if (isPaid || isPending || isIssued) ...[
             const SizedBox(height: 12),
-            Row(
-              children: [
-                if (isPaid)
+            if (isPaid)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                    SizedBox(width: 8),
+                    Text('Menunggu Penerbitan Tiket...', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  ],
+                ),
+              ),
+            if (isIssued)
+              OutlinedButton.icon(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/e-ticket', arguments: {'booking': booking}),
+                icon: const Icon(Icons.airplane_ticket_outlined, size: 16),
+                label: const Text('Lihat E-Tiket'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(38),
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            if (isPending) ...[
+              Row(
+                children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () =>
-                          Navigator.of(context).pushNamed('/e-ticket', arguments: {'booking': booking}),
-                      icon: const Icon(Icons.airplane_ticket_outlined, size: 16),
-                      label: const Text('E-Tiket'),
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        '/booking-seat',
+                        arguments: {
+                          'flightId': booking.flight.id.toString(),
+                          'adults': adults > 0 ? adults : 1,
+                          'children': children,
+                          'existingBookingId': booking.id,
+                        },
+                      ),
+                      icon: const Icon(Icons.event_seat_outlined, size: 16),
+                      label: const Text('Ubah Kursi'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        '/booking-passenger',
+                        arguments: {
+                          'flightId': booking.flight.id.toString(),
+                          'adults': adults > 0 ? adults : 1,
+                          'children': children,
+                          'selectedSeats': [],
+                          'seatIds': [],
+                          'extraPrice': 0,
+                          'existingBookingId': booking.id,
+                        },
+                      ),
+                      icon: const Icon(Icons.person_outline, size: 16),
+                      label: const Text('Ubah Penumpang'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _payingIds.contains(booking.id) ? null : () => _payBooking(booking.id),
+                      icon: _payingIds.contains(booking.id)
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.payment_rounded, size: 16),
+                      label: const Text('Bayar Sekarang'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _syncingIds.contains(booking.id) ? null : () => _syncBooking(booking.id),
+                      icon: _syncingIds.contains(booking.id)
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                          : const Icon(Icons.sync_rounded, size: 16),
+                      label: const Text('Cek Status'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
@@ -299,23 +457,21 @@ class _BookingsScreenState extends State<BookingsScreen>
                       ),
                     ),
                   ),
-                if (isPending) ...[
-                  if (isPaid) const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _cancelBooking(booking.id),
-                      icon: const Icon(Icons.cancel_outlined, size: 16),
-                      label: const Text('Batalkan'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.error,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
                 ],
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => _cancelBooking(booking.id),
+                icon: const Icon(Icons.cancel_outlined, size: 16),
+                label: const Text('Batalkan Pemesanan'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(38),
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
           ],
         ],
       ),

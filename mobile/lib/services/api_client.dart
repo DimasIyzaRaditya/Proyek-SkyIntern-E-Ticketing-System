@@ -10,6 +10,8 @@ class ApiClient {
   static const String baseUrl = 'http://localhost:3000';
   static String? _authToken;
 
+  static String? get authToken => _authToken;
+
   static void setAuthToken(String token) {
     _authToken = token;
   }
@@ -37,6 +39,11 @@ class ApiClient {
       if (response.statusCode == 401) {
         clearAuthToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
+      }
+
+      if (response.statusCode == 403) {
+        clearAuthToken();
+        throw Exception('ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.');
       }
 
       if (response.statusCode != 200) {
@@ -71,6 +78,11 @@ class ApiClient {
       if (response.statusCode == 401 && requireAuth) {
         clearAuthToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
+      }
+
+      if (response.statusCode == 403) {
+        clearAuthToken();
+        throw Exception('ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.');
       }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -109,6 +121,11 @@ class ApiClient {
       if (response.statusCode == 401) {
         clearAuthToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
+      }
+
+      if (response.statusCode == 403) {
+        clearAuthToken();
+        throw Exception('ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.');
       }
 
       if (response.statusCode != 200) {

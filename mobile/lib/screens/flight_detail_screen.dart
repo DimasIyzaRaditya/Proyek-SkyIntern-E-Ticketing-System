@@ -109,7 +109,7 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -130,10 +130,10 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline,
-                          size: 48, color: Colors.red),
+                          size: 48, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_error!,
-                          style: const TextStyle(color: Colors.red),
+                          style: const TextStyle(color: AppColors.error),
                           textAlign: TextAlign.center),
                       const SizedBox(height: 16),
                       PrimaryButton(
@@ -169,22 +169,22 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                         Row(
                           children: [
                             Text(f.airline,
-                                style: TextStyle(
+                                style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue.shade700)),
+                                    color: AppColors.primaryDark)),
                             const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
+                                color: AppColors.surfaceVariant,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(f.flightNumber,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                       fontSize: 13,
-                                      color: Colors.blue.shade700)),
+                                      color: AppColors.primaryDark)),
                             ),
                           ],
                         ),
@@ -200,17 +200,17 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                                           fontSize: 32,
                                           fontWeight: FontWeight.bold)),
                                   Text(f.origin,
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600)),
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary)),
                                 ],
                               ),
                             ),
                             Column(
                               children: [
-                                const Icon(Icons.flight, color: Colors.blue),
+                                const Icon(Icons.flight, color: AppColors.primary),
                                 Text(f.duration,
                                     style: const TextStyle(
-                                        fontSize: 12, color: Colors.grey)),
+                                        fontSize: 12, color: AppColors.textHint)),
                               ],
                             ),
                             Expanded(
@@ -222,8 +222,8 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                                           fontSize: 32,
                                           fontWeight: FontWeight.bold)),
                                   Text(f.destination,
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600),
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary),
                                       textAlign: TextAlign.end),
                                 ],
                               ),
@@ -261,7 +261,7 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                                     label: Text(fac,
                                         style:
                                             const TextStyle(fontSize: 12)),
-                                    backgroundColor: Colors.blue.shade50,
+                                    backgroundColor: AppColors.surfaceVariant,
                                   ))
                               .toList(),
                         ),
@@ -273,20 +273,20 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Harga per orang',
-                          style: TextStyle(color: Colors.grey.shade700)),
+                          style: const TextStyle(color: AppColors.textSecondary)),
                       Text(
                         CurrencyFormatter.formatPrice(f.price),
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700),
+                            color: AppColors.primaryDark),
                       ),
                     ],
                   ),
@@ -331,11 +331,11 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.blue.shade600),
+          Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
           Text(label,
               style:
-                  TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                  const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
           const Spacer(),
           Text(value,
               style: const TextStyle(

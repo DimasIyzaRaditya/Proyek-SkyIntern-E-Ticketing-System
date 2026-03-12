@@ -79,13 +79,13 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
         passengers: {
           create: passengers.map((p: any) => ({
             type: p.type,
-            title: p.title,
+            title: p.title ?? (p.type === 'CHILD' ? 'Mstr.' : 'Mr.'),
             firstName: p.firstName,
             lastName: p.lastName,
             documentType: p.documentType || p.idType || "KTP",
             documentNumber: p.documentNumber || p.idNumber || "0000000000000000",
             nationality: p.nationality || "Indonesian",
-            dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : undefined
+            dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : (p.dob ? new Date(p.dob) : undefined)
           }))
         }
       },

@@ -1,9 +1,12 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
-import '../utils/helpers.dart';
 import '../utils/formatters.dart';
+import '../utils/helpers.dart';
 import '../widgets/common_widgets.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -19,7 +22,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   late TextEditingController _nameCtrl;
   late TextEditingController _phoneCtrl;
   bool _isLoading = false;
+  bool _isUploadingAvatar = false;
   late AnimationController _animCtrl;
+  Uint8List? _localAvatarBytes;
 
   @override
   void initState() {
@@ -37,6 +42,36 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     _phoneCtrl.dispose();
     _animCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 80,
+    );
+    if (picked == null || !mounted) return;
+
+    final authProvider = context.read<AuthProvider>();
+    setState(() => _isUploadingAvatar = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final mimeType = picked.mimeType ?? 'image/jpeg';
+      final base64Str = base64Encode(bytes);
+      final dataUrl = 'data:$mimeType;base64,$base64Str';
+
+      await authProvider.updateProfile(avatarUrl: dataUrl);
+      if (mounted) {
+        setState(() => _localAvatarBytes = bytes);
+        showSnackBar(context, 'Foto profil berhasil diperbarui');
+      }
+    } catch (e) {
+      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
   }
 
   Future<void> _handleSave() async {
@@ -58,6 +93,63 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     }
   }
 
+  Widget _buildAvatar(String? avatarUrl, String fullName) {
+    ImageProvider? imageProvider;
+    if (_localAvatarBytes != null) {
+      imageProvider = MemoryImage(_localAvatarBytes!);
+    } else if (avatarUrl != null && avatarUrl.startsWith('data:image')) {
+      final base64Data = avatarUrl.split(',').last;
+      imageProvider = MemoryImage(base64Decode(base64Data));
+    } else if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      imageProvider = NetworkImage(avatarUrl);
+    }
+
+    return GestureDetector(
+      onTap: _isUploadingAvatar ? null : _pickAvatar,
+      child: Stack(
+        children: [
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              gradient: imageProvider == null ? AppColors.primaryGradient : null,
+              shape: BoxShape.circle,
+              boxShadow: AppShadows.colored,
+              image: imageProvider != null
+                  ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                  : null,
+            ),
+            alignment: Alignment.center,
+            child: imageProvider == null
+                ? Text(
+                    StringHelper.getInitials(fullName),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white),
+                  )
+                : null,
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: AppShadows.soft,
+              ),
+              child: _isUploadingAvatar
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    )
+                  : const Icon(Icons.camera_alt_rounded, size: 16, color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,7 +159,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -92,40 +184,14 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 100),
                   child: Center(
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 90,
-                          height: 90,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            shape: BoxShape.circle,
-                            boxShadow: AppShadows.colored,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            user != null ? StringHelper.getInitials(user.fullName) : '?',
-                            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: AppShadows.soft,
-                            ),
-                            child: const Icon(Icons.camera_alt_rounded, size: 16, color: AppColors.primary),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: _buildAvatar(user?.avatarUrl, user?.fullName ?? ''),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 8),
+                const Center(
+                  child: Text('Ketuk untuk mengubah foto', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                ),
+                const SizedBox(height: 24),
 
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 200),

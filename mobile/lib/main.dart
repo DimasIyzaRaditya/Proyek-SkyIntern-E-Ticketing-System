@@ -20,10 +20,14 @@ import 'screens/eticket_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
+import 'screens/booking_verify_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/admin_airlines_screen.dart';
 import 'screens/admin_airports_screen.dart';
 import 'screens/admin_users_screen.dart';
+import 'screens/admin_schedules_screen.dart';
+import 'screens/admin_seats_screen.dart';
+import 'screens/admin_transactions_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -151,10 +155,15 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
       page = const BookingPaymentScreen();
     case '/e-ticket':
       page = const ETicketScreen();
+    case '/booking-verify':
+      page = const BookingVerifyScreen();
     case '/admin/schedules':
+      page = const AdminGuard(child: AdminSchedulesScreen());
     case '/admin/seats':
+      final flightArg = settings.arguments as Map<String, dynamic>?;
+      page = AdminGuard(child: AdminSeatsScreen(flight: flightArg));
     case '/admin/transactions':
-      page = const AdminGuard(child: Placeholder());
+      page = const AdminGuard(child: AdminTransactionsScreen());
     default:
       if (settings.name?.startsWith('/reset-password') == true) {
         final uri = Uri.parse(settings.name ?? '');

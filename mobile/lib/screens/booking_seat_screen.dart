@@ -19,11 +19,13 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
   String? _error;
   bool _isHolding = false;
   bool _isInitialized = false;
+  bool _navigatingForward = false;
 
   late String _flightId;
   late int _adults;
   late int _children;
   FlightCardItem? _flight;
+  int? _existingBookingId;
 
   int get _totalPassengers => _adults + _children;
 
@@ -39,6 +41,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
       _adults = (args['adults'] as int?) ?? 1;
       _children = (args['children'] as int?) ?? 0;
       _flight = args['flight'] as FlightCardItem?;
+      _existingBookingId = args['existingBookingId'] as int?;
       _loadSeats();
     } else {
       setState(() {
@@ -50,7 +53,10 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
 
   @override
   void dispose() {
-    _releaseSelectedSeats();
+    // Hanya lepas seat jika user navigasi kembali (bukan ke halaman berikutnya)
+    if (!_navigatingForward) {
+      _releaseSelectedSeats();
+    }
     super.dispose();
   }
 
@@ -118,6 +124,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
   }
 
   void _handleContinue() {
+    _navigatingForward = true; // jangan lepas seat saat dispose karena navigasi maju
     final selectedSeats =
         _seats.where((s) => _selectedSeatIds.contains(s.id)).toList();
     final extraPrice =
@@ -134,16 +141,18 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
       'children': _children,
       'origin': args?['origin'] ?? '',
       'destination': args?['destination'] ?? '',
+      if (_existingBookingId != null) 'existingBookingId': _existingBookingId,
     });
   }
 
   Color _seatColor(Seat seat) {
-    if (seat.isOccupied) return Colors.grey.shade400;
+    if (seat.isOccupied) return const Color(0xFFEF4444);   // merah — sudah terisi
     if (seat.isHeld && !_selectedSeatIds.contains(seat.id)) {
-      return Colors.orange.shade300;
+      return const Color(0xFFF59E0B);                       // kuning — ditahan user lain
     }
-    if (_selectedSeatIds.contains(seat.id)) return Colors.blue.shade600;
-    return Colors.green.shade200;
+    if (_selectedSeatIds.contains(seat.id)) return AppColors.primary; // biru — dipilih
+    if (seat.additionalPrice > 0) return const Color(0xFFF97316);     // oranye — kursi spesial
+    return const Color(0xFF22C55E);                         // hijau cerah — tersedia
   }
 
   @override
@@ -154,7 +163,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -172,43 +181,43 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
           : _error != null
               ? Center(
                   child: Text(_error!,
-                      style: const TextStyle(color: Colors.red)))
+                      style: const TextStyle(color: AppColors.error)))
               : Column(
                   children: [
                     Container(
-                      color: Colors.grey.shade100,
+                      color: AppColors.background,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _legendItem(Colors.green.shade200, 'Tersedia'),
-                          _legendItem(Colors.blue.shade600, 'Dipilih'),
-                          _legendItem(Colors.orange.shade300, 'Ditahan'),
-                          _legendItem(Colors.grey.shade400, 'Terisi'),
+                          _legendItem(const Color(0xFF22C55E), 'Tersedia'),
+                          _legendItem(AppColors.primary, 'Dipilih'),
+                          _legendItem(const Color(0xFFF97316), 'Spesial'),
+                          _legendItem(const Color(0xFFEF4444), 'Terisi'),
                         ],
                       ),
                     ),
                     Container(
-                      color: Colors.blue.shade50,
+                      color: AppColors.surfaceVariant,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
                           Icon(Icons.info_outline,
-                              size: 16, color: Colors.blue.shade600),
+                              size: 16, color: AppColors.primary),
                           const SizedBox(width: 8),
                           Text('Pilih $_totalPassengers kursi',
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 13,
-                                  color: Colors.blue.shade700)),
+                                  color: AppColors.primaryDark)),
                           const Spacer(),
                           Text(
                             '${_selectedSeatIds.length}/$_totalPassengers dipilih',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
+                              color: AppColors.primaryDark,
                             ),
                           ),
                         ],
@@ -247,7 +256,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
     if (sortedRows.isEmpty) {
       return const Center(
           child: Text('Tidak ada data kursi tersedia',
-              style: TextStyle(color: Colors.grey)));
+              style: TextStyle(color: AppColors.textSecondary)));
     }
 
     return Column(
@@ -294,8 +303,8 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
             width: 32,
             child: Text(rowNum,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade600)),
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
           ),
           ...rowSeats.asMap().entries.map((entry) {
             final idx = entry.key;
@@ -314,7 +323,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: _selectedSeatIds.contains(seat.id)
-                            ? Colors.blue.shade800
+                            ? AppColors.primaryDark
                             : Colors.transparent,
                         width: 2,
                       ),
@@ -322,12 +331,10 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
                     child: Center(
                       child: Text(
                         seat.seatNumber.replaceAll(RegExp(r'[0-9]'), ''),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: _selectedSeatIds.contains(seat.id)
-                              ? Colors.white
-                              : Colors.grey.shade700,
+                          color: Colors.white,
                         ),
                       ),
                     ),

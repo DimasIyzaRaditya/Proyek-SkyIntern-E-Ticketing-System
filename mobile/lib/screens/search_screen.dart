@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/flight_model.dart';
 import '../providers/flight_provider.dart';
@@ -250,7 +250,7 @@ class _SearchScreenState extends State<SearchScreen>
                                     Icon(Icons.search_off_rounded,
                                         size: 48,
                                         color: AppColors.textSecondary
-                                            .withOpacity(0.4)),
+                                            .withValues(alpha: 0.4)),
                                     const SizedBox(height: 12),
                                     const Text(
                                       'Bandara tidak ditemukan',
@@ -278,7 +278,7 @@ class _SearchScreenState extends State<SearchScreen>
                                       decoration: BoxDecoration(
                                         color: isSelected
                                             ? AppColors.primary
-                                                .withOpacity(0.1)
+                                                .withValues(alpha: 0.1)
                                             : AppColors.background,
                                         borderRadius:
                                             BorderRadius.circular(10),
@@ -391,7 +391,7 @@ class _SearchScreenState extends State<SearchScreen>
                       children: [
                         Expanded(
                             child: Divider(
-                                color: AppColors.border.withOpacity(0.6))),
+                                color: AppColors.border.withValues(alpha: 0.6))),
                         GestureDetector(
                           onTap: () => setState(() {
                             final tmp = originCode;
@@ -410,7 +410,7 @@ class _SearchScreenState extends State<SearchScreen>
                         ),
                         Expanded(
                             child: Divider(
-                                color: AppColors.border.withOpacity(0.6))),
+                                color: AppColors.border.withValues(alpha: 0.6))),
                       ],
                     ),
                   ),
@@ -578,7 +578,7 @@ class _AirportTile extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: code != null
-                    ? AppColors.primary.withOpacity(0.1)
+                    ? AppColors.primary.withValues(alpha: 0.1)
                     : AppColors.background,
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -753,7 +753,7 @@ class _CounterBtn extends StatelessWidget {
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: enabled
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : AppColors.border,
           borderRadius: BorderRadius.circular(8),
         ),

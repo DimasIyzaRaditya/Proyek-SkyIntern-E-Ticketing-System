@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
@@ -16,6 +16,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _showPass = false;
@@ -40,6 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
+    _phoneCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     _animCtrl.dispose();
@@ -49,6 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   Future<void> _handleRegister() async {
     final name = _nameCtrl.text.trim();
     final email = _emailCtrl.text.trim().toLowerCase();
+    final phone = _phoneCtrl.text.trim();
     final password = _passCtrl.text;
     final confirm = _confirmCtrl.text;
 
@@ -68,7 +71,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     try {
       await context
           .read<AuthProvider>()
-          .register(name: name, email: email, password: password);
+          .register(name: name, email: email, password: password, phone: phone.isEmpty ? null : phone);
       if (mounted) {
         showSnackBar(context, 'Registrasi berhasil! Selamat datang.');
         Navigator.of(context).pushReplacementNamed('/dashboard');
@@ -121,10 +124,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                      color: Colors.white.withOpacity(0.4),
+                                      color: Colors.white.withValues(alpha: 0.4),
                                       width: 2),
                                 ),
                                 child: const Icon(Icons.flight_rounded,
@@ -177,6 +180,17 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 controller: _emailCtrl,
                                 keyboardType: TextInputType.emailAddress,
                                 prefixIcon: const Icon(Icons.email_outlined,
+                                    color: AppColors.textHint, size: 20),
+                                textInputAction: TextInputAction.next,
+                              ),
+                              const SizedBox(height: 16),
+
+                              InputField(
+                                label: 'Nomor Telepon',
+                                hint: '08xxxxxxxxxx',
+                                controller: _phoneCtrl,
+                                keyboardType: TextInputType.phone,
+                                prefixIcon: const Icon(Icons.phone_outlined,
                                     color: AppColors.textHint, size: 20),
                                 textInputAction: TextInputAction.next,
                               ),

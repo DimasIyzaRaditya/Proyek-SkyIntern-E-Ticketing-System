@@ -111,7 +111,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x220EA5E9), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -135,7 +135,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         Icon(
           Icons.check_circle_outline,
           size: 80,
-          color: Colors.green.shade400,
+          color: AppColors.success,
         ),
         const SizedBox(height: 24),
         const Text(
@@ -147,7 +147,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         Text(
           'Password Anda telah berhasil diperbarui.\nSilakan login dengan password baru.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey.shade600),
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 32),
         PrimaryButton(
@@ -167,7 +167,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           Icon(
             Icons.lock_reset,
             size: 64,
-            color: Colors.blue.shade400,
+            color: AppColors.primary,
           ),
           const SizedBox(height: 16),
           const Text(
@@ -177,7 +177,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           const SizedBox(height: 8),
           Text(
             'Masukkan password baru untuk akun Anda.',
-            style: TextStyle(color: Colors.grey.shade600),
+          style: const TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 32),
 
