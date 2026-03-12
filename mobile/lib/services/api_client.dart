@@ -2,14 +2,21 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ApiClient {
-  // Update this based on your environment:
-  // - Windows/Mac desktop: http://localhost:3000
-  // - Android emulator: http://10.0.2.2:3000
-  // - iOS simulator: http://localhost:3000
-  // - Physical device: http://YOUR_PC_IP:3000
-  static const String baseUrl = 'http://localhost:3000';
-  static String? _authToken;
+  // ─── Ganti IP di sini sesuai komputer kamu ───────────────────────────────
+  static const String _physicalDeviceIp = '192.168.18.38'; // ← ubah ini
+  // ─────────────────────────────────────────────────────────────────────────
 
+  // Ganti _usePhysicalDevice ke true saat run di HP, false saat di emulator/PC
+  static const bool _usePhysicalDevice = true;
+
+  static const String _emulatorUrl    = 'http://10.0.2.2:3000';   // Android emulator
+  static const String _localhostUrl   = 'http://localhost:3000';   // Desktop / iOS sim
+  static const String _physicalUrl    = 'http://$_physicalDeviceIp:3000'; // HP fisik
+
+  static const String baseUrl = _usePhysicalDevice ? _physicalUrl : _localhostUrl;
+
+  static String? _authToken;
+  
   static String? get authToken => _authToken;
 
   static void setAuthToken(String token) {
