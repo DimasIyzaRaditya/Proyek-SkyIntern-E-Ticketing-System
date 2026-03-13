@@ -8,6 +8,7 @@ import LazySection from "@/components/LazySection";
 import HomePromoSection from "@/components/HomePromoSection";
 import ChatBot from "@/components/ChatBot";
 import { getAirportOptionsFromApi } from "@/lib/airport-api";
+import { getFlightPriceByDateFromApi } from "@/lib/flight-api";
 
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -94,6 +95,20 @@ const formatLongDate = (dateValue: string) =>
     year: "numeric",
   }).format(parseDate(dateValue));
 
+const formatCompactTicketPrice = (value: number) => {
+  if (value >= 1_000_000) {
+    const millions = value / 1_000_000;
+    const display = millions >= 10 ? `${Math.round(millions)}` : millions.toFixed(1).replace(".", ",");
+    return `${display}jt`;
+  }
+
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}rb`;
+  }
+
+  return `${value}`;
+};
+
 const createMonthCells = (monthDate: Date, startDate: Date, endDate: Date) => {
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
@@ -179,6 +194,8 @@ export default function SearchPage() {
   const [airportMaster, setAirportMaster] = useState<AirportOption[]>([]);
   const [airportLoading, setAirportLoading] = useState(false);
   const [airportLoadError, setAirportLoadError] = useState<string | null>(null);
+  const [calendarPriceByDate, setCalendarPriceByDate] = useState<Record<string, number>>({});
+  const [calendarPriceLoading, setCalendarPriceLoading] = useState(false);
 
   const { leftMonth, rightMonth, leftMonthCells, rightMonthCells } = useMemo(() => {
     const checkInDate = parseDate(departureDate);
@@ -233,6 +250,12 @@ export default function SearchPage() {
 
   const originView = airportByLabel.get(origin);
   const destinationView = airportByLabel.get(destination);
+
+  const calendarPriceRange = useMemo(() => {
+    const rangeStart = toIsoDate(new Date(leftMonth.getFullYear(), leftMonth.getMonth(), 1));
+    const rangeEnd = toIsoDate(new Date(rightMonth.getFullYear(), rightMonth.getMonth() + 1, 0));
+    return { rangeStart, rangeEnd };
+  }, [leftMonth, rightMonth]);
 
   useEffect(() => {
     let isMounted = true;
@@ -476,6 +499,50 @@ export default function SearchPage() {
     };
   }, [triggerClosePanel]);
 
+  useEffect(() => {
+    if (activePanel !== "date") return;
+
+    let isMounted = true;
+
+    const loadCalendarPrices = async () => {
+      try {
+        setCalendarPriceLoading(true);
+        const prices = await getFlightPriceByDateFromApi({
+          origin,
+          destination,
+          adult: String(adult),
+          child: String(child),
+          startDate: calendarPriceRange.rangeStart,
+          endDate: calendarPriceRange.rangeEnd,
+        });
+
+        if (!isMounted) return;
+        setCalendarPriceByDate(prices);
+      } catch {
+        if (!isMounted) return;
+        setCalendarPriceByDate({});
+      } finally {
+        if (isMounted) {
+          setCalendarPriceLoading(false);
+        }
+      }
+    };
+
+    void loadCalendarPrices();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    activePanel,
+    origin,
+    destination,
+    adult,
+    child,
+    calendarPriceRange.rangeStart,
+    calendarPriceRange.rangeEnd,
+  ]);
+
   return (
     <>
       <div
@@ -486,15 +553,24 @@ export default function SearchPage() {
         }}
       >
         <MainNav />
-        <main className="mx-auto w-full max-w-7xl overflow-x-clip px-4 pb-10 pt-6 md:px-6 md:pt-8">
+        <main className="mx-auto w-full max-w-screen-2xl overflow-x-clip px-4 pb-12 pt-6 md:px-6 md:pt-8 lg:px-8">
         <LazySection>
         <section
-          className="relative overflow-visible rounded-[28px] bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-8 text-white shadow-xl md:px-8 md:py-10"
+          className="relative overflow-visible rounded-4xl bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-8 text-white shadow-xl md:px-8 md:py-10 lg:px-10 lg:py-12"
         >
           <div className="pointer-events-none absolute inset-0 opacity-20 [background:radial-gradient(circle_at_20%_10%,white,transparent_35%),radial-gradient(circle_at_80%_20%,white,transparent_30%)]" />
 
-          <div ref={wrapperRef} className="relative mx-auto max-w-6xl">
-            <div className="grid gap-2 text-sm font-bold text-blue-100 md:grid-cols-[1.1fr_1.1fr_1fr_auto]">
+          <div ref={wrapperRef} className="relative mx-auto max-w-7xl">
+            {/* Hero headline */}
+            <div className="mb-6 text-center page-enter md:mb-8">
+              <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-lg sm:text-4xl md:text-5xl lg:text-6xl">
+                Terbang ke mana hari ini?
+              </h1>
+              <p className="mt-2 text-sm text-blue-200 sm:text-base md:text-lg lg:text-2xl">
+                Temukan tiket penerbangan terbaik dengan mudah &amp; cepat.
+              </p>
+            </div>
+            <div className="grid gap-2 text-sm font-bold text-blue-100 md:grid-cols-[1.1fr_1.1fr_1fr_auto] lg:text-base">
               <p className="pl-1">Keberangkatan & Tujuan</p>
               <p className="pl-1">Check-in & Check-out Dates</p>
               <p className="pl-1">Guests</p>
@@ -507,24 +583,24 @@ export default function SearchPage() {
                   <div className="grid grid-cols-2 overflow-hidden rounded-full border border-slate-300 bg-white">
                     <button
                       onClick={() => openAirportPanel("origin")}
-                      className="inline-flex min-h-14 items-center gap-2 border-r border-slate-200 px-4 text-left text-slate-900 transition hover:bg-blue-50"
+                      className="inline-flex min-h-14 min-w-0 items-center gap-2 border-r border-slate-200 px-3 sm:px-4 lg:min-h-16 lg:px-5 text-left text-slate-900 transition hover:bg-blue-50"
                     >
-                      <PlaneTakeoff className="h-5 w-5 text-blue-500" />
-                      <span className="text-sm font-semibold sm:text-base lg:text-lg">{originView ? `${originView.city}, ${originView.country} (${originView.code})` : origin}</span>
+                      <PlaneTakeoff className="h-5 w-5 shrink-0 text-blue-500" />
+                      <span className="truncate text-sm font-semibold sm:text-base lg:text-lg">{originView ? `${originView.city}, ${originView.country} (${originView.code})` : origin}</span>
                     </button>
                     <button
                       onClick={() => openAirportPanel("destination")}
-                      className="inline-flex min-h-14 items-center gap-2 px-6 text-left text-slate-900 transition hover:bg-blue-50"
+                      className="inline-flex min-h-14 min-w-0 items-center gap-2 px-3 sm:px-4 lg:min-h-16 lg:px-5 text-left text-slate-900 transition hover:bg-blue-50"
                     >
-                      <PlaneLanding className="h-5 w-5 text-blue-500" />
-                      <span className="text-sm font-semibold sm:text-base lg:text-lg">{destinationView ? `${destinationView.city}, ${destinationView.country} (${destinationView.code})` : destination}</span>
+                      <PlaneLanding className="h-5 w-5 shrink-0 text-blue-500" />
+                      <span className="truncate text-sm font-semibold sm:text-base lg:text-lg">{destinationView ? `${destinationView.city}, ${destinationView.country} (${destinationView.code})` : destination}</span>
                     </button>
                   </div>
 
                   <button
                     type="button"
                     onClick={swapAirports}
-                    className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white text-blue-600 shadow-sm transition hover:bg-blue-50"
+                    className="absolute left-1/2 top-1/2 inline-flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white text-blue-600 shadow-sm transition hover:bg-blue-50 sm:h-12 sm:w-12"
                   >
                     <ArrowUpDown className="h-5 w-5" />
                   </button>
@@ -536,7 +612,7 @@ export default function SearchPage() {
                     openPanel("date");
                     setCalendarOffset(0);
                   }}
-                  className="inline-flex w-full items-center gap-2 border-b border-slate-200 px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50 md:border-b-0 md:border-r"
+                  className="inline-flex w-full items-center gap-2 border-b border-slate-200 px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50 md:border-b-0 md:border-r lg:min-h-16"
                 >
                   <CalendarDays className="h-5 w-5 text-blue-500" />
                   <span className="text-sm font-semibold sm:text-base lg:text-lg">
@@ -546,7 +622,7 @@ export default function SearchPage() {
 
                 <button
                   onClick={() => openPanel("guests")}
-                  className="inline-flex w-full items-center gap-2 border-b border-slate-200 px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50 md:border-b-0 md:border-r"
+                  className="inline-flex w-full items-center gap-2 border-b border-slate-200 px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50 md:border-b-0 md:border-r lg:min-h-16"
                 >
                   <Users className="h-5 w-5 text-blue-500" />
                   <span className="text-sm font-semibold sm:text-base lg:text-lg">
@@ -556,9 +632,10 @@ export default function SearchPage() {
 
                 <button
                   onClick={handleSearch}
-                  className="inline-flex items-center justify-center bg-orange-500 px-5 py-4 text-xl font-bold text-white transition hover:bg-orange-600"
+                  className="btn-animate btn-sheen inline-flex w-full items-center justify-center gap-2 bg-orange-500 px-6 py-4 text-base font-bold text-white transition hover:bg-orange-600 md:w-auto md:text-xl lg:min-h-16 lg:px-7"
                 >
                   <Search className="h-6 w-6" />
+                  <span className="md:hidden">Cari Tiket</span>
                 </button>
               </div>
             </div>
@@ -743,6 +820,9 @@ export default function SearchPage() {
                   <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-blue-700">
                     <span className="h-2 w-2 rounded-full bg-blue-600" /> Range terpilih
                   </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" /> Harga dari API
+                  </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-red-600">
                     <span className="h-2 w-2 rounded-full bg-red-500" /> Hari libur / weekend
                   </span>
@@ -750,6 +830,10 @@ export default function SearchPage() {
                     <span className="h-2 w-2 rounded-full bg-emerald-500" /> Hari kerja
                   </span>
                 </div>
+
+                {calendarPriceLoading && (
+                  <p className="mt-3 text-xs font-semibold text-slate-500">Memuat harga tiket dari API...</p>
+                )}
 
                 <>
                     <div className="mt-4 flex items-center justify-between gap-2">
@@ -805,7 +889,7 @@ export default function SearchPage() {
                                 key={cell.key}
                                 onClick={() => handleDaySelect(cell.isoDate!)}
                                 title={cell.holidayName ?? (isHoliday ? "Weekend" : "Hari kerja")}
-                                className={`relative flex h-14 flex-col items-center justify-start rounded-lg border px-1 pt-1 text-sm font-semibold transition ${
+                                className={`relative flex h-16 flex-col items-center justify-start rounded-lg border px-1 pt-1 text-sm font-semibold transition ${
                                   cell.isSelected
                                     ? "border-blue-600 bg-blue-600 text-white"
                                     : cell.isInRange
@@ -814,11 +898,25 @@ export default function SearchPage() {
                                 }`}
                               >
                                 <span>{cell.day}</span>
-                                <span
-                                  className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-                                    isHoliday ? "bg-red-500" : "bg-emerald-500"
-                                  }`}
-                                />
+                                {calendarPriceByDate[cell.isoDate] !== undefined ? (
+                                  <span
+                                    className={`absolute bottom-1 text-[10px] font-bold leading-none ${
+                                      cell.isSelected
+                                        ? "text-white/95"
+                                        : cell.isInRange
+                                          ? "text-blue-700"
+                                          : "text-amber-600"
+                                    }`}
+                                  >
+                                    {formatCompactTicketPrice(calendarPriceByDate[cell.isoDate])}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+                                      isHoliday ? "bg-red-500" : "bg-emerald-500"
+                                    }`}
+                                  />
+                                )}
                               </button>
                             );
                           })}

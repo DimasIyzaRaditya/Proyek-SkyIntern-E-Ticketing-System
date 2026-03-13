@@ -100,11 +100,41 @@ function ETicketContent() {
           .ticket-wrap { padding: 0 !important; background: white !important; min-height: 0 !important; }
           .ticket-doc { box-shadow: none !important; border: none !important; max-width: 100% !important; margin: 0 auto !important; zoom: 0.82; break-inside: avoid; page-break-inside: avoid; }
           .brand-wave { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .ticket-watermark {
+            display: flex !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .ticket-watermark span {
+            color: rgba(0,0,0,0.09) !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
         @page { margin: 5mm 10mm; size: A4; }
         .brand-wave {
           background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #60a5fa 100%);
           clip-path: ellipse(85% 100% at 100% 0%);
+        }
+        .ticket-watermark {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+          user-select: none;
+          overflow: hidden;
+          z-index: 0;
+        }
+        .ticket-watermark span {
+          transform: rotate(-35deg);
+          font-size: 5rem;
+          font-weight: 900;
+          letter-spacing: 0.18em;
+          color: rgba(0,0,0,0.055);
+          white-space: nowrap;
+          line-height: 1;
         }
       `}</style>
 
@@ -130,7 +160,12 @@ function ETicketContent() {
         </div>
 
         {/* ── Ticket Document ── */}
-        <div className="ticket-doc mx-auto max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+        <div className="ticket-doc relative mx-auto max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+
+          {/* Diagonal watermark – visible on screen & PDF */}
+          <div className="ticket-watermark" aria-hidden="true">
+            <span>{airline || "SkyIntern"}</span>
+          </div>
 
           {/* ── Section 1: Header ── */}
           <div className="relative flex items-start justify-between px-8 pt-7 pb-5 overflow-hidden">
