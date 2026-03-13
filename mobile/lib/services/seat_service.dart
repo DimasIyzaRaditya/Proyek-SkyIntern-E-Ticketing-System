@@ -11,15 +11,16 @@ class SeatService {
     // Backend returns { seatMap: { ECONOMY: [...], BUSINESS: [...], FIRST: [...] } }
     // Flatten all classes into a single list
     final List<dynamic> raw;
-    if (response.containsKey('seatMap')) {
-      final seatMap = response['seatMap'] as Map<String, dynamic>;
+    if (response['seatMap'] is Map) {
+      final seatMap = Map<String, dynamic>.from(response['seatMap'] as Map);
       final tmp = <dynamic>[];
       for (final cls in ['FIRST', 'BUSINESS', 'ECONOMY']) {
-        tmp.addAll((seatMap[cls] as List<dynamic>? ?? []));
+        final bucket = seatMap[cls];
+        if (bucket is List) tmp.addAll(bucket);
       }
       raw = tmp;
-    } else if (response.containsKey('seats')) {
-      raw = (response['seats'] as List<dynamic>? ?? []);
+    } else if (response['seats'] is List) {
+      raw = response['seats'] as List<dynamic>;
     } else {
       return [];
     }
@@ -28,12 +29,14 @@ class SeatService {
     // Merge nested fields so Seat.fromJson can read seatNumber / seatClass.
     return raw.map((item) {
       final fs = Map<String, dynamic>.from(item as Map);
-      final nested = (fs['seat'] as Map<String, dynamic>?) ?? {};
+      final nested = (fs['seat'] is Map)
+          ? Map<String, dynamic>.from(fs['seat'] as Map)
+          : <String, dynamic>{};
       final merged = {
         ...fs,
-        'seatNumber': fs['seatNumber'] ?? nested['seatNumber'],
-        'seatClass': fs['seatClass'] ?? nested['seatClass'],
-        'class': fs['class'] ?? nested['seatClass'],
+        'seatNumber': (fs['seatNumber'] ?? nested['seatNumber'] ?? '').toString(),
+        'seatClass': (fs['seatClass'] ?? nested['seatClass'] ?? 'ECONOMY').toString(),
+        'class': (fs['class'] ?? nested['seatClass'] ?? 'ECONOMY').toString(),
       };
       return Seat.fromJson(merged);
     }).toList();

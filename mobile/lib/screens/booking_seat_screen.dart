@@ -28,14 +28,18 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
   int? _existingBookingId;
 
   int get _totalPassengers => _adults + _children;
+  String get _flightCode =>
+      (_flight?.flightNumber.trim().isNotEmpty ?? false)
+          ? _flight!.flightNumber.trim()
+          : _flightId;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_isInitialized) return;
     _isInitialized = true;
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final rawArgs = ModalRoute.of(context)?.settings.arguments;
+    final args = rawArgs is Map ? Map<String, dynamic>.from(rawArgs) : null;
     if (args != null) {
       _flightId = args['flightId']?.toString() ?? '';
       _adults = (args['adults'] as int?) ?? 1;
@@ -129,8 +133,8 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
         _seats.where((s) => _selectedSeatIds.contains(s.id)).toList();
     final extraPrice =
         selectedSeats.fold(0, (sum, s) => sum + s.additionalPrice);
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final rawArgs = ModalRoute.of(context)?.settings.arguments;
+    final args = rawArgs is Map ? Map<String, dynamic>.from(rawArgs) : null;
     Navigator.of(context).pushNamed('/booking-passenger', arguments: {
       'flightId': _flightId,
       'flight': _flight,
@@ -155,8 +159,98 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
     return const Color(0xFF22C55E);                         // hijau cerah — tersedia
   }
 
+  Widget _buildSeatsNotGeneratedWarning() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFDE68A),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFB45309),
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Kursi Belum Tersedia',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF92400E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Admin belum melakukan generate seat untuk penerbangan ini.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF92400E),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFCD34D)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.flight_rounded,
+                        size: 18, color: Color(0xFFB45309)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Kode penerbangan: $_flightCode',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Silakan hubungi admin atau coba lagi nanti.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasNoSeats = !_isLoading && _error == null && _seats.isEmpty;
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
@@ -184,51 +278,58 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
                       style: const TextStyle(color: AppColors.error)))
               : Column(
                   children: [
-                    Container(
-                      color: AppColors.background,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _legendItem(const Color(0xFF22C55E), 'Tersedia'),
-                          _legendItem(AppColors.primary, 'Dipilih'),
-                          _legendItem(const Color(0xFFF97316), 'Spesial'),
-                          _legendItem(const Color(0xFFEF4444), 'Terisi'),
-                        ],
+                    if (!hasNoSeats) ...[
+                      Container(
+                        color: AppColors.background,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _legendItem(const Color(0xFF22C55E), 'Tersedia'),
+                            _legendItem(AppColors.primary, 'Dipilih'),
+                            _legendItem(const Color(0xFFF97316), 'Spesial'),
+                            _legendItem(const Color(0xFFEF4444), 'Terisi'),
+                          ],
+                        ),
                       ),
-                    ),
-                    Container(
-                      color: AppColors.surfaceVariant,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline,
-                              size: 16, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Text('Pilih $_totalPassengers kursi',
+                      Container(
+                        color: AppColors.surfaceVariant,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 16, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text('Pilih $_totalPassengers kursi',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.primaryDark)),
+                            const Spacer(),
+                            Text(
+                              '${_selectedSeatIds.length}/$_totalPassengers dipilih',
                               style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.primaryDark)),
-                          const Spacer(),
-                          Text(
-                            '${_selectedSeatIds.length}/$_totalPassengers dipilih',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryDark,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryDark,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                    ],
+                    Expanded(
+                      child: hasNoSeats
+                          ? _buildSeatsNotGeneratedWarning()
+                          : _buildSeatMap(),
                     ),
-                    Expanded(child: _buildSeatMap()),
                     SafeArea(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: PrimaryButton(
                           label: 'Lanjut ke Data Penumpang',
+                          isDisabled: hasNoSeats,
                           onPressed: _selectedSeatIds.length < _totalPassengers
                               ? () => _showSnack(
                                   'Pilih $_totalPassengers kursi terlebih dahulu')

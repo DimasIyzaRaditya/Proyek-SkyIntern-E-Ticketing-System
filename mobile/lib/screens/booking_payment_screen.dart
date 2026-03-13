@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/flight_model.dart';
@@ -7,6 +8,7 @@ import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
+import 'midtrans_payment_webview_screen.dart';
 
 class BookingPaymentScreen extends StatefulWidget {
   const BookingPaymentScreen({super.key});
@@ -96,6 +98,14 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return '$m:$s';
   }
 
+  bool get _supportsEmbeddedPayment {
+    if (kIsWeb) return false;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS => true,
+      _ => false,
+    };
+  }
+
   Future<void> _createBookingAndPay() async {
     setState(() {
       _isCreating = true;
@@ -149,15 +159,36 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _showSnack('URL pembayaran tidak valid', isError: true);
       return;
     }
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (mounted) setState(() => _paymentOpened = true);
-    } else {
-      _showSnack('Tidak dapat membuka halaman pembayaran', isError: true);
+
+    if (!_supportsEmbeddedPayment) {
+      final opened = await launchUrl(
+        uri,
+        mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      if (opened) {
+        setState(() => _paymentOpened = true);
+        _showSnack('Halaman pembayaran dibuka di browser karena platform ini tidak mendukung webview in-app.');
+      } else {
+        _showSnack('Tidak dapat membuka halaman pembayaran', isError: true);
+      }
+      return;
+    }
+
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => MidtransPaymentWebViewScreen(paymentUrl: uri.toString()),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _paymentOpened = true);
+
+    if (result?['callbackStatus'] != null) {
+      await _syncStatus(navigateToBookingsAfterSync: true);
     }
   }
 
-  Future<void> _syncStatus() async {
+  Future<void> _syncStatus({bool navigateToBookingsAfterSync = false}) async {
     if (_bookingId == null) return;
     setState(() => _isSyncing = true);
     try {
@@ -178,14 +209,37 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
         }
       } else if (status == 'PENDING') {
-        showErrorDialog(context, 'Menunggu Pembayaran',
-            'Pembayaran sedang diproses. Silakan cek ulang beberapa saat lagi.');
+        if (navigateToBookingsAfterSync) {
+          _showSnack('Pembayaran masih diproses. Detail booking ada di halaman booking.');
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (mounted) {
+            Navigator.of(context)
+                .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+          }
+        } else {
+          showErrorDialog(context, 'Menunggu Pembayaran',
+              'Pembayaran sedang diproses. Silakan cek ulang beberapa saat lagi.');
+        }
       } else if (['CANCELLED', 'EXPIRED', 'FAILED'].contains(status)) {
-        showErrorDialog(context, 'Pembayaran Gagal',
-            'Pembayaran dibatalkan atau kadaluwarsa. Silakan buat pemesanan baru.');
+        if (navigateToBookingsAfterSync) {
+          _showSnack('Pembayaran tidak berhasil. Silakan cek status booking di aplikasi.', isError: true);
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (mounted) {
+            Navigator.of(context)
+                .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+          }
+        } else {
+          showErrorDialog(context, 'Pembayaran Gagal',
+              'Pembayaran dibatalkan atau kadaluwarsa. Silakan buat pemesanan baru.');
+        }
       } else {
-        showErrorDialog(context, 'Status Tidak Diketahui',
-            'Status: $status. Coba lagi nanti.');
+        if (navigateToBookingsAfterSync) {
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+        } else {
+          showErrorDialog(context, 'Status Tidak Diketahui',
+              'Status: $status. Coba lagi nanti.');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -368,7 +422,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                   fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
                           const Text(
-                              'Selesaikan pembayaran di browser, lalu kembali ke sini untuk mengecek status.',
+                              'Selesaikan pembayaran di halaman Midtrans dalam aplikasi. Setelah selesai, Anda akan dikembalikan ke halaman booking mobile.',
                               style: TextStyle(
                                   fontSize: 13, color: AppColors.textSecondary)),
                         ],

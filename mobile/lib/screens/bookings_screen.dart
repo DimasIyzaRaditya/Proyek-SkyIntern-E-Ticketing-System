@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +10,7 @@ import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
 import '../widgets/common_widgets.dart';
+import 'midtrans_payment_webview_screen.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -61,6 +63,14 @@ class _BookingsScreenState extends State<BookingsScreen>
     }
   }
 
+  bool get _supportsEmbeddedPayment {
+    if (kIsWeb) return false;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS => true,
+      _ => false,
+    };
+  }
+
   Future<void> _payBooking(int bookingId) async {
     setState(() => _payingIds.add(bookingId));
     try {
@@ -70,11 +80,34 @@ class _BookingsScreenState extends State<BookingsScreen>
           ?? result['redirectUrl'] as String?
           ?? result['snap_redirect_url'] as String?;
       if (url == null) throw Exception('Gagal mendapatkan link pembayaran');
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        throw Exception('Tidak dapat membuka halaman pembayaran');
+      if (!mounted) return;
+
+      if (!_supportsEmbeddedPayment) {
+        final opened = await launchUrl(
+          Uri.parse(url),
+          mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+        );
+        if (!opened) {
+          throw Exception('Tidak dapat membuka halaman pembayaran');
+        }
+        if (!mounted) return;
+        showSnackBar(
+          context,
+          'Halaman pembayaran dibuka di browser karena platform ini tidak mendukung webview in-app.',
+        );
+        return;
+      }
+
+      final paymentResult = await Navigator.of(context).push<Map<String, dynamic>>(
+        MaterialPageRoute(
+          builder: (_) => MidtransPaymentWebViewScreen(paymentUrl: url),
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (paymentResult?['callbackStatus'] != null) {
+        await _syncBooking(bookingId);
       }
     } catch (e) {
       if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
