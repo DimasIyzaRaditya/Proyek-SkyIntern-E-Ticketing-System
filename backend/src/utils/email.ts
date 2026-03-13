@@ -23,9 +23,6 @@ export const sendResetPasswordEmail = async (
   try {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       console.warn("⚠️  SMTP not configured - Email not sent")
-      console.log(`🔑 Reset token for ${email}: ${resetToken}`)
-      console.log(`⏰ Token expires in 60 minutes`)
-      console.log(`📱 Platform: ${isMobile ? 'Mobile' : 'Web'}`)
       return
     }
 
@@ -131,9 +128,6 @@ export const sendResetPasswordEmail = async (
     console.log(`✅ Reset password email sent to ${email}`)
   } catch (error: any) {
     console.error("❌ Email send error:", error.message)
-    console.log(`🔑 Reset token for ${email}: ${resetToken}`)
-    console.log(`⏰ Token expires in 60 minutes`)
-    // Don't throw error in development, just log the token
   }
 }
 
@@ -145,7 +139,6 @@ export const sendBookingConfirmation = async (
   try {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       console.warn("⚠️  SMTP not configured - Email not sent")
-      console.log(`Booking confirmation for ${email}: ${bookingCode}`)
       return
     }
 

@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, CheckCircle2, Clock3, Plane, ReceiptText, Ticket, TrendingUp, Wallet, XCircle } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
-import { getProfileFromApi } from "@/lib/auth-api";
+import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 type BookingCard = {
@@ -188,9 +188,9 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+      <main className="mx-auto max-w-6xl px-4 py-6 page-enter sm:px-6 sm:py-10">
         <LazySection>
-        <section className="rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
+        <section className="animate-scale-in rounded-3xl border border-blue-100 bg-white p-4 shadow-lg sm:p-6">
           <h1 className="text-xl font-black text-slate-900 sm:text-2xl md:text-3xl">Dashboard</h1>
           <p className="mt-1 text-xs text-slate-600 sm:text-sm">Profil pengguna dan riwayat pemesanan dari API.</p>
 
@@ -215,17 +215,17 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
+            <div className="card-lift rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
               <p className="text-xs font-semibold text-slate-600">Nama</p>
-              <p className="mt-1 text-sm font-black text-slate-900 sm:text-base">{fullName}</p>
+              <p className="mt-1 text-sm font-bold text-slate-900 sm:text-base">{fullName}</p>
             </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
+            <div className="card-lift rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
               <p className="text-xs font-semibold text-slate-600">Email</p>
-              <p className="mt-1 truncate text-sm font-black text-slate-900 sm:text-base">{email}</p>
+              <p className="mt-1 truncate text-sm font-bold text-slate-900 sm:text-base">{email}</p>
             </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
+            <div className="card-lift rounded-2xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
               <p className="text-xs font-semibold text-slate-600">No. HP</p>
-              <p className="mt-1 text-sm font-black text-slate-900 sm:text-base">{phoneNumber || "-"}</p>
+              <p className="mt-1 text-sm font-bold text-slate-900 sm:text-base">{phoneNumber || "-"}</p>
             </div>
           </div>
         </section>
@@ -250,8 +250,8 @@ export default function DashboardPage() {
                 Belum ada pemesanan.
               </div>
             ) : (
-              visibleBookings.map((booking) => (
-                <article key={booking.id} className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              visibleBookings.map((booking, idx) => (
+                <article key={booking.id} className={`card-lift card-enter rounded-2xl border border-blue-100 bg-blue-50 p-4 ${(["stagger-1","stagger-2","stagger-3","stagger-4","stagger-5","stagger-6"] as const)[idx] ?? ""}`}>
                   <p className="inline-flex items-center gap-2 font-semibold text-slate-900">
                     <Plane className="h-4 w-4 text-blue-700" /> {booking.airline} • {booking.flightNumber}
                   </p>

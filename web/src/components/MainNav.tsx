@@ -107,7 +107,7 @@ export default function MainNav() {
           {/* Logo */}
           <Link
             href="/"
-            className="inline-flex shrink-0 items-center gap-2 text-lg font-black tracking-tight md:text-xl lg:text-2xl"
+            className="inline-flex shrink-0 items-center gap-2 text-lg font-black tracking-tight transition-transform duration-200 hover:scale-105 md:text-xl lg:text-2xl"
           >
             <Plane className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />
             <span>SkyIntern</span>
@@ -134,12 +134,12 @@ export default function MainNav() {
                 <span className="inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-white/95 px-3 text-xs font-semibold text-blue-700 md:h-9 md:px-3.5 md:text-sm lg:px-4">
                   {authState.displayName}
                 </span>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 md:h-9 md:px-3.5 md:text-sm lg:px-5"
-                >
-                  Logout
-                </button>
+              <button
+                onClick={handleLogout}
+                className="btn-animate inline-flex h-8 items-center whitespace-nowrap rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 md:h-9 md:px-3.5 md:text-sm lg:px-5"
+              >
+                Logout
+              </button>
               </>
             ) : (
               <>

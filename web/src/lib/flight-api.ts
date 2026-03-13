@@ -49,6 +49,8 @@ type SearchFlightsResponse = {
   passengers: number;
 };
 
+export type FlightPriceByDateMap = Record<string, number>;
+
 type GetFlightDetailResponse = {
   flight: BackendFlight;
 };
@@ -161,4 +163,56 @@ export const getFlightDetailFromApi = async (id: string) => {
 
   const payload = (await response.json()) as GetFlightDetailResponse;
   return toCardItem(payload.flight);
+};
+
+export const getFlightPriceByDateFromApi = async (params: {
+  origin: string;
+  destination: string;
+  adult: string;
+  child: string;
+  startDate: string;
+  endDate: string;
+}) => {
+  const passengerCount = Math.max(1, Number(params.adult || "1") + Number(params.child || "0"));
+  const query = new URLSearchParams({
+    passengerCount: String(passengerCount),
+    sortBy: "price-asc",
+    limit: "5000",
+  });
+
+  const response = await fetch(`${API_BASE_URL}/api/flights/search?${query.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Gagal mengambil harga tiket dari backend.");
+  }
+
+  const payload = (await response.json()) as SearchFlightsResponse;
+  const originCity = extractCity(params.origin);
+  const destinationCity = extractCity(params.destination);
+
+  const startTime = new Date(`${params.startDate}T00:00:00`).getTime();
+  const endTime = new Date(`${params.endDate}T23:59:59`).getTime();
+  const lowestPriceByDate: FlightPriceByDateMap = {};
+
+  payload.flights.forEach((flight) => {
+    const matchedOrigin = originCity ? flight.origin.city.toLowerCase() === originCity : true;
+    const matchedDestination = destinationCity ? flight.destination.city.toLowerCase() === destinationCity : true;
+    if (!matchedOrigin || !matchedDestination) return;
+
+    const departureDateTime = new Date(flight.departureTime).getTime();
+    if (Number.isNaN(departureDateTime) || departureDateTime < startTime || departureDateTime > endTime) {
+      return;
+    }
+
+    const dateKey = flight.departureTime.slice(0, 10);
+    const totalPrice = flight.basePrice + (flight.tax ?? 0) + (flight.adminFee ?? 0);
+    const existing = lowestPriceByDate[dateKey];
+    if (existing === undefined || totalPrice < existing) {
+      lowestPriceByDate[dateKey] = totalPrice;
+    }
+  });
+
+  return lowestPriceByDate;
 };

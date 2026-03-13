@@ -74,8 +74,8 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-lg px-4 py-8 sm:px-6 lg:py-12">
-        <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-lg sm:p-8">
+      <main className="mx-auto max-w-lg px-4 py-8 page-enter sm:px-6 lg:py-12">
+        <section className="animate-scale-in rounded-3xl border border-blue-100 bg-white p-6 shadow-lg sm:p-8">
           <h2 className="text-center text-3xl font-black text-slate-900">Register</h2>
           <p className="mt-1 text-center text-sm text-slate-600">Buat akun baru untuk mulai booking.</p>
 
@@ -143,7 +143,7 @@ export default function RegisterPage() {
                 </button>
               </div>
             </div>
-            <button disabled={loading} onClick={handleRegister} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Register"}</button>
+            <button disabled={loading} onClick={handleRegister} type="button" className="btn-animate btn-sheen w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Register"}</button>
           </form>
 
           {message && <p className="mt-4 text-center text-sm font-medium text-blue-700">{message}</p>}

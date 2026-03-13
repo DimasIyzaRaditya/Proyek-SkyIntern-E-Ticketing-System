@@ -7,6 +7,7 @@ import {
   X,
   Send,
   Bot,
+  MessageSquare,
   Minimize2,
   Maximize2,
   ChevronDown,
@@ -14,7 +15,7 @@ import {
 
 //    Types
 
-type Role = "bot" | "user";
+type Role = "bot" | "user" | "admin";
 
 interface Message {
   id: number;
@@ -113,6 +114,11 @@ const QUICK_REPLIES: QuickReply[] = [
   { label: "Hubungi support", value: "Bagaimana cara hubungi support?" },
 ];
 
+const ADMIN_WHATSAPP_NUMBER = (process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? "6281234567890").replace(/[^\d]/g, "");
+const ADMIN_ESCALATION_THRESHOLD = 4;
+const ADMIN_CHAT_SESSION_KEY_PREFIX = "skyintern_admin_chat_session_";
+const ADMIN_POLL_MS = 3000;
+
 
 //    Helper
 
@@ -134,10 +140,15 @@ function now(): string {
   return new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 }
 
+function fromTimestamp(value: number): string {
+  return new Date(value).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+}
+
 /* ─────────────────────────────────────────────
    Per-user chat persistence
 ───────────────────────────────────────────── */
 const CHAT_KEY_PREFIX = "skyintern_chat_";
+const ADMIN_ESCALATION_SESSION_KEY_PREFIX = "skyintern_admin_escalation_seen_";
 
 function makeInitialMessage(): Message {
   return {
@@ -165,6 +176,27 @@ function saveMessagesForUser(userId: number | null, msgs: Message[]) {
   localStorage.setItem(`${CHAT_KEY_PREFIX}${userId}`, JSON.stringify(msgs));
 }
 
+function hasSeenAdminEscalationInSession(userId: number | null): boolean {
+  if (!userId || typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(`${ADMIN_ESCALATION_SESSION_KEY_PREFIX}${userId}`) === "1";
+}
+
+function markAdminEscalationSeenInSession(userId: number | null) {
+  if (!userId || typeof window === "undefined") return;
+  window.sessionStorage.setItem(`${ADMIN_ESCALATION_SESSION_KEY_PREFIX}${userId}`, "1");
+}
+
+function getOrCreateAdminChatSessionId(userId: number | null): string {
+  if (typeof window === "undefined") return "";
+  const key = `${ADMIN_CHAT_SESSION_KEY_PREFIX}${userId ?? "guest"}`;
+  const existing = window.localStorage.getItem(key);
+  if (existing) return existing;
+
+  const created = `${userId ?? "guest"}-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+  window.localStorage.setItem(key, created);
+  return created;
+}
+
 function formatText(text: string): React.ReactNode[] {
   return text.split("\n").map((line, i) => {
     const parts = line.split(/\*\*(.*?)\*\*/g);
@@ -184,18 +216,22 @@ function formatText(text: string): React.ReactNode[] {
 
 function Bubble({ msg }: { msg: Message }) {
   const isBot = msg.role === "bot";
+  const isAdmin = msg.role === "admin";
+  const isLeft = isBot || isAdmin;
   return (
-    <div className={`flex items-end gap-2 ${isBot ? "justify-start" : "justify-end"}`}>
-      {isBot && (
+    <div className={`flex items-end gap-2 ${isLeft ? "justify-start" : "justify-end"}`}>
+      {isLeft && (
         <div className="w-7 h-7 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow">
-          <Bot size={14} className="text-white" />
+          {isAdmin ? <MessageSquare size={14} className="text-white" /> : <Bot size={14} className="text-white" />}
         </div>
       )}
-      <div className={`max-w-[78%] ${isBot ? "" : "items-end flex flex-col"}`}>
+      <div className={`max-w-[78%] ${isLeft ? "" : "items-end flex flex-col"}`}>
         <div
           className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
             isBot
               ? "bg-white text-slate-800 rounded-tl-sm border border-slate-100"
+              : isAdmin
+                ? "bg-emerald-50 text-emerald-900 rounded-tl-sm border border-emerald-200"
               : "bg-linear-to-br from-blue-500 to-indigo-600 text-white rounded-tr-sm"
           }`}
         >
@@ -254,11 +290,91 @@ export default function ChatBot() {
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(0);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [adminEscalationSeen, setAdminEscalationSeen] = useState(() => hasSeenAdminEscalationInSession(init.userId));
+  const [chatMode, setChatMode] = useState<"ai" | "admin">("ai");
+  const [adminChatSessionId, setAdminChatSessionId] = useState(() => getOrCreateAdminChatSessionId(init.userId));
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const idRef = useRef(init.nextId);
+  const lastAdminMessageIdRef = useRef(0);
+
+  const userMessageCount = messages.filter((msg) => msg.role === "user").length;
+  const showAdminEscalation = chatMode === "ai" && !adminEscalationSeen && userMessageCount > ADMIN_ESCALATION_THRESHOLD;
+  const latestUserMessage = [...messages].reverse().find((msg) => msg.role === "user")?.text ?? "";
+
+  const completeAdminEscalation = () => {
+    setAdminEscalationSeen(true);
+    markAdminEscalationSeenInSession(currentUserIdRef.current);
+  };
+
+  const openAdminWhatsApp = () => {
+    if (!ADMIN_WHATSAPP_NUMBER) return;
+
+    const recentTranscript = messages
+      .slice(-8)
+      .map((msg) => `${msg.role === "user" ? "User" : "Bot"}: ${msg.text.replace(/\n/g, " ")}`)
+      .join("\n");
+
+    const text = [
+      "Halo Admin SkyIntern, saya butuh bantuan lanjutan dari chatbot.",
+      `Session ID: ${adminChatSessionId}`,
+      `Jumlah pesan saya di chatbot: ${userMessageCount}`,
+      latestUserMessage ? `Pesan terakhir saya: \"${latestUserMessage}\"` : "",
+      recentTranscript ? `\nRingkasan chat terbaru:\n${recentTranscript}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const waUrl = `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleStartAdminChat = async () => {
+    setChatMode("admin");
+    completeAdminEscalation();
+
+    setTyping(false);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: idRef.current++,
+        role: "admin",
+        text: "Mode Chat Admin aktif. Kirim pesanmu di sini, admin akan membalas melalui kanal WhatsApp yang terhubung.",
+        time: now(),
+      },
+    ]);
+
+    try {
+      await fetch("/api/admin-chat/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: adminChatSessionId,
+          userId: currentUserIdRef.current,
+        }),
+      });
+    } catch {
+      // ignore network issue and still allow local admin mode
+    }
+
+    openAdminWhatsApp();
+  };
+
+  const handleFinishAdminChat = () => {
+    setChatMode("ai");
+    setTyping(false);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: idRef.current++,
+        role: "bot",
+        text: "Sesi chat admin selesai. Sekarang kamu kembali ke mode AI assistant. 😊",
+        time: now(),
+      },
+    ]);
+  };
 
   /* Persist messages for the current user whenever they change */
   useEffect(() => {
@@ -271,6 +387,10 @@ export default function ChatBot() {
       currentUserIdRef.current = userId;
       const freshMsgs = loadMessagesForUser(userId);
       setMessages(freshMsgs);
+      setAdminEscalationSeen(hasSeenAdminEscalationInSession(userId));
+      setChatMode("ai");
+      setAdminChatSessionId(getOrCreateAdminChatSessionId(userId));
+      lastAdminMessageIdRef.current = 0;
       idRef.current =
         freshMsgs.length > 0 ? Math.max(...freshMsgs.map((m) => m.id)) + 1 : 2;
       setUnread(0);
@@ -317,6 +437,47 @@ export default function ChatBot() {
     }
   }, [messages, open, minimized]);
 
+  useEffect(() => {
+    if (chatMode !== "admin") return;
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const query = new URLSearchParams({
+          sessionId: adminChatSessionId,
+          afterId: String(lastAdminMessageIdRef.current),
+        });
+        const response = await fetch(`/api/admin-chat/poll?${query.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as {
+          messages?: Array<{ id: number; text: string; timestamp: number }>;
+        };
+        const incoming = Array.isArray(payload.messages) ? payload.messages : [];
+        if (incoming.length === 0) return;
+
+        lastAdminMessageIdRef.current = incoming[incoming.length - 1]!.id;
+        setMessages((prev) => [
+          ...prev,
+          ...incoming.map((item) => ({
+            id: idRef.current++,
+            role: "admin" as const,
+            text: item.text,
+            time: fromTimestamp(item.timestamp),
+          })),
+        ]);
+        if (!open || minimized) setUnread((u) => u + incoming.length);
+      } catch {
+        // ignore poll errors and keep polling
+      }
+    }, ADMIN_POLL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [chatMode, adminChatSessionId, open, minimized]);
+
   /* detect scroll */
   const handleScroll = () => {
     const el = listRef.current;
@@ -325,7 +486,7 @@ export default function ChatBot() {
     setShowScrollBtn(!nearBottom);
   };
 
-  /* send message — calls /api/chat (OpenAI), falls back to local FAQ */
+  /* send message — AI mode calls /api/chat, Admin mode relays to /api/admin-chat/send */
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
 
@@ -341,6 +502,31 @@ export default function ChatBot() {
 
     setMessages((p) => [...p, userMsg]);
     setInput("");
+    if (chatMode === "admin") {
+      try {
+        await fetch("/api/admin-chat/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: adminChatSessionId,
+            userId: currentUserIdRef.current,
+            text: text.trim(),
+          }),
+        });
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: idRef.current++,
+            role: "admin",
+            text: "Gagal mengirim pesan ke kanal admin. Coba lagi sebentar lagi.",
+            time: now(),
+          },
+        ]);
+      }
+      return;
+    }
+
     setTyping(true);
 
     let answer: string;
@@ -490,6 +676,63 @@ export default function ChatBot() {
                 {messages.map((msg) => (
                   <Bubble key={msg.id} msg={msg} />
                 ))}
+
+                {showAdminEscalation && (
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-[88%] rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-center">
+                      <p className="text-[11px] font-semibold text-emerald-800">
+                        Ingin dibantu admin langsung?
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleStartAdminChat}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" /> Mulai Chat Admin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={completeAdminEscalation}
+                        className="ml-2 mt-2 inline-flex items-center rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                      >
+                        Nanti saja
+                      </button>
+                      <p className="mt-1 text-[10px] text-emerald-700">
+                        Kamu tetap chat di website, admin membaca pesanmu lewat WhatsApp.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {chatMode === "admin" && (
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-[88%] rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-center">
+                      <p className="text-[11px] font-semibold text-amber-800">
+                        Sedang terhubung ke Admin
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={openAdminWhatsApp}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-amber-600"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" /> Buka WA Admin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleFinishAdminChat}
+                          className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                        >
+                          Selesai Chat
+                        </button>
+                      </div>
+                      <p className="mt-1 text-[10px] text-amber-700">
+                        Balasan admin akan muncul di sini. Klik selesai untuk kembali ke AI default.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {typing && <Typing />}
                 <div ref={bottomRef} />
               </div>
@@ -511,6 +754,7 @@ export default function ChatBot() {
                     <button
                       key={qr.value}
                       onClick={() => void sendMessage(qr.value)}
+                      disabled={chatMode === "admin"}
                       className="shrink-0 text-[11px] px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors whitespace-nowrap"
                     >
                       {qr.label}
@@ -528,7 +772,7 @@ export default function ChatBot() {
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ketik pertanyaanmu…"
+                  placeholder={chatMode === "admin" ? "Kirim pesan ke admin…" : "Ketik pertanyaanmu…"}
                   className="flex-1 h-10 px-4 rounded-full bg-slate-100 text-sm text-slate-800 placeholder:text-slate-400 border border-transparent focus:outline-none focus:border-blue-400 focus:bg-white transition-colors"
                 />
                 <button

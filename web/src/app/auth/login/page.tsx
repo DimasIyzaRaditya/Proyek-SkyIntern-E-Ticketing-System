@@ -64,8 +64,8 @@ function LoginPageContent() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-lg px-4 py-8 sm:px-6 lg:py-12">
-        <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-lg sm:p-8">
+      <main className="mx-auto max-w-lg px-4 py-8 page-enter sm:px-6 lg:py-12">
+        <section className="animate-scale-in rounded-3xl border border-blue-100 bg-white p-6 shadow-lg sm:p-8">
           <h2 className="text-center text-3xl font-black text-slate-900">Login</h2>
           <p className="mt-1 text-center text-sm text-slate-600">Masuk ke akun SkyIntern Anda.</p>
 
@@ -112,7 +112,7 @@ function LoginPageContent() {
               <Link href="/auth/forgot-password" className="font-semibold text-blue-600 hover:text-blue-700">Forgot Password?</Link>
             </div>
 
-            {!redirecting && <button disabled={loading} onClick={handleLogin} type="button" className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Login"}</button>}
+            {!redirecting && <button disabled={loading} onClick={handleLogin} type="button" className="btn-animate btn-sheen w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70">{loading ? "Memproses..." : "Login"}</button>}
           </form>
 
           {message && <p className={`mt-3 text-center text-sm font-medium ${isError ? "text-red-600" : "text-blue-700"}`}>{message}</p>}
