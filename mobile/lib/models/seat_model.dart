@@ -14,8 +14,8 @@ class Seat {
   });
 
   bool get isAvailable => status == 'AVAILABLE';
-  bool get isOccupied => status == 'OCCUPIED';
-  bool get isHeld => status == 'HELD';
+  bool get isOccupied => status == 'BOOKED';
+  bool get isHeld => status == 'RESERVED';
 
   factory Seat.fromJson(Map<String, dynamic> json) {
     return Seat(

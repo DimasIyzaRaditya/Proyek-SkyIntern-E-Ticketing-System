@@ -18,7 +18,7 @@ class BookingPassengerScreen extends StatefulWidget {
 class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isInitialized = false;
-  final bool _isSubmitting = false;
+  bool _isSubmitting = false;
 
   late int _adults;
   late int _children;

@@ -18,6 +18,8 @@ class _SearchScreenState extends State<SearchScreen>
     with SingleTickerProviderStateMixin {
   String? originCode;
   String? destinationCode;
+  int? originId;
+  int? destinationId;
   late DateTime departureDate;
   late DateTime returnDate;
   int adults = 1;
@@ -82,7 +84,7 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Future<void> _handleSearch() async {
-    if (originCode == null || destinationCode == null) {
+    if (originId == null || destinationId == null) {
       showSnackBar(context, 'Pilih bandara keberangkatan dan tujuan',
           isError: true);
       return;
@@ -95,8 +97,8 @@ class _SearchScreenState extends State<SearchScreen>
     try {
       final fp = context.read<FlightProvider>();
       await fp.searchFlights(
-        origin: originCode!,
-        destination: destinationCode!,
+        originId: originId!.toString(),
+        destinationId: destinationId!.toString(),
         departureDate: DateFormatter.formatDate(departureDate),
         returnDate:
             isRoundTrip ? DateFormatter.formatDate(returnDate) : null,
@@ -313,8 +315,10 @@ class _SearchScreenState extends State<SearchScreen>
                                       setState(() {
                                         if (isOrigin) {
                                           originCode = a.code;
+                                          originId = a.id;
                                         } else {
                                           destinationCode = a.code;
+                                          destinationId = a.id;
                                         }
                                       });
                                       Navigator.pop(ctx);

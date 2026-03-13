@@ -1,6 +1,15 @@
 ﻿import 'package:flutter/material.dart';
+import '../services/admin_service.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
+
+// Derives a short 3-letter badge code from city name
+String _deriveCode(String? city) {
+  if (city == null || city.isEmpty) return '?';
+  final letters = city.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+  if (letters.length >= 3) return letters.substring(0, 3).toUpperCase();
+  return letters.toUpperCase().padRight(3, 'X');
+}
 
 class AdminAirportsScreen extends StatefulWidget {
   const AdminAirportsScreen({super.key});
@@ -10,11 +19,27 @@ class AdminAirportsScreen extends StatefulWidget {
 }
 
 class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
-  final List<Map<String, dynamic>> _airports = [
-    {'id': 1, 'airportName': 'Soekarno-Hatta International Airport', 'city': 'Jakarta', 'country': 'Indonesia', 'code': 'CGK'},
-    {'id': 2, 'airportName': 'Ngurah Rai International Airport', 'city': 'Denpasar', 'country': 'Indonesia', 'code': 'DPS'},
-    {'id': 3, 'airportName': 'Juanda International Airport', 'city': 'Surabaya', 'country': 'Indonesia', 'code': 'SUB'},
-  ];
+  List<Map<String, dynamic>> _airports = [];
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAirports();
+  }
+
+  Future<void> _loadAirports() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final data = await AdminService.getAirports();
+      if (mounted) setState(() { _airports = data; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); });
+    } finally {
+      if (mounted) setState(() { _isLoading = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +84,24 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
           ),
         ),
       ),
-      body: _airports.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_error!, style: const TextStyle(color: AppColors.error)),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _loadAirports,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Coba Lagi'),
+                      ),
+                    ],
+                  ),
+                )
+          : _airports.isEmpty
           ? const EmptyState(icon: Icons.location_city_rounded, title: 'Belum ada bandara', subtitle: 'Tambahkan bandara baru')
           : ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -84,7 +126,7 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           alignment: Alignment.center,
-                          child: Text(a['code'],
+                          child: Text(_deriveCode(a['city'] as String?),
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
                         const SizedBox(width: 14),
@@ -92,7 +134,7 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(a['airportName'],
+                              Text(a['name'] ?? a['airportName'] ?? '',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
                                   maxLines: 1, overflow: TextOverflow.ellipsis),
                               const SizedBox(height: 2),
@@ -124,10 +166,9 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
 
   void _showAddEditDialog({Map<String, dynamic>? airport}) {
     final isEdit = airport != null;
-    final nameCtrl = TextEditingController(text: airport?['airportName'] ?? '');
+    final nameCtrl = TextEditingController(text: airport?['name'] ?? '');
     final cityCtrl = TextEditingController(text: airport?['city'] ?? '');
     final countryCtrl = TextEditingController(text: airport?['country'] ?? '');
-    final codeCtrl = TextEditingController(text: airport?['code'] ?? '');
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -163,9 +204,6 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                 const SizedBox(height: 14),
                 InputField(label: 'Negara', controller: countryCtrl,
                     validator: (v) => v?.isEmpty == true ? 'Wajib diisi' : null),
-                const SizedBox(height: 14),
-                InputField(label: 'Kode Bandara (IATA)', controller: codeCtrl,
-                    validator: (v) => v?.isEmpty == true ? 'Wajib diisi' : null),
               ],
             ),
           ),
@@ -174,25 +212,42 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx),
               child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary))),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (!formKey.currentState!.validate()) return;
-              if (isEdit) {
-                setState(() {
-                  final idx = _airports.indexWhere((a) => a['id'] == airport!['id']);
-                  if (idx != -1) {
-                    _airports[idx] = {...airport!, 'airportName': nameCtrl.text, 'city': cityCtrl.text, 'country': countryCtrl.text, 'code': codeCtrl.text};
-                  }
-                });
-              } else {
-                setState(() => _airports.add({'id': _airports.length + 1, 'airportName': nameCtrl.text, 'city': cityCtrl.text, 'country': countryCtrl.text, 'code': codeCtrl.text}));
-              }
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Bandara berhasil ${isEdit ? 'diperbarui' : 'ditambahkan'}!'),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ));
+              try {
+                if (isEdit) {
+                  await AdminService.updateAirport(
+                    id: airport!['id'] as int,
+                    name: nameCtrl.text.trim(),
+                    city: cityCtrl.text.trim(),
+                    country: countryCtrl.text.trim(),
+                  );
+                } else {
+                  await AdminService.createAirport(
+                    name: nameCtrl.text.trim(),
+                    city: cityCtrl.text.trim(),
+                    country: countryCtrl.text.trim(),
+                  );
+                }
+                await _loadAirports();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Bandara berhasil ${isEdit ? 'diperbarui' : 'ditambahkan'}!'),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Gagal: ${e.toString()}'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
@@ -211,20 +266,33 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Hapus Bandara', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Anda yakin ingin menghapus "${airport['airportName']}"?',
+        content: Text('Anda yakin ingin menghapus "${airport['name']}"?',
             style: const TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx),
               child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary))),
           ElevatedButton(
-            onPressed: () {
-              setState(() => _airports.removeWhere((a) => a['id'] == airport['id']));
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Bandara berhasil dihapus'),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-              ));
+              try {
+                await AdminService.deleteAirport(airport['id'] as int);
+                await _loadAirports();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Bandara berhasil dihapus'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Gagal menghapus: ${e.toString()}'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,

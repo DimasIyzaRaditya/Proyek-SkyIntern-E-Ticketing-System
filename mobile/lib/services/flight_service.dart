@@ -14,8 +14,8 @@ class FlightService {
   }
 
   static Future<List<FlightCardItem>> searchFlights({
-    required String origin,
-    required String destination,
+    required String originId,
+    required String destinationId,
     required String departureDate,
     String? returnDate,
     String adult = '1',
@@ -23,8 +23,8 @@ class FlightService {
     String? sortBy,
   }) async {
     final buffer = StringBuffer('/api/flights/search?');
-    buffer.write('origin=$origin&');
-    buffer.write('destination=$destination&');
+    buffer.write('originId=$originId&');
+    buffer.write('destinationId=$destinationId&');
     buffer.write('departureDate=$departureDate&');
     if (returnDate != null) buffer.write('returnDate=$returnDate&');
     buffer.write('adult=$adult&');

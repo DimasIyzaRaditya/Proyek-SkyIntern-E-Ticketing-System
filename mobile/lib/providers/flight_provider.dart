@@ -32,8 +32,8 @@ class FlightProvider extends ChangeNotifier {
   }
 
   Future<void> searchFlights({
-    required String origin,
-    required String destination,
+    required String originId,
+    required String destinationId,
     required String departureDate,
     String? returnDate,
     String adult = '1',
@@ -47,8 +47,8 @@ class FlightProvider extends ChangeNotifier {
 
     try {
       _flights = await FlightService.searchFlights(
-        origin: origin,
-        destination: destination,
+        originId: originId,
+        destinationId: destinationId,
         departureDate: departureDate,
         returnDate: returnDate,
         adult: adult,

@@ -1,3 +1,11 @@
+// Derives a 3-letter display code from city name (backend doesn't expose IATA code in flight responses)
+String _deriveCode(String? city) {
+  if (city == null || city.isEmpty) return 'XXX';
+  final letters = city.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+  if (letters.length >= 3) return letters.substring(0, 3).toUpperCase();
+  return letters.toUpperCase().padRight(3, 'X');
+}
+
 class FlightCardItem {
   final String id;
   final String flightNumber;
@@ -69,8 +77,8 @@ class FlightCardItem {
       airline: (flight['airline']?['name'] ?? 'Unknown Airline').toString(),
       logo: (flight['airline']?['logo'] ?? '✈️').toString(),
       aircraft: (flight['aircraft'] ?? 'Aircraft').toString(),
-      origin: '${origin['city'] ?? ''} (${origin['code'] ?? 'XXX'})',
-      destination: '${destination['city'] ?? ''} (${destination['code'] ?? 'XXX'})',
+      origin: '${origin['city'] ?? ''} (${_deriveCode(origin['city'] as String?)})',
+      destination: '${destination['city'] ?? ''} (${_deriveCode(destination['city'] as String?)})',
       departureTime: formatTime(flight['departureTime'] as String?),
       arrivalTime: formatTime(flight['arrivalTime'] as String?),
       duration: formatDuration(flight['duration']),
@@ -103,8 +111,8 @@ class Airport {
       code: json['code'] ?? '',
       city: json['city'] ?? '',
       country: json['country'] ?? '',
-      airportName: json['airportName'] ?? '',
-      label: json['label'] ?? '',
+      airportName: json['airportName'] ?? json['name'] ?? '',
+      label: json['label'] ?? '${json['city'] ?? ''} – ${json['airportName'] ?? json['name'] ?? ''}',
     );
   }
 }

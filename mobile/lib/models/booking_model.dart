@@ -1,3 +1,11 @@
+// Derives a 3-letter display code from city name
+String _deriveCode(String? city) {
+  if (city == null || city.isEmpty) return 'XXX';
+  final letters = city.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+  if (letters.length >= 3) return letters.substring(0, 3).toUpperCase();
+  return letters.toUpperCase().padRight(3, 'X');
+}
+
 class Booking {
   final int id;
   final int flightId;
@@ -63,9 +71,9 @@ class FlightInfo {
       departureTime: json['departureTime'] ?? '',
       airline: json['airline']?['name'] ?? 'Unknown',
       originCity: json['origin']?['city'] ?? '',
-      originCode: json['origin']?['code'] ?? 'XXX',
+      originCode: _deriveCode(json['origin']?['city'] as String?),
       destinationCity: json['destination']?['city'] ?? '',
-      destinationCode: json['destination']?['code'] ?? 'XXX',
+      destinationCode: _deriveCode(json['destination']?['city'] as String?),
     );
   }
 }

@@ -4,6 +4,14 @@ import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/admin_service.dart';
 
+// Derives a 3-letter display code from city name
+String _deriveCode(String? city) {
+  if (city == null || city.isEmpty) return '???';
+  final letters = city.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+  if (letters.length >= 3) return letters.substring(0, 3).toUpperCase();
+  return letters.toUpperCase().padRight(3, 'X');
+}
+
 class AdminSchedulesScreen extends StatefulWidget {
   const AdminSchedulesScreen({super.key});
 
@@ -226,7 +234,7 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
                                           size: 16, color: AppColors.primary),
                                       const SizedBox(width: 6),
                                       Text(
-                                        '${origin?['code'] ?? '-'} → ${dest?['code'] ?? '-'}',
+                                        '${_deriveCode(origin?['city'] as String?)} → ${_deriveCode(dest?['city'] as String?)}',
                                         style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 15,

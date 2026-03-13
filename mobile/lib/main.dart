@@ -160,7 +160,10 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
     case '/admin/schedules':
       page = const AdminGuard(child: AdminSchedulesScreen());
     case '/admin/seats':
-      final flightArg = settings.arguments as Map<String, dynamic>?;
+      final rawArg = settings.arguments;
+      final flightArg = rawArg is Map
+          ? Map<String, dynamic>.from(rawArg)
+          : null;
       page = AdminGuard(child: AdminSeatsScreen(flight: flightArg));
     case '/admin/transactions':
       page = const AdminGuard(child: AdminTransactionsScreen());

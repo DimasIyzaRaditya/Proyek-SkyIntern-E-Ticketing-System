@@ -55,10 +55,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       }
     }
 
-    // Debug: print the token and URL for troubleshooting
-    print('Debug - Current URL: ${Uri.base}');
-    print('Debug - Token found: $_token');
-
     if (_token == null || _token!.isEmpty) {
       if (mounted) {
         showSnackBar(context, 'Token reset password tidak valid atau tidak ditemukan', isError: true);

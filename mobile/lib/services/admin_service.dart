@@ -73,28 +73,26 @@ class AdminService {
   }
 
   static Future<void> createAirport({
-    required String code,
     required String name,
     required String city,
     required String country,
   }) async {
     await ApiClient.post(
       '/api/admin/airports',
-      body: {'code': code, 'name': name, 'city': city, 'country': country},
+      body: {'name': name, 'city': city, 'country': country},
       requireAuth: true,
     );
   }
 
   static Future<void> updateAirport({
     required int id,
-    required String code,
     required String name,
     required String city,
     required String country,
   }) async {
     await ApiClient.put(
       '/api/admin/airports/$id',
-      body: {'code': code, 'name': name, 'city': city, 'country': country},
+      body: {'name': name, 'city': city, 'country': country},
       requireAuth: true,
     );
   }
@@ -108,7 +106,7 @@ class AdminService {
   static Future<List<Map<String, dynamic>>> getFlights() async {
     final res = await ApiClient.get('/api/admin/flights', requireAuth: true);
     final list = res['flights'] as List<dynamic>? ?? [];
-    return list.cast<Map<String, dynamic>>();
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   static Future<void> createFlight({
@@ -188,31 +186,35 @@ class AdminService {
       requireAuth: true,
     );
 
-    // Collect raw FlightSeat list (with nested seat object)
+    // Backend returns { seatMap: { FIRST: [...], BUSINESS: [...], ECONOMY: [...] } }
+    // Each item is a FlightSeat with a nested `seat` object.
     final List<dynamic> raw;
-    if (res.containsKey('seatMap')) {
+    if (res['seatMap'] is Map) {
       final seatMap = res['seatMap'] as Map<String, dynamic>;
       final tmp = <dynamic>[];
       for (final cls in ['FIRST', 'BUSINESS', 'ECONOMY']) {
-        tmp.addAll((seatMap[cls] as List<dynamic>? ?? []));
+        final bucket = seatMap[cls];
+        if (bucket is List) tmp.addAll(bucket);
       }
       raw = tmp;
-    } else if (res.containsKey('seats')) {
-      raw = res['seats'] as List<dynamic>? ?? [];
+    } else if (res['seats'] is List) {
+      raw = res['seats'] as List<dynamic>;
     } else {
       return [];
     }
 
-    // Flatten: merge nested seat fields to top level so the screen can read
+    // Flatten nested seat fields to top level so the screen can access
     // seatNumber, seatClass, status, additionalPrice directly.
-    return raw.map((item) {
+    return raw.map<Map<String, dynamic>>((item) {
       final fs = Map<String, dynamic>.from(item as Map);
-      final nested = fs['seat'] as Map<String, dynamic>? ?? {};
-      return {
+      final nested = (fs['seat'] is Map)
+          ? Map<String, dynamic>.from(fs['seat'] as Map)
+          : <String, dynamic>{};
+      return <String, dynamic>{
         ...fs,
-        'seatNumber': fs['seatNumber'] ?? nested['seatNumber'],
-        'seatClass': fs['seatClass'] ?? nested['seatClass'],
-        'class': fs['class'] ?? nested['seatClass'],
+        'seatNumber': (fs['seatNumber'] ?? nested['seatNumber'] ?? '').toString(),
+        'seatClass': (fs['seatClass'] ?? nested['seatClass'] ?? 'ECONOMY').toString(),
+        'class': (fs['class'] ?? nested['seatClass'] ?? 'ECONOMY').toString(),
       };
     }).toList();
   }

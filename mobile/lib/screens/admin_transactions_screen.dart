@@ -238,7 +238,7 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                '${p['name'] ?? p['passengerName'] ?? '-'} (${p['seatNumber'] ?? '-'})',
+                                '${('${p['firstName'] ?? ''} ${p['lastName'] ?? ''}').trim().isEmpty ? '-' : ('${p['firstName'] ?? ''} ${p['lastName'] ?? ''}').trim()} (${p['seatNumber'] ?? '-'})',
                                 style: const TextStyle(fontSize: 13),
                               ),
                             ),

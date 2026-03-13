@@ -47,7 +47,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       {'label': 'Maskapai', 'icon': Icons.flight_rounded, 'gradient': AppColors.primaryGradient, 'route': '/admin/airlines'},
       {'label': 'Bandara', 'icon': Icons.location_city_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]), 'route': '/admin/airports'},
       {'label': 'Jadwal', 'icon': Icons.schedule_rounded, 'gradient': const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]), 'route': '/admin/schedules'},
-      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]), 'route': '/admin/schedules'},
+      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]), 'route': '/admin/seats'},
       {'label': 'Transaksi', 'icon': Icons.receipt_long_rounded, 'gradient': const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFF59E0B)]), 'route': '/admin/transactions'},
       {'label': 'Pengguna', 'icon': Icons.group_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF0D9488), Color(0xFF6366F1)]), 'route': '/admin/users'},
     ];

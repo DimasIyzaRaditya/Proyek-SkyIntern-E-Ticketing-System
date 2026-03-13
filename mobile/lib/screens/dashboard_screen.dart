@@ -374,8 +374,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             .where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase()))
             .length;
         final done = bp.bookings
-            .where((b) =>
-                ['SETTLEMENT', 'COMPLETED'].contains(b.status.toUpperCase()))
+            .where((b) => b.ticket != null)
             .length;
 
         return Column(

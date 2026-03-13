@@ -170,7 +170,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       if (!mounted) return;
       setState(() => _isSyncing = false);
 
-      if (status == 'PAID' || status == 'SETTLEMENT') {
+      if (status == 'PAID') {
         _showSnack('Pembayaran berhasil dikonfirmasi!');
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {

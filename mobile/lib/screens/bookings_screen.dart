@@ -53,7 +53,7 @@ class _BookingsScreenState extends State<BookingsScreen>
       case 'active':
         return all.where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase())).toList();
       case 'completed':
-        return all.where((b) => ['SETTLEMENT', 'COMPLETED', 'ISSUED'].contains(b.status.toUpperCase())).toList();
+        return all.where((b) => b.status.toUpperCase() == 'PAID' && b.ticket != null).toList();
       case 'cancelled':
         return all.where((b) => ['CANCELLED', 'EXPIRED', 'FAILED'].contains(b.status.toUpperCase())).toList();
       default:
@@ -65,7 +65,10 @@ class _BookingsScreenState extends State<BookingsScreen>
     setState(() => _payingIds.add(bookingId));
     try {
       final result = await BookingService.createPayment(bookingId);
-      final url = result['redirectUrl'] as String? ?? result['snap_redirect_url'] as String?;
+      final paymentData = result['payment'] as Map<String, dynamic>?;
+      final url = paymentData?['redirectUrl'] as String?
+          ?? result['redirectUrl'] as String?
+          ?? result['snap_redirect_url'] as String?;
       if (url == null) throw Exception('Gagal mendapatkan link pembayaran');
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
@@ -86,7 +89,7 @@ class _BookingsScreenState extends State<BookingsScreen>
       final result = await BookingService.syncPayment(bookingId);
       final status = (result['booking']?['status'] ?? result['status'] ?? '').toString().toUpperCase();
       if (!mounted) return;
-      if (status == 'PAID' || status == 'SETTLEMENT') {
+      if (status == 'PAID') {
         showSnackBar(context, 'Pembayaran berhasil dikonfirmasi!');
         await context.read<BookingProvider>().loadBookings();
       } else if (status == 'PENDING') {
@@ -233,8 +236,8 @@ class _BookingsScreenState extends State<BookingsScreen>
 
   Widget _buildCard(BuildContext context, Booking booking) {
     final isPending = booking.status.toUpperCase() == 'PENDING';
-    final isPaid = ['PAID', 'SETTLEMENT', 'COMPLETED'].contains(booking.status.toUpperCase());
-    final isIssued = booking.status.toUpperCase() == 'ISSUED';
+    final isIssued = booking.ticket != null;
+    final isPaid = booking.status.toUpperCase() == 'PAID' && !isIssued;
 
     // Count adult/child from passenger list
     final adults = booking.passengers.where((p) => p.type.toUpperCase() == 'ADULT').length;
