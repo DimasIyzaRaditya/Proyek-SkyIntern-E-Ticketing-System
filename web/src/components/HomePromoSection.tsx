@@ -651,7 +651,7 @@ export default function HomePromoSection() {
             {/* Header */}
             <div className="mb-4 sm:mb-5">
               <h2 className="text-lg font-black text-slate-900 sm:text-xl md:text-2xl">
-                Domestic Flight Best Deals for You ✈️
+                Domestic Flight Best Deals for You
               </h2>
             </div>
 
@@ -692,7 +692,7 @@ export default function HomePromoSection() {
           <section>
             <div className="mb-4 sm:mb-5">
               <h2 className="text-lg font-black text-slate-900 sm:text-xl md:text-2xl">
-                🌏 Penerbangan Internasional Terbaik
+                Penerbangan Internasional Terbaik
               </h2>
             </div>
             {/* Country tabs */}
