@@ -3,6 +3,13 @@ import type { UserSession } from "@/lib/auth";
 
 type AuthLoginResponse = {
   message: string;
+  token?: string;
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string;
+};
+
+type AuthVerifyTwoFactorResponse = {
+  message: string;
   token: string;
 };
 
@@ -13,6 +20,7 @@ type AuthProfileResponse = {
     email: string;
     phone: string | null;
     avatarUrl: string | null;
+    twoFactorEnabled: boolean;
     role: "ADMIN" | "USER";
   };
 };
@@ -22,12 +30,20 @@ export type AuthSessionPayload = {
   user: UserSession;
 };
 
+export type AuthPendingTwoFactorPayload = {
+  requiresTwoFactor: true;
+  twoFactorToken: string;
+};
+
+export type AuthLoginResult = AuthSessionPayload | AuthPendingTwoFactorPayload;
+
 const toUserSession = (user: AuthProfileResponse["user"]): UserSession => ({
   id: user.id,
   fullName: user.name,
   email: user.email,
   phoneNumber: user.phone ?? "",
   avatarUrl: user.avatarUrl ?? "",
+  twoFactorEnabled: user.twoFactorEnabled,
   role: user.role === "ADMIN" ? "admin" : "user",
 });
 
@@ -38,11 +54,26 @@ export const registerWithApi = async (payload: { name: string; email: string; pa
   });
 };
 
-export const loginWithApi = async (payload: { email: string; password: string }): Promise<AuthSessionPayload> => {
+export const loginWithApi = async (payload: { email: string; password: string }): Promise<AuthLoginResult> => {
   const loginResponse = await apiRequest<AuthLoginResponse>("/api/auth/login", {
     method: "POST",
     body: payload,
   });
+
+  if (loginResponse.requiresTwoFactor) {
+    if (!loginResponse.twoFactorToken) {
+      throw new Error("Token verifikasi 2FA tidak tersedia.");
+    }
+
+    return {
+      requiresTwoFactor: true,
+      twoFactorToken: loginResponse.twoFactorToken,
+    };
+  }
+
+  if (!loginResponse.token) {
+    throw new Error("Token login tidak tersedia.");
+  }
 
   const profileResponse = await apiRequest<AuthProfileResponse>("/api/auth/profile", {
     headers: {
@@ -56,6 +87,31 @@ export const loginWithApi = async (payload: { email: string; password: string })
   };
 };
 
+export const verifyTwoFactorLoginWithApi = async (payload: { twoFactorToken: string; code: string }): Promise<AuthSessionPayload> => {
+  const verifyResponse = await apiRequest<AuthVerifyTwoFactorResponse>("/api/auth/login/2fa/verify", {
+    method: "POST",
+    body: payload,
+  });
+
+  const profileResponse = await apiRequest<AuthProfileResponse>("/api/auth/profile", {
+    headers: {
+      Authorization: `Bearer ${verifyResponse.token}`,
+    },
+  });
+
+  return {
+    token: verifyResponse.token,
+    user: toUserSession(profileResponse.user),
+  };
+};
+
+export const resendTwoFactorCodeFromApi = async (payload: { twoFactorToken: string }) => {
+  return apiRequest<{ message: string }>("/api/auth/login/2fa/resend", {
+    method: "POST",
+    body: payload,
+  });
+};
+
 export const getProfileFromApi = async (): Promise<UserSession> => {
   const payload = await apiRequest<AuthProfileResponse>("/api/auth/profile", { auth: true });
   return toUserSession(payload.user);
@@ -67,6 +123,16 @@ export const updateProfileFromApi = async (payload: { name?: string; phone?: str
     auth: true,
     body: payload,
   });
+  return toUserSession(response.user);
+};
+
+export const updateTwoFactorSettingFromApi = async (payload: { enabled: boolean }): Promise<UserSession> => {
+  const response = await apiRequest<AuthProfileResponse & { message: string }>("/api/auth/2fa", {
+    method: "PUT",
+    auth: true,
+    body: payload,
+  });
+
   return toUserSession(response.user);
 };
 

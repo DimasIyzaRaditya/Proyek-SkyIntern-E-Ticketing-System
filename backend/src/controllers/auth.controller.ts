@@ -2,13 +2,40 @@
 // manajemen profil, alur lupa/reset password via email, hapus akun,
 // serta pengambilan daftar semua user (khusus admin).
 import bcrypt from "bcrypt"
+import crypto from "crypto"
 import jwt from "jsonwebtoken"
 import { Request, Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateResetToken, addMinutes } from "../utils/helpers"
-import { sendResetPasswordEmail } from "../utils/email"
+import { sendResetPasswordEmail, sendTwoFactorCodeEmail } from "../utils/email"
 import { uploadFile, deleteFile } from "../utils/minio"
+
+const TWO_FACTOR_CODE_TTL_MINUTES = 10
+
+const issueAccessToken = (user: { id: number; email: string; role: string }) => {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "1d" }
+  )
+}
+
+const issueTwoFactorToken = (user: { id: number; email: string }) => {
+  return jwt.sign(
+    { id: user.id, email: user.email, purpose: "2fa-login" },
+    process.env.JWT_SECRET as string,
+    { expiresIn: `${TWO_FACTOR_CODE_TTL_MINUTES}m` }
+  )
+}
+
+const createTwoFactorCode = () => {
+  return crypto.randomInt(100000, 1000000).toString()
+}
+
+const hashTwoFactorCode = (code: string) => {
+  return crypto.createHash("sha256").update(code).digest("hex")
+}
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -58,19 +85,181 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Akun Anda telah diblokir." })
     }
 
-    const token = jwt.sign( // Buat JWT token berisi id, email, role user, berlaku 1 hari
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "1d" }
-    )
+    if (user.twoFactorEnabled) {
+      const code = createTwoFactorCode()
+      const codeHash = hashTwoFactorCode(code)
+      const expiresAt = addMinutes(new Date(), TWO_FACTOR_CODE_TTL_MINUTES)
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          twoFactorCodeHash: codeHash,
+          twoFactorCodeExpiresAt: expiresAt
+        }
+      })
+
+      await sendTwoFactorCodeEmail(user.email, user.name, code)
+
+      return res.json({
+        message: "Kode verifikasi 2FA telah dikirim ke email Anda",
+        requiresTwoFactor: true,
+        twoFactorToken: issueTwoFactorToken({ id: user.id, email: user.email })
+      })
+    }
+
+    const token = issueAccessToken({ id: user.id, email: user.email, role: user.role })
 
     res.json({
       message: "Login berhasil",
-      token
+      token,
+      requiresTwoFactor: false
     })
 
   } catch (error) {
     console.error("Login error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const verifyTwoFactorLogin = async (req: Request, res: Response) => {
+  try {
+    const { twoFactorToken, code } = req.body
+
+    if (!twoFactorToken || !code) {
+      return res.status(400).json({ message: "Token 2FA dan kode wajib diisi" })
+    }
+
+    const decoded = jwt.verify(twoFactorToken, process.env.JWT_SECRET as string) as {
+      id: number
+      purpose?: string
+    }
+
+    if (decoded.purpose !== "2fa-login") {
+      return res.status(401).json({ message: "Token 2FA tidak valid" })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(decoded.id) },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isBlocked: true,
+        twoFactorEnabled: true,
+        twoFactorCodeHash: true,
+        twoFactorCodeExpiresAt: true
+      }
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ message: "Akun Anda telah diblokir." })
+    }
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ message: "2FA tidak aktif untuk akun ini" })
+    }
+
+    if (!user.twoFactorCodeHash || !user.twoFactorCodeExpiresAt || user.twoFactorCodeExpiresAt < new Date()) {
+      return res.status(400).json({ message: "Kode 2FA tidak valid atau sudah kedaluwarsa" })
+    }
+
+    if (hashTwoFactorCode(String(code)) !== user.twoFactorCodeHash) {
+      return res.status(401).json({ message: "Kode 2FA salah" })
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        twoFactorCodeHash: null,
+        twoFactorCodeExpiresAt: null
+      }
+    })
+
+    const token = issueAccessToken({ id: user.id, email: user.email, role: user.role })
+
+    res.json({
+      message: "Verifikasi 2FA berhasil",
+      token
+    })
+  } catch (error: any) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token 2FA telah kedaluwarsa, silakan login ulang" })
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ message: "Token 2FA tidak valid" })
+    }
+    console.error("Verify 2FA error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const resendTwoFactorCode = async (req: Request, res: Response) => {
+  try {
+    const { twoFactorToken } = req.body
+
+    if (!twoFactorToken) {
+      return res.status(400).json({ message: "Token 2FA wajib diisi" })
+    }
+
+    const decoded = jwt.verify(twoFactorToken, process.env.JWT_SECRET as string) as {
+      id: number
+      purpose?: string
+    }
+
+    if (decoded.purpose !== "2fa-login") {
+      return res.status(401).json({ message: "Token 2FA tidak valid" })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(decoded.id) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isBlocked: true,
+        twoFactorEnabled: true
+      }
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ message: "Akun Anda telah diblokir." })
+    }
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ message: "2FA tidak aktif untuk akun ini" })
+    }
+
+    const code = createTwoFactorCode()
+    const codeHash = hashTwoFactorCode(code)
+    const expiresAt = addMinutes(new Date(), TWO_FACTOR_CODE_TTL_MINUTES)
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        twoFactorCodeHash: codeHash,
+        twoFactorCodeExpiresAt: expiresAt
+      }
+    })
+
+    await sendTwoFactorCodeEmail(user.email, user.name, code)
+
+    res.json({ message: "Kode 2FA baru telah dikirim ke email Anda" })
+  } catch (error: any) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token 2FA telah kedaluwarsa, silakan login ulang" })
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ message: "Token 2FA tidak valid" })
+    }
+    console.error("Resend 2FA error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
@@ -114,6 +303,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         email: true,
         phone: true,
         avatarUrl: true,
+        twoFactorEnabled: true,
         role: true,
         createdAt: true
       }
@@ -148,6 +338,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         email: true,
         phone: true,
         avatarUrl: true,
+        twoFactorEnabled: true,
         role: true
       }
     })
@@ -158,6 +349,42 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     })
   } catch (error) {
     console.error("Update profile error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const updateTwoFactorSetting = async (req: AuthRequest, res: Response) => {
+  try {
+    const { enabled } = req.body
+
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "Field enabled harus bernilai true atau false" })
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user?.id },
+      data: {
+        twoFactorEnabled: enabled,
+        twoFactorCodeHash: enabled ? undefined : null,
+        twoFactorCodeExpiresAt: enabled ? undefined : null
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        twoFactorEnabled: true
+      }
+    })
+
+    res.json({
+      message: enabled ? "2FA berhasil diaktifkan" : "2FA berhasil dinonaktifkan",
+      user
+    })
+  } catch (error) {
+    console.error("Update 2FA setting error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
@@ -325,6 +552,7 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
         phone: true,
         role: true,
         isBlocked: true,
+        twoFactorEnabled: true,
         avatarUrl: true,
         createdAt: true
       },
@@ -395,6 +623,52 @@ export const blockUser = async (req: AuthRequest, res: Response) => {
     })
   } catch (error) {
     console.error("Block user error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const toggleUserTwoFactorByAdmin = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = Number(req.params.id)
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: "ID user tidak valid" })
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+
+    if (!user) {
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" })
+    }
+
+    if (user.role === "ADMIN") {
+      return res.status(403).json({ message: "2FA akun admin tidak dapat diubah dari endpoint ini" })
+    }
+
+    const enabled = !user.twoFactorEnabled
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: enabled,
+        twoFactorCodeHash: enabled ? undefined : null,
+        twoFactorCodeExpiresAt: enabled ? undefined : null
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isBlocked: true,
+        twoFactorEnabled: true
+      }
+    })
+
+    res.json({
+      message: updated.twoFactorEnabled ? "2FA pengguna berhasil diaktifkan" : "2FA pengguna berhasil dinonaktifkan",
+      user: updated
+    })
+  } catch (error) {
+    console.error("Toggle user 2FA error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

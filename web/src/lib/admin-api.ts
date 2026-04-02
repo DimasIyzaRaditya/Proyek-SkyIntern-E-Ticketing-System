@@ -342,6 +342,15 @@ export const updateAdminBookingStatus = async (
   return response;
 };
 
+export const sendAdminDepartureReminder = async (id: number) => {
+  const response = await apiRequest<{ message: string }>(`/api/admin/bookings/${id}/send-departure-reminder`, {
+    method: "POST",
+    auth: true,
+  });
+
+  return response;
+};
+
 export type AdminSeat = {
   id: number;
   seatId: number;
@@ -417,6 +426,7 @@ export type AdminUser = {
   phone: string | null;
   role: "ADMIN" | "USER";
   isBlocked: boolean;
+  twoFactorEnabled: boolean;
   avatarUrl: string | null;
   createdAt: string;
 };
@@ -430,6 +440,14 @@ export const getAllAdminUsers = async (): Promise<AdminUser[]> => {
 
 export const blockAdminUser = async (userId: number): Promise<AdminUser> => {
   const response = await apiRequest<{ message: string; user: AdminUser }>(`/api/admin/users/${userId}/block`, {
+    method: "PUT",
+    auth: true,
+  });
+  return response.user;
+};
+
+export const toggleAdminUserTwoFactor = async (userId: number): Promise<AdminUser> => {
+  const response = await apiRequest<{ message: string; user: AdminUser }>(`/api/admin/users/${userId}/2fa`, {
     method: "PUT",
     auth: true,
   });

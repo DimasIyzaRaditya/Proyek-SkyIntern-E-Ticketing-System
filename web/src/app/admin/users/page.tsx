@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCcw, ShieldOff, ShieldCheck } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
-import { getAdminBookings, type AdminBooking, getAllAdminUsers, blockAdminUser, type AdminUser } from "@/lib/admin-api";
+import { getAdminBookings, type AdminBooking, getAllAdminUsers, blockAdminUser, toggleAdminUserTwoFactor, type AdminUser } from "@/lib/admin-api";
 import { formatRupiah } from "@/lib/currency";
 // tes
 type UserView = AdminUser & {
@@ -35,6 +35,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [blockingId, setBlockingId] = useState<number | null>(null);
+  const [togglingTwoFactorId, setTogglingTwoFactorId] = useState<number | null>(null);
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -66,6 +67,22 @@ export default function AdminUsersPage() {
       setMessage(error instanceof Error ? error.message : "Gagal mengubah status blokir.");
     } finally {
       setBlockingId(null);
+    }
+  };
+
+  const handleToggleTwoFactor = async (userId: number) => {
+    setTogglingTwoFactorId(userId);
+    try {
+      const updated = await toggleAdminUserTwoFactor(userId);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, twoFactorEnabled: updated.twoFactorEnabled } : u,
+        ),
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gagal mengubah status 2FA user.");
+    } finally {
+      setTogglingTwoFactorId(null);
     }
   };
 
@@ -111,14 +128,15 @@ export default function AdminUsersPage() {
                 <th className="p-3">Email</th>
                 <th className="p-3">Booking</th>
                 <th className="p-3">Total Spent</th>
-                <th className="rounded-r-xl p-3">Status</th>
+                <th className="p-3">Status</th>
+                <th className="rounded-r-xl p-3">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="p-4 text-center text-slate-500">Memuat data user...</td></tr>
+                <tr><td colSpan={7} className="p-4 text-center text-slate-500">Memuat data user...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={6} className="p-4 text-center text-slate-500">Belum ada data user.</td></tr>
+                <tr><td colSpan={7} className="p-4 text-center text-slate-500">Belum ada data user.</td></tr>
               ) : visibleUsers.map((item) => (
                 <tr key={item.id} className={`border-b border-blue-100 last:border-0 ${item.isBlocked ? "bg-red-50" : ""}`}>
                   <td className="p-3 font-semibold text-slate-700">#{item.id}</td>
@@ -129,10 +147,33 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="p-3 text-slate-700">{formatRupiah(item.totalSpent)}</td>
                   <td className="p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.isBlocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        {item.isBlocked ? "Terblokir" : "Tidak Terblokir"}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.twoFactorEnabled ? "bg-indigo-100 text-indigo-700" : "bg-slate-200 text-slate-700"}`}>
+                        {item.twoFactorEnabled ? "2FA Aktif" : "2FA Nonaktif"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-3">
                     <div className="flex items-center gap-2">
-                      {item.isBlocked && (
-                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">Diblokir</span>
-                      )}
+                      <button
+                        onClick={() => void handleToggleTwoFactor(item.id)}
+                        disabled={togglingTwoFactorId === item.id}
+                        title={item.twoFactorEnabled ? "Nonaktifkan 2FA user" : "Aktifkan 2FA user"}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                          item.twoFactorEnabled
+                            ? "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                            : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {togglingTwoFactorId === item.id
+                          ? "..."
+                          : item.twoFactorEnabled
+                            ? "Matikan 2FA"
+                            : "Hidupkan 2FA"}
+                      </button>
                       <button
                         onClick={() => void handleToggleBlock(item.id)}
                         disabled={blockingId === item.id}

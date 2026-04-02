@@ -7,8 +7,75 @@ import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateBookingCode, generateTicketNumber, calculateTotalPrice, addMinutes } from "../utils/helpers"
 import { uploadFile, deleteFile } from "../utils/minio"
-import { sendBookingConfirmation } from "../utils/email"
+import { sendBookingConfirmation, sendNewTransactionReminderEmail, sendTodayDepartureReminderEmail } from "../utils/email"
 import { createTransaction, checkTransactionStatus, verifySignature, mapMidtransStatus } from "../utils/midtrans"
+
+const getJakartaDateParts = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date)
+
+  const year = Number(parts.find((part) => part.type === "year")?.value || "0")
+  const month = Number(parts.find((part) => part.type === "month")?.value || "1")
+  const day = Number(parts.find((part) => part.type === "day")?.value || "1")
+
+  return { year, month, day }
+}
+
+const getDaysUntilDeparture = (departureTime: Date) => {
+  const departure = getJakartaDateParts(new Date(departureTime))
+  const today = getJakartaDateParts(new Date())
+
+  const departureUtc = Date.UTC(departure.year, departure.month - 1, departure.day)
+  const todayUtc = Date.UTC(today.year, today.month - 1, today.day)
+  const diffDays = Math.floor((departureUtc - todayUtc) / (24 * 60 * 60 * 1000))
+
+  return Math.max(0, diffDays)
+}
+
+const sendTransactionReminderIfNeeded = async (bookingId: number) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      user: { select: { email: true, name: true } },
+      flight: {
+        include: {
+          airline: { select: { name: true } },
+          origin: { select: { city: true } },
+          destination: { select: { city: true } }
+        }
+      }
+    }
+  })
+
+  if (!booking || booking.status !== "PAID" || booking.transactionReminderSentAt) {
+    return
+  }
+
+  const daysUntilDeparture = getDaysUntilDeparture(booking.flight.departureTime)
+
+  const sent = await sendNewTransactionReminderEmail({
+    email: booking.user.email,
+    name: booking.user.name,
+    bookingCode: booking.bookingCode,
+    flightNumber: booking.flight.flightNumber,
+    airlineName: booking.flight.airline.name,
+    originCity: booking.flight.origin.city,
+    destinationCity: booking.flight.destination.city,
+    departureTime: booking.flight.departureTime,
+    daysUntilDeparture
+  })
+
+  if (!sent) return
+
+  await prisma.booking.update({
+    where: { id: booking.id },
+    data: { transactionReminderSentAt: new Date() }
+  })
+}
 
 // Step 1: Create Booking with Passenger Data
 export const createBooking = async (req: AuthRequest, res: Response) => {
@@ -564,6 +631,7 @@ export const paymentNotification = async (req: any, res: Response) => {
         where: { id: payment.bookingId },
         data: { status: "PAID" }
       })
+      await sendTransactionReminderIfNeeded(payment.bookingId)
 
       // Update seat status
       await prisma.flightSeat.updateMany({
@@ -599,7 +667,7 @@ export const paymentNotification = async (req: any, res: Response) => {
           await sendBookingConfirmation(
             payment.booking.user.email,
             payment.booking.bookingCode,
-            `${process.env.FRONTEND_URL}/tickets/${ticket.id}`
+            `${process.env.FRONTEND_URL}/bookings/e-ticket/${encodeURIComponent(payment.booking.bookingCode)}?download=1`
           )
           console.log("📧 Confirmation email sent to:", payment.booking.user.email)
         } catch (emailError) {
@@ -696,6 +764,7 @@ export const syncPaymentStatus = async (req: AuthRequest, res: Response) => {
         where: { id: bookingId },
         data: { status: "PAID" }
       })
+      await sendTransactionReminderIfNeeded(bookingId)
 
       await prisma.flightSeat.updateMany({
         where: { bookingId },
@@ -723,7 +792,7 @@ export const syncPaymentStatus = async (req: AuthRequest, res: Response) => {
           await sendBookingConfirmation(
             booking.user.email,
             booking.bookingCode,
-            `${process.env.FRONTEND_URL}/tickets/${ticket.id}`
+            `${process.env.FRONTEND_URL}/bookings/e-ticket/${encodeURIComponent(booking.bookingCode)}?download=1`
           )
         } catch { /* silent */ }
       }
@@ -824,11 +893,13 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
 
     if (action === "markpaid") {
       await prisma.booking.update({ where: { id }, data: { status: "PAID" } })
+      await sendTransactionReminderIfNeeded(id)
       return res.json({ message: "Status berhasil diubah ke Paid" })
     }
 
     if (action === "markissued") {
       await prisma.booking.update({ where: { id }, data: { status: "PAID" } })
+      await sendTransactionReminderIfNeeded(id)
       if (!booking.ticket) {
         const ticketNumber = generateTicketNumber()
         const qrData = JSON.stringify({ ticketNumber, bookingCode: booking.bookingCode, flight: booking.flight.flightNumber })
@@ -846,6 +917,68 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
     return res.status(400).json({ message: "Action tidak valid" })
   } catch (error) {
     console.error("Update admin booking status error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+// Admin: Trigger manual "today reminder" email with departure day estimate
+export const triggerDepartureReminderByAdmin = async (req: AuthRequest, res: Response) => {
+  try {
+    const bookingId = parseInt(req.params.id as string)
+
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ message: "ID booking tidak valid" })
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        user: {
+          select: {
+            email: true,
+            name: true
+          }
+        },
+        flight: {
+          select: {
+            flightNumber: true,
+            departureTime: true,
+            airline: { select: { name: true } },
+            origin: { select: { city: true } },
+            destination: { select: { city: true } }
+          }
+        }
+      }
+    })
+
+    if (!booking) {
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" })
+    }
+
+    const daysUntilDeparture = getDaysUntilDeparture(booking.flight.departureTime)
+
+    const sent = await sendTodayDepartureReminderEmail({
+      email: booking.user.email,
+      name: booking.user.name,
+      bookingCode: booking.bookingCode,
+      flightNumber: booking.flight.flightNumber,
+      airlineName: booking.flight.airline.name,
+      originCity: booking.flight.origin.city,
+      destinationCity: booking.flight.destination.city,
+      departureTime: booking.flight.departureTime,
+      daysUntilDeparture
+    })
+
+    if (!sent) {
+      return res.status(500).json({ message: "Gagal mengirim email reminder hari ini" })
+    }
+
+    res.json({
+      message: "Email reminder hari ini berhasil dikirim",
+      bookingCode: booking.bookingCode
+    })
+  } catch (error) {
+    console.error("Trigger today reminder by admin error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

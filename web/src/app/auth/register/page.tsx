@@ -46,10 +46,23 @@ export default function RegisterPage() {
         password,
       });
 
-      const session = await loginWithApi({
+      const loginResult = await loginWithApi({
         email: email.trim().toLowerCase(),
         password,
       });
+
+      if ("requiresTwoFactor" in loginResult) {
+        const params = new URLSearchParams({
+          token: loginResult.twoFactorToken,
+          redirect: "/dashboard",
+          email: email.trim().toLowerCase(),
+        });
+        setMessage("Registrasi berhasil. Verifikasi 2FA diperlukan untuk login.");
+        router.push(`/auth/2fa?${params.toString()}`);
+        return;
+      }
+
+      const session = loginResult;
 
       setUserSession(
         {
@@ -57,6 +70,7 @@ export default function RegisterPage() {
           fullName: session.user.fullName,
           email: session.user.email,
           phoneNumber: session.user.phoneNumber,
+          twoFactorEnabled: session.user.twoFactorEnabled,
           role: session.user.role,
         },
         session.token,

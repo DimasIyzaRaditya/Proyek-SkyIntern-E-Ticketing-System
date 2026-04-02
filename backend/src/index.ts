@@ -11,11 +11,13 @@ import bookingRoutes from "./routes/booking.routes"
 import { getActivePromos } from "./controllers/promo.controller"
 import swaggerSpec from "./config/swagger"
 import { initializeBucket } from "./utils/minio"
+import { startDepartureReminderScheduler } from "./utils/departure-reminder"
 
 const app = express() // Instance utama aplikasi Express
 
 // Initialize Minio bucket
 initializeBucket().catch(console.error)
+startDepartureReminderScheduler()
 
 // CORS configuration
 app.use(cors({

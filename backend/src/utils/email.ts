@@ -15,6 +15,15 @@ const transporter = nodemailer.createTransport({
   }
 })
 
+const getETicketUrl = (bookingCode: string) => {
+  return `${process.env.FRONTEND_URL}/bookings/e-ticket/${encodeURIComponent(bookingCode)}`
+}
+
+const getETicketQrImageUrl = (bookingCode: string) => {
+  const eticketUrl = getETicketUrl(bookingCode)
+  return `https://quickchart.io/qr?size=220&text=${encodeURIComponent(eticketUrl)}`
+}
+
 export const sendResetPasswordEmail = async (
   email: string,
   resetToken: string,
@@ -142,6 +151,9 @@ export const sendBookingConfirmation = async (
       return
     }
 
+    const eticketUrl = ticketUrl || getETicketUrl(bookingCode)
+    const qrUrl = getETicketQrImageUrl(bookingCode)
+
     await transporter.sendMail({
       from: process.env.SMTP_FROM || "noreply@skyintern.com",
       to: email,
@@ -149,12 +161,253 @@ export const sendBookingConfirmation = async (
       html: `
         <h1>Booking Confirmed!</h1>
         <p>Your booking code: <strong>${bookingCode}</strong></p>
-        <p>Download your ticket: <a href="${ticketUrl}">Download</a></p>
+        <p>Lihat e-ticket Anda di link berikut:</p>
+        <p><a href="${eticketUrl}">${eticketUrl}</a></p>
+        <p>Scan QR berikut untuk membuka e-ticket lebih cepat:</p>
+        <p><img src="${qrUrl}" alt="QR E-Ticket ${bookingCode}" width="220" height="220" /></p>
       `
     })
     console.log(`✅ Booking confirmation email sent to ${email}`)
   } catch (error: any) {
     console.error("❌ Email send error:", error.message)
     // Don't throw error for booking confirmation, just log it
+  }
+}
+
+export const sendTwoFactorCodeEmail = async (
+  email: string,
+  name: string,
+  code: string
+) => {
+  try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️  SMTP not configured - 2FA code email not sent")
+      return
+    }
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || "noreply@skyintern.com",
+      to: email,
+      subject: "Kode Verifikasi Login (2FA) - SkyIntern",
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+          <div style="background: #2563eb; color: #ffffff; padding: 18px 20px;">
+            <h2 style="margin: 0; font-size: 20px;">Verifikasi Login SkyIntern</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p>Halo ${name || "Pengguna SkyIntern"},</p>
+            <p>Kami menerima permintaan login ke akun Anda. Masukkan kode berikut untuk melanjutkan:</p>
+            <div style="margin: 16px 0; padding: 14px; border-radius: 8px; background: #eff6ff; text-align: center;">
+              <span style="font-size: 30px; letter-spacing: 6px; font-weight: 700; color: #1d4ed8;">${code}</span>
+            </div>
+            <p style="margin: 0;">Kode berlaku selama <strong>10 menit</strong>.</p>
+            <p style="margin-top: 12px; color: #6b7280; font-size: 13px;">Jika Anda tidak merasa login, abaikan email ini dan segera ganti password akun Anda.</p>
+          </div>
+        </div>
+      `
+    })
+
+    console.log(`✅ 2FA code email sent to ${email}`)
+  } catch (error: any) {
+    console.error("❌ 2FA email send error:", error.message)
+  }
+}
+
+export const sendDepartureReminderEmail = async (payload: {
+  email: string
+  name: string
+  bookingCode: string
+  flightNumber: string
+  airlineName: string
+  originCity: string
+  destinationCity: string
+  departureTime: Date
+}) => {
+  try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️  SMTP not configured - departure reminder email not sent")
+      return false
+    }
+
+    const departureDate = new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "full",
+      timeStyle: "short"
+    }).format(payload.departureTime)
+
+    const eticketUrl = getETicketUrl(payload.bookingCode)
+    const qrUrl = getETicketQrImageUrl(payload.bookingCode)
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || "noreply@skyintern.com",
+      to: payload.email,
+      subject: `Pengingat Keberangkatan H-1 - ${payload.bookingCode}`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+          <div style="background: #0f766e; color: #ffffff; padding: 18px 20px;">
+            <h2 style="margin: 0; font-size: 20px;">Pengingat Keberangkatan H-1</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p>Halo ${payload.name || "Pengguna SkyIntern"},</p>
+            <p>Penerbangan Anda akan berangkat dalam kurang lebih 1 hari. Mohon pastikan seluruh dokumen perjalanan sudah siap.</p>
+
+            <div style="margin: 16px 0; padding: 14px; border-radius: 8px; background: #f0fdfa; border: 1px solid #99f6e4;">
+              <p style="margin: 0 0 6px 0;"><strong>Kode Booking:</strong> ${payload.bookingCode}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Maskapai:</strong> ${payload.airlineName}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Nomor Penerbangan:</strong> ${payload.flightNumber}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Rute:</strong> ${payload.originCity} → ${payload.destinationCity}</p>
+              <p style="margin: 0;"><strong>Waktu Berangkat:</strong> ${departureDate}</p>
+            </div>
+
+            <p style="margin: 0 0 6px 0;"><strong>Link E-Ticket:</strong> <a href="${eticketUrl}">${eticketUrl}</a></p>
+            <p style="margin: 10px 0 6px 0;">Scan QR untuk membuka e-ticket:</p>
+            <p style="margin: 0 0 14px 0;"><img src="${qrUrl}" alt="QR E-Ticket ${payload.bookingCode}" width="180" height="180" /></p>
+
+            <p style="margin: 0;">Datang lebih awal ke bandara untuk proses check-in dan pemeriksaan keamanan.</p>
+          </div>
+        </div>
+      `
+    })
+
+    console.log(`✅ Departure reminder email sent to ${payload.email} (${payload.bookingCode})`)
+    return true
+  } catch (error: any) {
+    console.error("❌ Departure reminder email send error:", error.message)
+    return false
+  }
+}
+
+export const sendNewTransactionReminderEmail = async (payload: {
+  email: string
+  name: string
+  bookingCode: string
+  flightNumber: string
+  airlineName: string
+  originCity: string
+  destinationCity: string
+  departureTime: Date
+  daysUntilDeparture: number
+}) => {
+  try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️  SMTP not configured - new transaction reminder email not sent")
+      return false
+    }
+
+    const departureDate = new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "full",
+      timeStyle: "short"
+    }).format(payload.departureTime)
+
+    const dayText = payload.daysUntilDeparture <= 0
+      ? "hari ini"
+      : `${payload.daysUntilDeparture} hari lagi`
+
+    const eticketUrl = getETicketUrl(payload.bookingCode)
+    const qrUrl = getETicketQrImageUrl(payload.bookingCode)
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || "noreply@skyintern.com",
+      to: payload.email,
+      subject: `Transaksi Baru Diterima - ${payload.bookingCode}`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+          <div style="background: #1d4ed8; color: #ffffff; padding: 18px 20px;">
+            <h2 style="margin: 0; font-size: 20px;">Transaksi Anda Berhasil Dicatat</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p>Halo ${payload.name || "Pengguna SkyIntern"},</p>
+            <p>Transaksi booking Anda sudah masuk ke sistem. Keberangkatan Anda diperkirakan <strong>${dayText}</strong>.</p>
+
+            <div style="margin: 16px 0; padding: 14px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe;">
+              <p style="margin: 0 0 6px 0;"><strong>Kode Booking:</strong> ${payload.bookingCode}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Maskapai:</strong> ${payload.airlineName}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Nomor Penerbangan:</strong> ${payload.flightNumber}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Rute:</strong> ${payload.originCity} → ${payload.destinationCity}</p>
+              <p style="margin: 0;"><strong>Waktu Berangkat:</strong> ${departureDate}</p>
+            </div>
+
+            <p style="margin: 0 0 6px 0;"><strong>Link E-Ticket:</strong> <a href="${eticketUrl}">${eticketUrl}</a></p>
+            <p style="margin: 10px 0 6px 0;">Scan QR untuk membuka e-ticket:</p>
+            <p style="margin: 0 0 14px 0;"><img src="${qrUrl}" alt="QR E-Ticket ${payload.bookingCode}" width="180" height="180" /></p>
+
+            <p style="margin: 0;">Kami juga akan mengirimkan pengingat tambahan mendekati hari keberangkatan Anda.</p>
+          </div>
+        </div>
+      `
+    })
+
+    console.log(`✅ New transaction reminder email sent to ${payload.email} (${payload.bookingCode})`)
+    return true
+  } catch (error: any) {
+    console.error("❌ New transaction reminder email send error:", error.message)
+    return false
+  }
+}
+
+export const sendTodayDepartureReminderEmail = async (payload: {
+  email: string
+  name: string
+  bookingCode: string
+  flightNumber: string
+  airlineName: string
+  originCity: string
+  destinationCity: string
+  departureTime: Date
+  daysUntilDeparture: number
+}) => {
+  try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️  SMTP not configured - today reminder email not sent")
+      return false
+    }
+
+    const departureDate = new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "full",
+      timeStyle: "short"
+    }).format(payload.departureTime)
+
+    const dayText = payload.daysUntilDeparture <= 0
+      ? "hari ini"
+      : `${payload.daysUntilDeparture} hari lagi`
+
+    const eticketUrl = getETicketUrl(payload.bookingCode)
+    const qrUrl = getETicketQrImageUrl(payload.bookingCode)
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || "noreply@skyintern.com",
+      to: payload.email,
+      subject: `Reminder Keberangkatan Hari Ini - ${payload.bookingCode}`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+          <div style="background: #1d4ed8; color: #ffffff; padding: 18px 20px;">
+            <h2 style="margin: 0; font-size: 20px;">Reminder Hari Ini</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p>Halo ${payload.name || "Pengguna SkyIntern"},</p>
+            <p>Ini adalah pengingat perjalanan Anda hari ini. Keberangkatan Anda diperkirakan <strong>${dayText}</strong>.</p>
+
+            <div style="margin: 16px 0; padding: 14px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe;">
+              <p style="margin: 0 0 6px 0;"><strong>Kode Booking:</strong> ${payload.bookingCode}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Maskapai:</strong> ${payload.airlineName}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Nomor Penerbangan:</strong> ${payload.flightNumber}</p>
+              <p style="margin: 0 0 6px 0;"><strong>Rute:</strong> ${payload.originCity} → ${payload.destinationCity}</p>
+              <p style="margin: 0;"><strong>Waktu Berangkat:</strong> ${departureDate}</p>
+            </div>
+
+            <p style="margin: 0 0 6px 0;"><strong>Link E-Ticket:</strong> <a href="${eticketUrl}">${eticketUrl}</a></p>
+            <p style="margin: 10px 0 6px 0;">Scan QR untuk membuka e-ticket:</p>
+            <p style="margin: 0 0 14px 0;"><img src="${qrUrl}" alt="QR E-Ticket ${payload.bookingCode}" width="180" height="180" /></p>
+
+            <p style="margin: 0;">Pastikan Anda datang lebih awal ke bandara untuk proses check-in dan pemeriksaan keamanan.</p>
+          </div>
+        </div>
+      `
+    })
+
+    console.log(`✅ Today departure reminder email sent to ${payload.email} (${payload.bookingCode})`)
+    return true
+  } catch (error: any) {
+    console.error("❌ Today departure reminder email send error:", error.message)
+    return false
   }
 }

@@ -8,7 +8,7 @@ import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
-import { getProfileFromApi, updateProfileFromApi, uploadAvatarToApi } from "@/lib/auth-api";
+import { getProfileFromApi, updateProfileFromApi, updateTwoFactorSettingFromApi, uploadAvatarToApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 export default function ProfilePage() {
@@ -17,9 +17,11 @@ export default function ProfilePage() {
   const [phoneNumber, setPhoneNumber] = useState(() => getUserSession()?.phoneNumber ?? "");
   const [avatarUrl, setAvatarUrl] = useState(() => getUserSession()?.avatarUrl ?? "");
   const [email, setEmail] = useState(() => getUserSession()?.email ?? "user@skyintern.com");
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(() => Boolean(getUserSession()?.twoFactorEnabled));
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTwoFactor, setSavingTwoFactor] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const showSkeleton = useMinDelay(loading);
@@ -42,6 +44,7 @@ export default function ProfilePage() {
         setPhoneNumber(profile.phoneNumber ?? "");
         setAvatarUrl(profile.avatarUrl ?? "");
         setEmail(profile.email);
+        setTwoFactorEnabled(Boolean(profile.twoFactorEnabled));
         setUserSession(profile);
       } catch {
         clearSession();
@@ -221,6 +224,40 @@ export default function ProfilePage() {
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Email</label>
                 <input value={email} readOnly className="w-full rounded-2xl border border-blue-100 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 sm:px-4 sm:py-3" />
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Two-Factor Authentication (2FA)</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Jika aktif, login memerlukan kode verifikasi yang dikirim ke email Anda.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingTwoFactor}
+                    onClick={async () => {
+                      setSavingTwoFactor(true);
+                      setMessage("");
+                      setSaved(false);
+
+                      try {
+                        const profile = await updateTwoFactorSettingFromApi({ enabled: !twoFactorEnabled });
+                        setTwoFactorEnabled(Boolean(profile.twoFactorEnabled));
+                        setUserSession(profile);
+                        setMessage(profile.twoFactorEnabled ? "2FA berhasil diaktifkan." : "2FA berhasil dinonaktifkan.");
+                      } catch (error) {
+                        setMessage(error instanceof Error ? error.message : "Gagal mengubah pengaturan 2FA.");
+                      } finally {
+                        setSavingTwoFactor(false);
+                      }
+                    }}
+                    className={`rounded-xl px-4 py-2 text-xs font-semibold transition sm:text-sm ${twoFactorEnabled ? "border border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+                  >
+                    {savingTwoFactor ? "Menyimpan..." : twoFactorEnabled ? "Nonaktifkan 2FA" : "Aktifkan 2FA"}
+                  </button>
+                </div>
               </div>
             </div>
 

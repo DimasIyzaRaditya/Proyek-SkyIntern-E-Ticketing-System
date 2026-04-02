@@ -11,7 +11,7 @@ import AdminShell from "@/components/AdminShell";
 import { formatRupiah } from "@/lib/currency";
 // Fungsi untuk mengubah angka menjadi format Rupiah
 
-import { getAdminBookings, updateAdminBookingStatus, type AdminBooking } from "@/lib/admin-api";
+import { getAdminBookings, updateAdminBookingStatus, sendAdminDepartureReminder, type AdminBooking } from "@/lib/admin-api";
 // Mengambil data booking dari API admin
 
 
@@ -109,6 +109,7 @@ export default function AdminTransactionsPage() {
 
   // status loading aksi edit
   const [actionLoading, setActionLoading] = useState(false);
+  const [notifyLoadingId, setNotifyLoadingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{id: string; text: string; ok: boolean} | null>(null);
 
   // konfirmasi sebelum ubah status
@@ -188,6 +189,28 @@ export default function AdminTransactionsPage() {
       });
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleSendManualNotification = async (item: TransactionItem) => {
+    setNotifyLoadingId(item.id);
+    setActionMessage(null);
+
+    try {
+      const response = await sendAdminDepartureReminder(Number(item.id));
+      setActionMessage({
+        id: item.id,
+        text: response.message || "Notifikasi berhasil dikirim.",
+        ok: true,
+      });
+    } catch (error) {
+      setActionMessage({
+        id: item.id,
+        text: error instanceof Error ? error.message : "Gagal mengirim notifikasi.",
+        ok: false,
+      });
+    } finally {
+      setNotifyLoadingId(null);
     }
   };
 
@@ -445,6 +468,18 @@ export default function AdminTransactionsPage() {
                                     </button>
                                   </div>
                                 )}
+                              </div>
+
+                              <div className="mt-4 border-t border-slate-100 pt-4">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Notifikasi Email</p>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendManualNotification(item)}
+                                  disabled={notifyLoadingId === item.id}
+                                  className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                                >
+                                  {notifyLoadingId === item.id ? "Mengirim..." : "Kirim Reminder Hari Ini"}
+                                </button>
                               </div>
                           </div>
                         </td>

@@ -9,7 +9,7 @@ import * as airlineController from "../controllers/airline.controller"
 import * as flightController from "../controllers/flight.controller"
 import * as seatController from "../controllers/seat.controller"
 import * as bookingController from "../controllers/booking.controller"
-import { getAllUsers, deleteUser, blockUser } from "../controllers/auth.controller"
+import { getAllUsers, deleteUser, blockUser, toggleUserTwoFactorByAdmin } from "../controllers/auth.controller"
 import * as promoController from "../controllers/promo.controller"
 
 const router = Router() // Router Express untuk semua route admin
@@ -390,6 +390,7 @@ router.post("/seats/generate", seatController.generateStandardSeats)
 // Booking & Transaction Management
 router.get("/bookings", bookingController.getAllBookingsAdmin)
 router.put("/bookings/:id/status", bookingController.updateAdminBookingStatus)
+router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDepartureReminderByAdmin)
 
 // User Management
 /**
@@ -431,6 +432,7 @@ router.put("/bookings/:id/status", bookingController.updateAdminBookingStatus)
  */
 router.get("/users", getAllUsers)
 router.put("/users/:id/block", blockUser)
+router.put("/users/:id/2fa", toggleUserTwoFactorByAdmin)
 
 /**
  * @swagger

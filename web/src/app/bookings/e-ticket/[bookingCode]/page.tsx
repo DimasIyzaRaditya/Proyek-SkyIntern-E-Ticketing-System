@@ -2,10 +2,11 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Plane } from "lucide-react";
 import MainNav from "@/components/MainNav";
+import { verifyBookingFromApi } from "@/lib/booking-api";
 
 const QRCode = dynamic(
   () => import("qrcode.react").then((m) => ({ default: m.QRCodeSVG })),
@@ -56,22 +57,172 @@ type ETicketData = {
 
 function ETicketContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const bookingCode = typeof params.bookingCode === "string" ? params.bookingCode : "";
+  const shouldAutoDownload = searchParams.get("download") === "1";
+  const hasTriggeredPrintRef = useRef(false);
+  const ticketRef = useRef<HTMLDivElement | null>(null);
 
   const [data, setData] = useState<ETicketData | null>(null);
   const [qrValue, setQrValue] = useState("");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = useCallback(async (useSaveAs: boolean = true) => {
+    if (!ticketRef.current || !bookingCode || isGeneratingPdf) return;
+
+    try {
+      setIsGeneratingPdf(true);
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas-pro"),
+        import("jspdf")
+      ]);
+
+      const canvas = await html2canvas(ticketRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false
+      });
+
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+      const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+      const renderWidth = canvas.width * ratio;
+      const renderHeight = canvas.height * ratio;
+      const offsetX = (pageWidth - renderWidth) / 2;
+      const offsetY = (pageHeight - renderHeight) / 2;
+
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
+      const defaultFileName = `SkyIntern E-ticketing-${bookingCode}.pdf`;
+      const pdfBlob = pdf.output("blob");
+
+      type WindowWithSavePicker = Window & {
+        showSaveFilePicker?: (options: {
+          suggestedName?: string;
+          types?: Array<{ description: string; accept: Record<string, string[]> }>;
+        }) => Promise<{
+          createWritable: () => Promise<{
+            write: (data: Blob) => Promise<void>;
+            close: () => Promise<void>;
+          }>;
+        }>;
+      };
+
+      const pickerWindow = window as WindowWithSavePicker;
+      if (useSaveAs && pickerWindow.showSaveFilePicker) {
+        try {
+          const fileHandle = await pickerWindow.showSaveFilePicker({
+            suggestedName: defaultFileName,
+            types: [
+              {
+                description: "PDF Document",
+                accept: { "application/pdf": [".pdf"] }
+              }
+            ]
+          });
+
+          const writable = await fileHandle.createWritable();
+          await writable.write(pdfBlob);
+          await writable.close();
+        } catch (error) {
+          // User canceled Save As dialog: treat as normal cancel, no fallback download.
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+
+          // If picker is blocked/not allowed, fallback to regular download.
+          pdf.save(defaultFileName);
+        }
+      } else {
+        // Fallback for browsers that don't support Save As picker
+        pdf.save(defaultFileName);
+      }
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [bookingCode, isGeneratingPdf]);
 
   useEffect(() => {
-    const raw = sessionStorage.getItem(`eticket_${bookingCode}`);
-    if (raw) {
-      try {
-        setData(JSON.parse(raw) as ETicketData);
-      } catch {
-        // ignore parse errors
+    let isMounted = true;
+
+    const loadData = async () => {
+      const raw = sessionStorage.getItem(`eticket_${bookingCode}`);
+      if (raw) {
+        try {
+          if (isMounted) {
+            setData(JSON.parse(raw) as ETicketData);
+          }
+        } catch {
+          // ignore parse errors
+        }
       }
-    }
-    setQrValue(`${window.location.origin}/bookings/verify?code=${encodeURIComponent(bookingCode)}`);
+
+      if (!raw && bookingCode) {
+        try {
+          const response = await verifyBookingFromApi(bookingCode);
+          const booking = response.booking;
+          const passenger = booking.passengers?.[0]
+            ? `${booking.passengers[0].firstName} ${booking.passengers[0].lastName}`.trim()
+            : "Passenger";
+
+          const fallbackData: ETicketData = {
+            passenger,
+            flightNumber: booking.flight.flightNumber,
+            seat: booking.selectedSeats ?? "-",
+            route: `${booking.flight.origin.city} → ${booking.flight.destination.city}`,
+            date: fmtDateEn(booking.flight.departureTime),
+            status: booking.status,
+            pdfUrl: "",
+            bookingCode: booking.bookingCode,
+            airline: booking.flight.airline.name,
+            departureIso: booking.flight.departureTime,
+            arrivalIso: booking.flight.arrivalTime,
+            originAirportName: booking.flight.origin.city,
+            destAirportName: booking.flight.destination.city,
+            originCity: booking.flight.origin.city,
+            destCity: booking.flight.destination.city,
+            pTitle: booking.passengers?.[0]?.title ?? "Mr",
+            pDocType: "",
+            pDocNumber: "",
+            totalPrice: "",
+          };
+
+          if (isMounted) {
+            setData(fallbackData);
+          }
+        } catch {
+          // keep null data to show fallback message
+        }
+      }
+
+      if (isMounted) {
+        setQrValue(`${window.location.origin}/bookings/verify?code=${encodeURIComponent(bookingCode)}`);
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [bookingCode]);
+
+  useEffect(() => {
+    if (!shouldAutoDownload || !data || hasTriggeredPrintRef.current) return;
+
+    hasTriggeredPrintRef.current = true;
+    const timer = setTimeout(() => {
+      // Auto download from email should skip Save As picker (no user gesture context).
+      void handleDownloadPdf(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [shouldAutoDownload, data, handleDownloadPdf]);
 
   if (!data) {
     return (
@@ -96,9 +247,41 @@ function ETicketContent() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            overflow: hidden !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .ticket-doc,
+          .ticket-doc * {
+            visibility: visible !important;
+          }
           body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .ticket-wrap { padding: 0 !important; background: white !important; min-height: 0 !important; }
-          .ticket-doc { box-shadow: none !important; border: none !important; max-width: 100% !important; margin: 0 auto !important; zoom: 0.82; break-inside: avoid; page-break-inside: avoid; }
+          .ticket-wrap {
+            display: flex !important;
+            align-items: flex-start !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            background: white !important;
+            min-height: 0 !important;
+          }
+          .ticket-doc {
+            position: absolute !important;
+            top: 0 !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            box-shadow: none !important;
+            border: none !important;
+            width: 270mm !important;
+            max-width: 270mm !important;
+            margin: 0 auto !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
           .brand-wave { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .ticket-watermark {
             display: flex !important;
@@ -111,7 +294,7 @@ function ETicketContent() {
             print-color-adjust: exact !important;
           }
         }
-        @page { margin: 5mm 10mm; size: A4; }
+        @page { margin: 8mm; size: A4 landscape; }
         .brand-wave {
           background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #60a5fa 100%);
           clip-path: ellipse(85% 100% at 100% 0%);
@@ -144,7 +327,7 @@ function ETicketContent() {
 
       <main className="ticket-wrap min-h-screen bg-gray-100 px-4 py-8 print:bg-white print:p-0">
         {/* Top nav bar */}
-        <div className="no-print mx-auto mb-5 flex max-w-2xl items-center justify-between">
+        <div className="no-print mx-auto mb-3 flex max-w-245 items-center justify-between">
           <Link
             href="/bookings"
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-600 shadow-sm transition hover:bg-gray-50"
@@ -152,15 +335,20 @@ function ETicketContent() {
             <ArrowLeft className="h-3.5 w-3.5" /> Kembali
           </Link>
           <button
-            onClick={() => window.print()}
+            onClick={() => void handleDownloadPdf()}
+            disabled={isGeneratingPdf}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
           >
-            <Download className="h-3.5 w-3.5" /> Unduh PDF
+            <Download className="h-3.5 w-3.5" /> {isGeneratingPdf ? "Membuat PDF..." : "Unduh PDF"}
           </button>
         </div>
 
+        <div className="no-print mx-auto mb-4 max-w-245 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-800">
+          Jangan lupa untuk membawa e-tiket ini dan identitas yang valid saat check-in di bandara. Selamat menikmati penerbangan Anda!
+        </div>
+
         {/* ── Ticket Document ── */}
-        <div className="ticket-doc relative mx-auto max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+        <div ref={ticketRef} className="ticket-doc relative mx-auto max-w-245 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
 
           {/* Diagonal watermark – visible on screen & PDF */}
           <div className="ticket-watermark" aria-hidden="true">
@@ -168,12 +356,12 @@ function ETicketContent() {
           </div>
 
           {/* ── Section 1: Header ── */}
-          <div className="relative flex items-start justify-between px-8 pt-7 pb-5 overflow-hidden">
+          <div className="relative flex items-start justify-between overflow-hidden px-7 pb-4 pt-5">
             <div>
               <p className="text-2xl font-bold text-gray-900 leading-tight">E-ticket</p>
               <p className="text-sm text-gray-500 mt-0.5">Penerbangan Pergi / <span className="italic">Departure Flight</span></p>
             </div>
-            <div className="brand-wave absolute top-0 right-0 h-24 w-52 flex items-start justify-end">
+            <div className="brand-wave absolute right-0 top-0 flex h-20 w-56 items-start justify-end">
               <div className="flex items-center gap-1.5 text-white mt-4 mr-5">
                 <Plane className="h-4 w-4 shrink-0" />
                 <span className="text-base font-bold tracking-wide whitespace-nowrap">SkyIntern</span>
@@ -184,7 +372,7 @@ function ETicketContent() {
           <div className="mx-8 border-t border-gray-200" />
 
           {/* ── Section 2: Flight Info ── */}
-          <div className="grid grid-cols-1 gap-0 px-8 py-5 sm:grid-cols-[auto_1fr_auto] sm:gap-8">
+          <div className="grid grid-cols-1 gap-0 px-7 py-4 sm:grid-cols-[auto_1fr_auto] sm:gap-8">
 
             {/* Airline */}
             <div className="mb-4 flex flex-row items-center gap-3 sm:mb-0 sm:flex-col sm:items-start sm:justify-start sm:w-32">
@@ -200,16 +388,16 @@ function ETicketContent() {
 
             {/* Route timeline */}
             <div className="flex-1">
-              <p className="mb-3 text-sm font-semibold text-gray-700">
+              <p className="mb-2 text-sm font-semibold text-gray-700">
                 {departureIso ? fmtDateEn(departureIso) : date}
               </p>
               <div className="flex items-start gap-3">
                 <div className="flex flex-col items-center pt-1.5">
                   <div className="h-3 w-3 rounded-full bg-blue-600 border-2 border-blue-600" />
-                  <div className="w-px flex-1 bg-blue-200 my-1" style={{ minHeight: "2.5rem" }} />
+                  <div className="my-1 w-px flex-1 bg-blue-200" style={{ minHeight: "2.1rem" }} />
                   <div className="h-3 w-3 rounded-full border-2 border-blue-500 bg-white" />
                 </div>
-                <div className="flex flex-col gap-6 flex-1">
+                <div className="flex flex-1 flex-col gap-4">
                   <div>
                     <div className="flex items-baseline gap-2">
                       <span className="text-xl font-black tabular-nums text-gray-900">
@@ -256,7 +444,7 @@ function ETicketContent() {
           <div className="mx-8 border-t border-gray-200" />
 
           {/* ── Section 3: Tips ── */}
-          <div className="grid grid-cols-1 gap-4 px-8 py-5 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 px-7 py-4 sm:grid-cols-3">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 text-base">
                 📋
@@ -286,7 +474,7 @@ function ETicketContent() {
           <div className="mx-8 border-t border-gray-200" />
 
           {/* ── Section 4: Passenger Table ── */}
-          <div className="px-8 py-5">
+          <div className="px-7 py-4">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
@@ -310,7 +498,7 @@ function ETicketContent() {
           <div className="mx-8 border-t border-gray-200" />
 
           {/* ── Section 5: QR Code ── */}
-          <div className="flex flex-col items-center gap-5 px-8 py-6 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-center gap-4 px-7 py-4 sm:flex-row sm:items-center">
             <div className="shrink-0 border border-gray-200 bg-white p-2">
               {qrValue ? (
                 <QRCode value={qrValue} size={96} level="M" includeMargin={false} />

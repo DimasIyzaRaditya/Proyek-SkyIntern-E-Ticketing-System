@@ -4,6 +4,7 @@ export type UserSession = {
   email: string;
   phoneNumber?: string;
   avatarUrl?: string;
+  twoFactorEnabled?: boolean;
   role: "user" | "admin";
 };
 

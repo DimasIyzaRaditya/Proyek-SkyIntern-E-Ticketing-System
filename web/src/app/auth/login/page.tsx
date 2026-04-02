@@ -33,10 +33,25 @@ function LoginPageContent() {
     setMessage("");
 
     try {
-      const session = await loginWithApi({
+      const loginResult = await loginWithApi({
         email: email.trim().toLowerCase(),
         password,
       });
+
+      if ("requiresTwoFactor" in loginResult) {
+        setIsError(false);
+        setMessage("Kode verifikasi 2FA dikirim ke email Anda. Mengarahkan...");
+        setRedirecting(true);
+        const params = new URLSearchParams({
+          token: loginResult.twoFactorToken,
+          redirect: redirectTarget,
+          email: email.trim().toLowerCase(),
+        });
+        router.push(`/auth/2fa?${params.toString()}`);
+        return;
+      }
+
+      const session = loginResult;
 
       setUserSession(
         {
@@ -44,6 +59,7 @@ function LoginPageContent() {
           fullName: session.user.fullName,
           email: session.user.email,
           phoneNumber: session.user.phoneNumber,
+          twoFactorEnabled: session.user.twoFactorEnabled,
           role: session.user.role,
         },
         session.token,
