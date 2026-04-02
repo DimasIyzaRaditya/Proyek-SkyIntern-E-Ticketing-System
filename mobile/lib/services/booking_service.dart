@@ -68,6 +68,7 @@ class BookingService {
   }
 
   static Future<Map<String, dynamic>> verifyBooking(String code) async {
-    return await ApiClient.get('/api/bookings/verify?code=$code');
+    final normalizedCode = Uri.encodeQueryComponent(code.trim());
+    return await ApiClient.get('/api/bookings/verify?code=$normalizedCode');
   }
 }

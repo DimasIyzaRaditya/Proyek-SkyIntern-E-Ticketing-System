@@ -2,8 +2,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ApiClient {
-  // ─── Ganti IP di sini sesuai komputer kamu ───────────────────────────────
-  static const String _physicalDeviceIp = '192.168.18.39'; // ← ubah ini
+  // ─── Ganti IP di sini sesuai IP laptop/server di jaringan Wi-Fi ────────
+  static const String _physicalDeviceIp = '192.168.18.38'; // IP laptop
   // ─────────────────────────────────────────────────────────────────────────
 
   // Ganti _usePhysicalDevice ke true saat run di HP, false saat di emulator/PC

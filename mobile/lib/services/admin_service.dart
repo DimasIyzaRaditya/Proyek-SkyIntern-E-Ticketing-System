@@ -304,4 +304,74 @@ class AdminService {
     );
     return (res['user'] as Map<String, dynamic>?)?['isBlocked'] as bool? ?? false;
   }
+
+  // ─── Promos ───────────────────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getPromos() async {
+    final res = await ApiClient.get('/api/admin/promos', requireAuth: true);
+    final list = res['promos'] as List<dynamic>? ?? [];
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  static Future<Map<String, dynamic>> createPromo({
+    required String title,
+    String? description,
+    int discount = 0,
+    required String startDate,
+    required String endDate,
+    bool isActive = true,
+    int? flightId,
+  }) async {
+    final res = await ApiClient.post(
+      '/api/admin/promos',
+      body: {
+        'title': title,
+        if (description != null && description.trim().isNotEmpty)
+          'description': description.trim(),
+        'discount': discount,
+        'startDate': startDate,
+        'endDate': endDate,
+        'isActive': isActive,
+        'flightId': flightId,
+      },
+      requireAuth: true,
+    );
+    return Map<String, dynamic>.from(res['promo'] as Map);
+  }
+
+  static Future<Map<String, dynamic>> updatePromo({
+    required int id,
+    String? title,
+    String? description,
+    int? discount,
+    String? startDate,
+    String? endDate,
+    bool? isActive,
+    int? flightId,
+    bool includeFlightId = false,
+  }) async {
+    final payload = <String, dynamic>{
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (discount != null) 'discount': discount,
+      if (startDate != null) 'startDate': startDate,
+      if (endDate != null) 'endDate': endDate,
+      if (isActive != null) 'isActive': isActive,
+    };
+
+    if (includeFlightId) {
+      payload['flightId'] = flightId;
+    }
+
+    final res = await ApiClient.put(
+      '/api/admin/promos/$id',
+      body: payload,
+      requireAuth: true,
+    );
+    return Map<String, dynamic>.from(res['promo'] as Map);
+  }
+
+  static Future<void> deletePromo(int id) async {
+    await ApiClient.delete('/api/admin/promos/$id', requireAuth: true);
+  }
 }

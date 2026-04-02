@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 class LocalStorage {
   static const String userKey = 'skyintern_user';
   static const String tokenKey = 'skyintern_token';
+  static const String recentAccountsKey = 'skyintern_recent_accounts';
 
   static Future<void> saveUser(UserSession user, String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,6 +35,62 @@ class LocalStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(userKey);
     await prefs.remove(tokenKey);
+  }
+
+  static Future<void> saveRecentAccount(UserSession user) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(recentAccountsKey);
+    final decoded = raw == null
+        ? <dynamic>[]
+        : (json.decode(raw) as List<dynamic>);
+
+    final normalized = decoded
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
+    normalized.removeWhere(
+      (a) => (a['email'] ?? '').toString().toLowerCase() == user.email.toLowerCase(),
+    );
+
+    normalized.insert(0, {
+      'email': user.email,
+      'fullName': user.fullName,
+      'role': user.role,
+      'avatarUrl': user.avatarUrl,
+    });
+
+    if (normalized.length > 5) {
+      normalized.removeRange(5, normalized.length);
+    }
+
+    await prefs.setString(recentAccountsKey, json.encode(normalized));
+  }
+
+  static Future<List<Map<String, dynamic>>> getRecentAccounts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(recentAccountsKey);
+    if (raw == null) return [];
+
+    try {
+      final list = json.decode(raw) as List<dynamic>;
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> removeRecentAccount(String email) async {
+    final accounts = await getRecentAccounts();
+    accounts.removeWhere(
+      (a) => (a['email'] ?? '').toString().toLowerCase() == email.toLowerCase(),
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(recentAccountsKey, json.encode(accounts));
   }
 }
 

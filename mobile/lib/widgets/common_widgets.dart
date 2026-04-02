@@ -22,10 +22,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        color: AppColors.navSurface,
         boxShadow: [
           BoxShadow(
-            color: Color(0x222563EB),
+            color: Color(0x1F1F3A5F),
             blurRadius: 12,
             offset: Offset(0, 4),
           ),
@@ -126,16 +126,9 @@ class _PrimaryButtonState extends State<PrimaryButton>
           width: widget.width ?? double.infinity,
           height: 52,
           decoration: BoxDecoration(
-            gradient: _disabled || widget.color != null
-                ? null
-                : const LinearGradient(
-                    colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
             color: _disabled
                 ? const Color(0xFFD1D5DB)
-                : widget.color,
+                : (widget.color ?? AppColors.primary),
             borderRadius: BorderRadius.circular(12),
             boxShadow: _disabled
                 ? []

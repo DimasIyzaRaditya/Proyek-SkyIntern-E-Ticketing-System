@@ -70,6 +70,7 @@ class AuthProvider extends ChangeNotifier {
       final user = await AuthService.getProfile();
       _user = user;
       await LocalStorage.saveUser(_user!, _token!);
+      await LocalStorage.saveRecentAccount(_user!);
       _isLoading = false;
       notifyListeners();
     } catch (e) {

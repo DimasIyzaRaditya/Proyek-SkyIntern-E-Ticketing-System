@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/formatters.dart';
 import '../utils/helpers.dart';
 import '../widgets/common_widgets.dart';
 
@@ -16,8 +17,10 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _passFocus = FocusNode();
   bool _showPass = false;
   String? _loginError;
+  List<Map<String, dynamic>> _recentAccounts = const [];
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -34,6 +37,18 @@ class _LoginScreenState extends State<LoginScreen>
     _animCtrl.forward();
     _emailCtrl.addListener(_clearError);
     _passCtrl.addListener(_clearError);
+    _loadRecentAccounts();
+  }
+
+  Future<void> _loadRecentAccounts() async {
+    final accounts = await LocalStorage.getRecentAccounts();
+    if (!mounted) return;
+    setState(() => _recentAccounts = accounts);
+  }
+
+  Future<void> _removeRecentAccount(String email) async {
+    await LocalStorage.removeRecentAccount(email);
+    await _loadRecentAccounts();
   }
 
   void _clearError() {
@@ -46,6 +61,7 @@ class _LoginScreenState extends State<LoginScreen>
     _passCtrl.removeListener(_clearError);
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _passFocus.dispose();
     _animCtrl.dispose();
     super.dispose();
   }
@@ -186,6 +202,74 @@ class _LoginScreenState extends State<LoginScreen>
                                     fontSize: 13,
                                     color: AppColors.textSecondary),
                               ),
+                              if (_recentAccounts.isNotEmpty) ...[
+                                const SizedBox(height: 18),
+                                const Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Beralih Akun Cepat',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                ..._recentAccounts.map(
+                                  (account) {
+                                    final email = (account['email'] ?? '').toString();
+                                    final name = (account['fullName'] ?? '').toString();
+                                    final role = (account['role'] ?? 'user').toString();
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceVariant,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppColors.border),
+                                      ),
+                                      child: ListTile(
+                                        dense: true,
+                                        leading: CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: AppColors.primaryLight,
+                                          child: Text(
+                                            StringHelper.getInitials(name.isEmpty ? 'U' : name),
+                                            style: const TextStyle(
+                                              color: AppColors.primaryDark,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        title: Text(
+                                          name.isEmpty ? email : name,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '$email • ${role == 'admin' ? 'Admin' : 'User'}',
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                        onTap: () {
+                                          _emailCtrl.text = email;
+                                          _passCtrl.clear();
+                                          FocusScope.of(context).requestFocus(_passFocus);
+                                        },
+                                        trailing: IconButton(
+                                          tooltip: 'Hapus dari daftar',
+                                          icon: const Icon(Icons.close_rounded, size: 18),
+                                          onPressed: () => _removeRecentAccount(email),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                               const SizedBox(height: 28),
 
                               InputField(
@@ -217,6 +301,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   onPressed: () =>
                                       setState(() => _showPass = !_showPass),
                                 ),
+                                focusNode: _passFocus,
                                 textInputAction: TextInputAction.done,
                                 onFieldSubmitted: (_) => _handleLogin(),
                               ),

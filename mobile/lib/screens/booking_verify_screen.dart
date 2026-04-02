@@ -18,6 +18,26 @@ class _BookingVerifyScreenState extends State<BookingVerifyScreen> {
   Map<String, dynamic>? _booking;
   String _code = '';
 
+  String _extractCodeFromInput(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasScheme) {
+      final queryCode = uri.queryParameters['code'];
+      if (queryCode != null && queryCode.trim().isNotEmpty) {
+        return queryCode.trim();
+      }
+    }
+
+    final codeMatch = RegExp(r'[?&]code=([^&#]+)', caseSensitive: false).firstMatch(trimmed);
+    if (codeMatch != null) {
+      return Uri.decodeQueryComponent(codeMatch.group(1) ?? '').trim();
+    }
+
+    return trimmed;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -25,9 +45,9 @@ class _BookingVerifyScreenState extends State<BookingVerifyScreen> {
     _isInitialized = true;
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, dynamic>) {
-      _code = args['code']?.toString() ?? '';
+      _code = _extractCodeFromInput(args['code']?.toString() ?? '');
     } else if (args is String) {
-      _code = args;
+      _code = _extractCodeFromInput(args);
     }
     _loadBooking();
   }

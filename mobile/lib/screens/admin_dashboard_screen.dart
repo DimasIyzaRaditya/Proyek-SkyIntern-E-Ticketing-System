@@ -44,12 +44,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final isWide = MediaQuery.of(context).size.width > 600;
 
     final menus = [
-      {'label': 'Maskapai', 'icon': Icons.flight_rounded, 'gradient': AppColors.primaryGradient, 'route': '/admin/airlines'},
-      {'label': 'Bandara', 'icon': Icons.location_city_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF0EA5E9)]), 'route': '/admin/airports'},
-      {'label': 'Jadwal', 'icon': Icons.schedule_rounded, 'gradient': const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]), 'route': '/admin/schedules'},
-      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]), 'route': '/admin/seats'},
-      {'label': 'Transaksi', 'icon': Icons.receipt_long_rounded, 'gradient': const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFF59E0B)]), 'route': '/admin/transactions'},
-      {'label': 'Pengguna', 'icon': Icons.group_rounded, 'gradient': const LinearGradient(colors: [Color(0xFF0D9488), Color(0xFF6366F1)]), 'route': '/admin/users'},
+      {'label': 'Maskapai', 'icon': Icons.flight_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/airlines'},
+      {'label': 'Bandara', 'icon': Icons.location_city_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/airports'},
+      {'label': 'Jadwal', 'icon': Icons.schedule_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/schedules'},
+      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/seats'},
+      {'label': 'Transaksi', 'icon': Icons.receipt_long_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/transactions'},
+      {'label': 'Pengguna', 'icon': Icons.group_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/users'},
+      {'label': 'Promo', 'icon': Icons.local_offer_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/promos'},
     ];
 
     return Scaffold(
@@ -58,9 +59,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
           decoration: const BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            color: AppColors.navSurface,
             boxShadow: [
-              BoxShadow(color: Color(0x221A56DB), blurRadius: 12, offset: Offset(0, 4))
+              BoxShadow(color: Color(0x1F1F3A5F), blurRadius: 12, offset: Offset(0, 4))
             ],
           ),
           child: AppBar(
@@ -70,6 +71,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             title: const Text('Admin Panel',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.switch_account_rounded, color: Colors.white),
+                tooltip: 'Beralih Akun',
+                onPressed: () => _switchAccount(),
+              ),
               IconButton(
                 icon: const Icon(Icons.logout_rounded, color: Colors.white),
                 tooltip: 'Keluar',
@@ -213,7 +219,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.search_rounded,
@@ -247,6 +253,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _switchAccount() async {
+    await context.read<AuthProvider>().logout();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   void _showLogoutDialog(BuildContext context) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../models/booking_model.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/admin_service.dart';
@@ -144,6 +145,40 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
     }
   }
 
+  Booking _toBookingModel(Map<String, dynamic> booking) {
+    final safe = Map<String, dynamic>.from(booking);
+
+    final userFlight = Map<String, dynamic>.from((safe['flight'] as Map?) ?? {});
+    final passengers = (safe['passengers'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        <Map<String, dynamic>>[];
+
+    final normalizedPassengers = passengers
+        .map((p) => {
+              'firstName': (p['firstName'] ?? '').toString(),
+              'lastName': (p['lastName'] ?? '').toString(),
+              'type': (p['type'] ?? 'ADULT').toString(),
+            })
+        .toList();
+
+    return Booking.fromJson({
+      'id': (safe['id'] as num?)?.toInt() ?? 0,
+      'flightId': (safe['flightId'] as num?)?.toInt() ?? 0,
+      'bookingCode': (safe['bookingCode'] ?? '').toString(),
+      'status': (safe['status'] ?? 'PENDING').toString(),
+      'createdAt': (safe['createdAt'] ?? '').toString(),
+      'flight': userFlight,
+      'passengers': normalizedPassengers,
+      'ticket': safe['ticket'],
+    });
+  }
+
+  void _openETicket(Map<String, dynamic> booking) {
+    final model = _toBookingModel(booking);
+    Navigator.of(context).pushNamed('/e-ticket', arguments: {'booking': model});
+  }
+
   void _showDetailDialog(Map<String, dynamic> booking) {
     final user = booking['user'] as Map<String, dynamic>?;
     final flight = booking['flight'] as Map<String, dynamic>?;
@@ -251,6 +286,15 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
           ),
         ),
         actions: [
+          if (booking['ticket'] != null)
+            TextButton.icon(
+              icon: const Icon(Icons.airplane_ticket_rounded, size: 16, color: AppColors.primary),
+              label: const Text('Lihat E-Tiket', style: TextStyle(color: AppColors.primary)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openETicket(booking);
+              },
+            ),
           if (actions.isNotEmpty)
             ...actions.map((a) => TextButton.icon(
                   icon: Icon(a.icon, size: 16, color: a.color),
@@ -580,6 +624,12 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
                                                   _doAction(
                                                       b['id'].toString(),
                                                       action),
+                                            ),
+                                          if (b['ticket'] != null)
+                                            IconButton(
+                                              tooltip: 'Lihat E-Tiket',
+                                              icon: const Icon(Icons.airplane_ticket_outlined, color: AppColors.primary),
+                                              onPressed: () => _openETicket(b),
                                             ),
                                         ],
                                       ),

@@ -28,6 +28,7 @@ import 'screens/admin_users_screen.dart';
 import 'screens/admin_schedules_screen.dart';
 import 'screens/admin_seats_screen.dart';
 import 'screens/admin_transactions_screen.dart';
+import 'screens/admin_promos_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -167,6 +168,8 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
       page = AdminGuard(child: AdminSeatsScreen(flight: flightArg));
     case '/admin/transactions':
       page = const AdminGuard(child: AdminTransactionsScreen());
+    case '/admin/promos':
+      page = const AdminGuard(child: AdminPromosScreen());
     default:
       if (settings.name?.startsWith('/reset-password') == true) {
         final uri = Uri.parse(settings.name ?? '');

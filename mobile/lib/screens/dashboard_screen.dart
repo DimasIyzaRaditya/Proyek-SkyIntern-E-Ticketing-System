@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
+import '../services/promo_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
@@ -18,6 +19,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
+  List<PromoItem> _promos = const [];
+  bool _promoLoading = false;
 
   @override
   void initState() {
@@ -36,10 +39,26 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _loadData() async {
     try {
-      await context.read<BookingProvider>().loadBookings();
+      setState(() => _promoLoading = true);
+      await Future.wait([
+        context.read<BookingProvider>().loadBookings(),
+        _loadPromos(),
+      ]);
     } catch (_) {
       if (mounted) showSnackBar(context, 'Gagal memuat data', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _promoLoading = false);
+      }
     }
+  }
+
+  Future<void> _loadPromos() async {
+    final promos = await PromoService.getActivePromos();
+    if (!mounted) return;
+    setState(() {
+      _promos = promos.take(5).toList();
+    });
   }
 
   Animation<double> _fade(double start, double end) => CurvedAnimation(
@@ -103,6 +122,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: SlideTransition(
                     position: _slide(0.3, 0.75),
                     child: _buildStats(isWide)),
+              ),
+              const SizedBox(height: 20),
+
+              // Promo section (parity with web dashboard)
+              FadeTransition(
+                opacity: _fade(0.37, 0.82),
+                child: SlideTransition(
+                  position: _slide(0.37, 0.82),
+                  child: _buildPromoSection(isWide),
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -177,6 +206,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 onSelected: (v) {
                   if (v == 'profile') Navigator.pushNamed(context, '/edit-profile');
                   if (v == 'bookings') Navigator.pushNamed(context, '/bookings');
+                  if (v == 'switch-account') _switchAccount();
                   if (v == 'logout') _showLogoutDialog();
                 },
                 itemBuilder: (_) => [
@@ -197,6 +227,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ]),
                   ),
                   const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'switch-account',
+                    child: Row(children: [
+                      Icon(Icons.switch_account_rounded, size: 20, color: AppColors.primary),
+                      SizedBox(width: 10),
+                      Text('Beralih Akun')
+                    ]),
+                  ),
                   const PopupMenuItem(
                     value: 'logout',
                     child: Row(children: [
@@ -301,15 +339,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       {
         'label': 'Booking Saya',
         'icon': Icons.confirmation_number_outlined,
-        'gradient': const LinearGradient(
-            colors: [Color(0xFF10B981), Color(0xFF2563EB)]),
+        'gradient': AppColors.cardGradient,
         'route': '/bookings',
       },
       {
         'label': 'Edit Profil',
         'icon': Icons.person_outline_rounded,
-        'gradient': const LinearGradient(
-            colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
+        'gradient': AppColors.warmGradient,
         'route': '/edit-profile',
       },
     ];
@@ -398,21 +434,192 @@ class _DashboardScreenState extends State<DashboardScreen>
                         label: 'Aktif',
                         value: '$active',
                         icon: Icons.schedule_rounded,
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]))),
+                        gradient: AppColors.cardGradient)),
                 const SizedBox(width: 10),
                 Expanded(
                     child: StatCard(
                         label: 'Selesai',
                         value: '$done',
                         icon: Icons.check_circle_outline_rounded,
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF2563EB)]))),
+                        gradient: AppColors.warmGradient)),
               ],
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildPromoSection(bool isWide) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(
+          title: 'Promo Aktif',
+          subtitle: 'Promo tampil seperti iklan untuk user',
+        ),
+        const SizedBox(height: 12),
+        if (_promoLoading)
+          ...List.generate(
+            2,
+            (_) => const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: ShimmerBox(width: double.infinity, height: 84, borderRadius: 14),
+            ),
+          ),
+        if (!_promoLoading && _promos.isEmpty)
+          const GlassCard(
+            padding: EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Icon(Icons.local_offer_outlined, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Belum ada promo aktif saat ini.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (!_promoLoading && _promos.isNotEmpty)
+          SizedBox(
+            height: isWide ? 170 : 160,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _promos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, i) {
+                final promo = _promos[i];
+                final until = promo.endDate != null
+                    ? DateFormatter.formatDate(promo.endDate!)
+                    : null;
+
+                return SizedBox(
+                  width: isWide ? 360 : 300,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        if (promo.isFlightPromo &&
+                            promo.flightId != null &&
+                            promo.flightId!.isNotEmpty) {
+                          Navigator.pushNamed(
+                            context,
+                            '/flight-detail',
+                            arguments: {
+                              'flightId': promo.flightId,
+                              'origin': promo.origin ?? '',
+                              'destination': promo.destination ?? '',
+                              'adults': 1,
+                              'children': 0,
+                            },
+                          );
+                          return;
+                        }
+
+                        Navigator.pushNamed(context, '/search');
+                      },
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x1F1F3A5F),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            )
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'HEMAT ${promo.discount}%',
+                                      style: const TextStyle(
+                                        color: AppColors.primaryDark,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(
+                                    promo.isFlightPromo
+                                        ? Icons.flight_takeoff_rounded
+                                        : Icons.public_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                promo.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              if ((promo.description ?? '').trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  promo.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFEAF1FF),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              Text(
+                                promo.sourceLabel ?? 'Promo SkyIntern',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              if (until != null)
+                                Text(
+                                  'Berlaku sampai $until',
+                                  style: const TextStyle(
+                                    color: Color(0xFFDCE7FF),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 
@@ -512,6 +719,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         );
       },
     );
+  }
+
+  Future<void> _switchAccount() async {
+    await context.read<AuthProvider>().logout();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   void _showLogoutDialog() {

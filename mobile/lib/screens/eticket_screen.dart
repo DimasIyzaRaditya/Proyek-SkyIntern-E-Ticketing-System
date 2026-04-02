@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/booking_model.dart';
+import '../services/api_client.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 
@@ -212,6 +213,10 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
   }
 
   Widget _buildQrSection(Booking booking) {
+    // Generate shareable link that points to the e-ticket verify page.
+    final webBase = ApiClient.baseUrl.replaceFirst(':3000', ':3001');
+    final qrLink = '$webBase/bookings/verify?code=${Uri.encodeComponent(booking.bookingCode)}';
+
     return Card(
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -223,7 +228,7 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             QrImageView(
-              data: booking.bookingCode,
+              data: qrLink,
               version: QrVersions.auto,
               size: 200,
               backgroundColor: Colors.white,
@@ -234,6 +239,15 @@ class ETicketScreen extends StatelessWidget {  const ETicketScreen({super.key});
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 3)),
+            const SizedBox(height: 8),
+            SelectableText(
+              qrLink,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 4),
             Text('Tunjukkan QR code ini kepada petugas bandara',
                 style: const TextStyle(

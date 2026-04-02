@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 
 // ─── Color Palette — Modern Minimalist ───────────────────────────────────────
 class AppColors {
-  // ── Primary Brand Blue ─────────────────────────────────────────────────────
-  static const Color primary      = Color(0xFF2563EB); // blue-600
-  static const Color primaryDark  = Color(0xFF1E40AF); // blue-800
-  static const Color primaryLight = Color(0xFFEFF6FF); // blue-50 (tint chips)
+  // Core palette: navy, blue, and clean light surface.
+  static const Color primary      = Color(0xFF2563EB);
+  static const Color primaryDark  = Color(0xFF1F3A5F);
+  static const Color primaryLight = Color(0xFFEAF1FF);
 
   // ── Secondary — slate indigo ───────────────────────────────────────────────
-  static const Color secondary     = Color(0xFF1E40AF);
-  static const Color secondaryDark = Color(0xFF1E3A5F);
+  static const Color secondary     = Color(0xFF1F3A5F);
+  static const Color secondaryDark = Color(0xFF1F3A5F);
 
   // ── Accent ────────────────────────────────────────────────────────────────
-  static const Color accent      = Color(0xFF38BDF8); // sky-400
-  static const Color accentLight = Color(0xFFE0F2FE); // sky-100
+  static const Color accent      = Color(0xFF2563EB);
+  static const Color accentLight = Color(0xFFEAF1FF);
 
   // ── Status ────────────────────────────────────────────────────────────────
   static const Color success      = Color(0xFF10B981); // emerald-500
@@ -25,14 +25,14 @@ class AppColors {
 
   // ── Surfaces ─────────────────────────────────────────────────────────────
   // Clean neutral surfaces — no blue tinting
-  static const Color background     = Color(0xFFF5F7FA); // neutral-100
-  static const Color surface        = Color(0xFFFFFFFF); // pure white cards
-  static const Color surfaceVariant = Color(0xFFF3F4F6); // gray-100 inputs
-  static const Color border         = Color(0xFFE5E7EB); // gray-200
+  static const Color background     = Color(0xFFF6F8FC);
+  static const Color surface        = Color(0xFFFFFFFF);
+  static const Color surfaceVariant = Color(0xFFF2F4F8);
+  static const Color border         = Color(0xFFD9E0EA);
 
   // ── Navigation ───────────────────────────────────────────────────────────
-  static const Color navBackground = Color(0xFF1E3A5F);
-  static const Color navSurface    = Color(0xFF1E3A5F);
+  static const Color navBackground = Color(0xFF1F3A5F);
+  static const Color navSurface    = Color(0xFF1F3A5F);
 
   // ── Text ─────────────────────────────────────────────────────────────────
   static const Color textPrimary   = Color(0xFF111827); // gray-900
@@ -48,46 +48,46 @@ class AppColors {
   // ── Stat card accents ─────────────────────────────────────────────────────
   static const Color statGreen      = Color(0xFF10B981);
   static const Color statGreenLight = Color(0xFFECFDF5);
-  static const Color statPurple     = Color(0xFF8B5CF6);
-  static const Color statPurpleLight= Color(0xFFF5F3FF);
+  static const Color statPurple     = Color(0xFF2563EB);
+  static const Color statPurpleLight= Color(0xFFEAF1FF);
 
   // ── Gradients ─────────────────────────────────────────────────────────────
-  /// Deep navy → brand blue — AppBar / hero cards
+  /// Single-tone gradients keep compatibility while rendering as solid color.
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+    colors: [Color(0xFF1F3A5F), Color(0xFF1F3A5F)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   /// AppBar nav gradient
   static const LinearGradient navGradient = LinearGradient(
-    colors: [Color(0xFF1E3A5F), Color(0xFF2563EB)],
+    colors: [Color(0xFF1F3A5F), Color(0xFF1F3A5F)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
 
   /// Hero sky gradient
   static const LinearGradient skyGradient = LinearGradient(
-    colors: [Color(0xFF1E3A5F), Color(0xFF2563EB), Color(0xFF38BDF8)],
+    colors: [Color(0xFFEAF1FF), Color(0xFFEAF1FF), Color(0xFFEAF1FF)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
   /// Teal-blue card gradient (for highlighted cards)
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+    colors: [Color(0xFF2563EB), Color(0xFF2563EB)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient warmGradient = LinearGradient(
-    colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
+    colors: [Color(0xFF2563EB), Color(0xFF2563EB)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient greenGradient = LinearGradient(
-    colors: [Color(0xFF059669), Color(0xFF10B981)],
+    colors: [Color(0xFF2563EB), Color(0xFF2563EB)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
