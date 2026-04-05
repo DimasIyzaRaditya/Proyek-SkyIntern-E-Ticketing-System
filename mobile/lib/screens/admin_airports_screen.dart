@@ -151,8 +151,11 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                             const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_rounded, size: 18, color: AppColors.error), SizedBox(width: 10), Text('Hapus', style: TextStyle(color: AppColors.error))])),
                           ],
                           onSelected: (v) {
-                            if (v == 'edit') _showAddEditDialog(airport: a);
-                            else _showDeleteDialog(a);
+                            if (v == 'edit') {
+                              _showAddEditDialog(airport: a);
+                            } else {
+                              _showDeleteDialog(a);
+                            }
                           },
                         ),
                       ],
@@ -218,7 +221,7 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
               try {
                 if (isEdit) {
                   await AdminService.updateAirport(
-                    id: airport!['id'] as int,
+                    id: airport['id'] as int,
                     name: nameCtrl.text.trim(),
                     city: cityCtrl.text.trim(),
                     country: countryCtrl.text.trim(),

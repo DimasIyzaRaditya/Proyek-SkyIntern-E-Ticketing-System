@@ -84,10 +84,12 @@ class _AdminSeatsScreenState extends State<AdminSeatsScreen> {
       final seats = await AdminService.getFlightSeats(id);
       if (mounted) setState(() { _seats = seats; _loadingSeats = false; });
     } catch (e) {
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _seatError = e.toString().replaceAll('Exception: ', '');
         _loadingSeats = false;
       });
+      }
     }
   }
 
@@ -406,7 +408,7 @@ class _AdminSeatsScreenState extends State<AdminSeatsScreen> {
                   style: const TextStyle(color: AppColors.textSecondary)),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedStatus,
+                initialValue: selectedStatus,
                 decoration: InputDecoration(
                   labelText: 'Status',
                   filled: true,
@@ -550,7 +552,7 @@ class _AdminSeatsScreenState extends State<AdminSeatsScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: selectedClass,
+                    initialValue: selectedClass,
                     decoration: InputDecoration(
                       labelText: 'Kelas Kursi',
                       filled: true,
@@ -599,8 +601,9 @@ class _AdminSeatsScreenState extends State<AdminSeatsScreen> {
                     keyboardType: TextInputType.number,
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) return 'Wajib diisi';
-                      if (int.tryParse(v.trim()) == null)
+                      if (int.tryParse(v.trim()) == null) {
                         return 'Masukkan angka valid';
+                      }
                       return null;
                     },
                   ),

@@ -9,6 +9,7 @@ import { generateBookingCode, generateTicketNumber, calculateTotalPrice, addMinu
 import { uploadFile, deleteFile } from "../utils/minio"
 import { sendBookingConfirmation, sendNewTransactionReminderEmail, sendTodayDepartureReminderEmail } from "../utils/email"
 import { createTransaction, checkTransactionStatus, verifySignature, mapMidtransStatus } from "../utils/midtrans"
+import { emitToUser } from "../utils/socket"
 
 const getJakartaDateParts = (date: Date) => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -179,6 +180,14 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       })
     }
 
+    emitToUser(booking.userId, "booking:updated", {
+      type: "CREATED",
+      bookingId: booking.id,
+      bookingCode: booking.bookingCode,
+      status: booking.status,
+      at: new Date().toISOString()
+    })
+
     res.status(201).json({
       message: "Pemesanan berhasil dibuat",
       booking,
@@ -283,6 +292,14 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
         transactionId: orderId,
         status: "PENDING"
       }
+    })
+
+    emitToUser(booking.userId, "booking:updated", {
+      type: "PAYMENT_CREATED",
+      bookingId: booking.id,
+      bookingCode: booking.bookingCode,
+      status: booking.status,
+      at: new Date().toISOString()
     })
 
     res.json({
@@ -540,6 +557,14 @@ export const cancelBooking = async (req: AuthRequest, res: Response) => {
       data: { status: "CANCELLED" }
     })
 
+    emitToUser(booking.userId, "booking:updated", {
+      type: "CANCELLED",
+      bookingId: booking.id,
+      bookingCode: booking.bookingCode,
+      status: "CANCELLED",
+      at: new Date().toISOString()
+    })
+
     // Release seats
     await prisma.flightSeat.updateMany({
       where: { bookingId: parseInt(id as string) },
@@ -631,6 +656,13 @@ export const paymentNotification = async (req: any, res: Response) => {
         where: { id: payment.bookingId },
         data: { status: "PAID" }
       })
+      emitToUser(payment.booking.userId, "booking:updated", {
+        type: "PAID",
+        bookingId: payment.bookingId,
+        bookingCode: payment.booking.bookingCode,
+        status: "PAID",
+        at: new Date().toISOString()
+      })
       await sendTransactionReminderIfNeeded(payment.bookingId)
 
       // Update seat status
@@ -681,6 +713,13 @@ export const paymentNotification = async (req: any, res: Response) => {
       await prisma.booking.update({
         where: { id: payment.bookingId },
         data: { status: "CANCELLED" }
+      })
+      emitToUser(payment.booking.userId, "booking:updated", {
+        type: "FAILED",
+        bookingId: payment.bookingId,
+        bookingCode: payment.booking.bookingCode,
+        status: "CANCELLED",
+        at: new Date().toISOString()
       })
 
       // Release seats
@@ -764,6 +803,13 @@ export const syncPaymentStatus = async (req: AuthRequest, res: Response) => {
         where: { id: bookingId },
         data: { status: "PAID" }
       })
+      emitToUser(booking.userId, "booking:updated", {
+        type: "PAID",
+        bookingId,
+        bookingCode: booking.bookingCode,
+        status: "PAID",
+        at: new Date().toISOString()
+      })
       await sendTransactionReminderIfNeeded(bookingId)
 
       await prisma.flightSeat.updateMany({
@@ -804,6 +850,13 @@ export const syncPaymentStatus = async (req: AuthRequest, res: Response) => {
       await prisma.booking.update({
         where: { id: bookingId },
         data: { status: "CANCELLED" }
+      })
+      emitToUser(booking.userId, "booking:updated", {
+        type: "FAILED",
+        bookingId,
+        bookingCode: booking.bookingCode,
+        status: "CANCELLED",
+        at: new Date().toISOString()
       })
       await prisma.flightSeat.updateMany({
         where: { bookingId },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
+import '../services/websocket_service.dart';
 import '../utils/helpers.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -29,6 +30,7 @@ class AuthProvider extends ChangeNotifier {
       _token = token;
       _user = user;
       ApiClient.setAuthToken(token);
+      WebSocketService.instance.connect(token: token);
     }
     _isInitialized = true;
     notifyListeners();
@@ -56,7 +58,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> login({
+  Future<LoginResult> login({
     required String email,
     required String password,
   }) async {
@@ -65,12 +67,50 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await AuthService.login(email: email, password: password);
+      final loginResult = await AuthService.login(email: email, password: password);
+
+      if (loginResult.requiresTwoFactor) {
+        _isLoading = false;
+        notifyListeners();
+        return loginResult;
+      }
+
+      _token = loginResult.token;
+      final user = await AuthService.getProfile();
+      _user = user;
+      await LocalStorage.saveUser(_user!, _token!);
+      await LocalStorage.saveRecentAccount(_user!);
+      WebSocketService.instance.connect(token: _token!);
+      _isLoading = false;
+      notifyListeners();
+      return loginResult;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> verifyTwoFactorLogin({
+    required String twoFactorToken,
+    required String code,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final token = await AuthService.verifyTwoFactorLogin(
+        twoFactorToken: twoFactorToken,
+        code: code,
+      );
       _token = token;
       final user = await AuthService.getProfile();
       _user = user;
       await LocalStorage.saveUser(_user!, _token!);
       await LocalStorage.saveRecentAccount(_user!);
+      WebSocketService.instance.connect(token: _token!);
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -79,6 +119,12 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  Future<void> resendTwoFactorCode({
+    required String twoFactorToken,
+  }) async {
+    await AuthService.resendTwoFactorCode(twoFactorToken: twoFactorToken);
   }
 
   Future<void> getProfile() async {
@@ -119,11 +165,27 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateTwoFactorSetting({required bool enabled}) async {
+    if (!isAuthenticated) throw Exception('Not authenticated');
+
+    try {
+      final user = await AuthService.updateTwoFactorSetting(enabled: enabled);
+      _user = user;
+      if (_token != null) await LocalStorage.saveUser(_user!, _token!);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> logout() async {
     _user = null;
     _token = null;
     _error = null;
     ApiClient.clearAuthToken();
+    WebSocketService.instance.disconnect();
     await LocalStorage.clearAll();
     notifyListeners();
   }

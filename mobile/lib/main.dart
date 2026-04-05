@@ -21,6 +21,8 @@ import 'screens/edit_profile_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/booking_verify_screen.dart';
+import 'screens/login_2fa_screen.dart';
+import 'screens/chatbot_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/admin_airlines_screen.dart';
 import 'screens/admin_airports_screen.dart';
@@ -134,6 +136,7 @@ class MyApp extends StatelessWidget {
           '/bookings': (_) => const BookingsScreen(),
           '/edit-profile': (_) => const EditProfileScreen(),
           '/forgot-password': (_) => const ForgotPasswordScreen(),
+          '/chatbot': (_) => const ChatBotScreen(),
         },
         // Global smooth page transition
         onGenerateRoute: (settings) => _buildRoute(settings),
@@ -158,6 +161,13 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
       page = const ETicketScreen();
     case '/booking-verify':
       page = const BookingVerifyScreen();
+    case '/login-2fa':
+      final rawArg = settings.arguments;
+      final args = rawArg is Map ? Map<String, dynamic>.from(rawArg) : <String, dynamic>{};
+      page = LoginTwoFactorScreen(
+        twoFactorToken: (args['twoFactorToken'] ?? '').toString(),
+        email: (args['email'] ?? '').toString(),
+      );
     case '/admin/schedules':
       page = const AdminGuard(child: AdminSchedulesScreen());
     case '/admin/seats':

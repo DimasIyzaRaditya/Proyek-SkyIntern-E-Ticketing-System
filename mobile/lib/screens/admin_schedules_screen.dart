@@ -216,8 +216,9 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
                                               ])),
                                         ],
                                         onSelected: (v) {
-                                          if (v == 'edit') _showAddEditDialog(flight: f);
-                                          else if (v == 'seats') {
+                                          if (v == 'edit') {
+                                            _showAddEditDialog(flight: f);
+                                          } else if (v == 'seats') {
                                             Navigator.pushNamed(context, '/admin/seats',
                                                 arguments: f);
                                           } else {
@@ -387,7 +388,7 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
 
                     // Airline dropdown
                     DropdownButtonFormField<int>(
-                      value: selectedAirlineId,
+                      initialValue: selectedAirlineId,
                       decoration: InputDecoration(
                         labelText: 'Maskapai',
                         filled: true,
@@ -419,7 +420,7 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
 
                     // Origin airport
                     DropdownButtonFormField<int>(
-                      value: selectedOriginId,
+                      initialValue: selectedOriginId,
                       decoration: InputDecoration(
                         labelText: 'Bandara Asal',
                         filled: true,
@@ -452,7 +453,7 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
 
                     // Destination airport
                     DropdownButtonFormField<int>(
-                      value: selectedDestId,
+                      initialValue: selectedDestId,
                       decoration: InputDecoration(
                         labelText: 'Bandara Tujuan',
                         filled: true,

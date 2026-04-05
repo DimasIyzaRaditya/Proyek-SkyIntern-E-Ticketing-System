@@ -85,7 +85,18 @@ class _LoginScreenState extends State<LoginScreen>
 
     try {
       final auth = context.read<AuthProvider>();
-      await auth.login(email: email, password: password);
+      final loginResult = await auth.login(email: email, password: password);
+
+      if (loginResult.requiresTwoFactor) {
+        if (mounted) {
+          Navigator.of(context).pushNamed('/login-2fa', arguments: {
+            'twoFactorToken': loginResult.twoFactorToken,
+            'email': email,
+          });
+        }
+        return;
+      }
+
       if (mounted) {
         showSnackBar(context, 'Selamat datang kembali!');
         final user = context.read<AuthProvider>().user;

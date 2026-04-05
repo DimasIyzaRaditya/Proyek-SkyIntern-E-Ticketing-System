@@ -1,6 +1,18 @@
 import '../models/user_model.dart';
 import 'api_client.dart';
 
+class LoginResult {
+  final String? token;
+  final bool requiresTwoFactor;
+  final String? twoFactorToken;
+
+  const LoginResult({
+    this.token,
+    this.requiresTwoFactor = false,
+    this.twoFactorToken,
+  });
+}
+
 class AuthService {
   static Future<Map<String, dynamic>> register({
     required String name,
@@ -19,7 +31,7 @@ class AuthService {
     );
   }
 
-  static Future<String> login({
+  static Future<LoginResult> login({
     required String email,
     required String password,
   }) async {
@@ -31,11 +43,68 @@ class AuthService {
       },
     );
 
+    final needsTwoFactor = loginResponse['requiresTwoFactor'] == true;
+    if (needsTwoFactor) {
+      final twoFactorToken = loginResponse['twoFactorToken'] as String?;
+      if (twoFactorToken == null || twoFactorToken.isEmpty) {
+        throw Exception('Token 2FA tidak tersedia. Silakan ulangi login.');
+      }
+      return LoginResult(
+        requiresTwoFactor: true,
+        twoFactorToken: twoFactorToken,
+      );
+    }
+
     final token = loginResponse['token'] as String?;
     if (token == null) throw Exception('Token not found in response');
 
     ApiClient.setAuthToken(token);
+    return LoginResult(token: token);
+  }
+
+  static Future<String> verifyTwoFactorLogin({
+    required String twoFactorToken,
+    required String code,
+  }) async {
+    final verifyResponse = await ApiClient.post(
+      '/api/auth/login/2fa/verify',
+      body: {
+        'twoFactorToken': twoFactorToken,
+        'code': code,
+      },
+    );
+
+    final token = verifyResponse['token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw Exception('Token login tidak tersedia setelah verifikasi 2FA.');
+    }
+
+    ApiClient.setAuthToken(token);
     return token;
+  }
+
+  static Future<void> resendTwoFactorCode({
+    required String twoFactorToken,
+  }) async {
+    await ApiClient.post(
+      '/api/auth/login/2fa/resend',
+      body: {'twoFactorToken': twoFactorToken},
+    );
+  }
+
+  static Future<UserSession> updateTwoFactorSetting({
+    required bool enabled,
+  }) async {
+    final response = await ApiClient.put(
+      '/api/auth/2fa',
+      body: {'enabled': enabled},
+      requireAuth: true,
+    );
+
+    final userJson = response['user'] as Map<String, dynamic>?;
+    if (userJson == null) throw Exception('User not found in response');
+
+    return UserSession.fromJson(userJson);
   }
 
   static Future<UserSession> getProfile() async {

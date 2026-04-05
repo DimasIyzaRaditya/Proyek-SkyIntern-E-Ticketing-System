@@ -1,19 +1,29 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 class ApiClient {
-  // ─── Ganti IP di sini sesuai IP laptop/server di jaringan Wi-Fi ────────
-  static const String _physicalDeviceIp = '192.168.18.38'; // IP laptop
-  // ─────────────────────────────────────────────────────────────────────────
+  // Optional override saat run app:
+  // flutter run --dart-define=API_HOST=192.168.1.7 --dart-define=API_PORT=3000
+  static const String _apiHostOverride = String.fromEnvironment('API_HOST', defaultValue: '');
+  static const String _apiPort = String.fromEnvironment('API_PORT', defaultValue: '3000');
+  static const Duration _requestTimeout = Duration(seconds: 20);
 
-  // Ganti _usePhysicalDevice ke true saat run di HP, false saat di emulator/PC
-  static const bool _usePhysicalDevice = true;
+  static String get _resolvedHost {
+    if (_apiHostOverride.isNotEmpty) return _apiHostOverride;
 
-  static const String _emulatorUrl    = 'http://10.0.2.2:3000';   // Android emulator
-  static const String _localhostUrl   = 'http://localhost:3000';   // Desktop / iOS sim
-  static const String _physicalUrl    = 'http://$_physicalDeviceIp:3000'; // HP fisik
+    // Default yang aman per platform, tanpa perlu edit manual.
+    if (kIsWeb) return 'localhost';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return '10.0.2.2'; // Android emulator -> host machine
+      default:
+        return 'localhost'; // Desktop/iOS simulator
+    }
+  }
 
-  static const String baseUrl = _usePhysicalDevice ? _physicalUrl : _localhostUrl;
+  static String get baseUrl => 'http://$_resolvedHost:$_apiPort';
 
   static String? _authToken;
   
@@ -41,7 +51,7 @@ class ApiClient {
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -59,6 +69,8 @@ class ApiClient {
       }
 
       return json.decode(response.body) as Map<String, dynamic>;
+    } on TimeoutException {
+      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -80,7 +92,7 @@ class ApiClient {
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
         body: json.encode(body),
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 401 && requireAuth) {
         clearAuthToken();
@@ -102,6 +114,8 @@ class ApiClient {
       }
 
       return json.decode(response.body) as Map<String, dynamic>;
+    } on TimeoutException {
+      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -123,7 +137,7 @@ class ApiClient {
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
         body: json.encode(body),
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -145,6 +159,8 @@ class ApiClient {
       }
 
       return json.decode(response.body) as Map<String, dynamic>;
+    } on TimeoutException {
+      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -164,7 +180,7 @@ class ApiClient {
       final response = await http.delete(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -179,6 +195,8 @@ class ApiClient {
           throw Exception('Hapus gagal (status ${response.statusCode})');
         }
       }
+    } on TimeoutException {
+      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }

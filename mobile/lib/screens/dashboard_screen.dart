@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../services/promo_service.dart';
+import '../services/websocket_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
@@ -175,6 +176,25 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
           actions: [
+            AnimatedBuilder(
+              animation: WebSocketService.instance,
+              builder: (_, __) {
+                final connected = WebSocketService.instance.isConnected;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    connected ? Icons.wifi_tethering_rounded : Icons.wifi_tethering_error_rounded,
+                    color: connected ? Colors.lightGreenAccent : Colors.orangeAccent,
+                    size: 20,
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              tooltip: 'SkyIntern Assistant',
+              icon: const Icon(Icons.smart_toy_outlined, color: Colors.white),
+              onPressed: () => Navigator.pushNamed(context, '/chatbot'),
+            ),
             Consumer<AuthProvider>(
               builder: (_, auth, __) {
                 final user = auth.user;

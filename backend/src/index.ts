@@ -3,6 +3,7 @@
 import "dotenv/config"
 import express from "express"
 import cors from "cors"
+import { createServer } from "http"
 import swaggerUi from "swagger-ui-express"
 import authRoutes from "./routes/auth.routes"
 import adminRoutes from "./routes/admin.routes"
@@ -12,6 +13,7 @@ import { getActivePromos } from "./controllers/promo.controller"
 import swaggerSpec from "./config/swagger"
 import { initializeBucket } from "./utils/minio"
 import { startDepartureReminderScheduler } from "./utils/departure-reminder"
+import { initSocketServer } from "./utils/socket"
 
 const app = express() // Instance utama aplikasi Express
 
@@ -59,8 +61,11 @@ app.get("/", (req, res) => {
 })
 
 const PORT = process.env.PORT || 3000
+const httpServer = createServer(app)
+initSocketServer(httpServer)
 
-app.listen(PORT, () => {
+httpServer.listen(Number(PORT), "0.0.0.0", () => {
   console.log(`Server running on http://localhost:${PORT}`)
   console.log(`API Documentation: http://localhost:${PORT}/api-docs`)
+  console.log(`WebSocket ready on ws://localhost:${PORT}`)
 })

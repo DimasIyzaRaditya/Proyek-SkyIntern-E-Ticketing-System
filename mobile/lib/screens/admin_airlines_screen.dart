@@ -147,8 +147,11 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
                             const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_rounded, size: 18, color: AppColors.error), SizedBox(width: 10), Text('Hapus', style: TextStyle(color: AppColors.error))])),
                           ],
                           onSelected: (v) {
-                            if (v == 'edit') _showAddEditDialog(airline: a);
-                            else _showDeleteDialog(a);
+                            if (v == 'edit') {
+                              _showAddEditDialog(airline: a);
+                            } else {
+                              _showDeleteDialog(a);
+                            }
                           },
                         ),
                       ],

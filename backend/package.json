@@ -33,6 +33,7 @@
     "nodemailer": "^8.0.1",
     "pg": "^8.19.0",
     "prisma": "^7.4.2",
+    "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "yamljs": "^0.3.0"

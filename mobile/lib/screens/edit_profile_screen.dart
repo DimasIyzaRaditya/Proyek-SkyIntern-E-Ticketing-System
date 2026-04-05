@@ -23,6 +23,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   late TextEditingController _phoneCtrl;
   bool _isLoading = false;
   bool _isUploadingAvatar = false;
+  bool _isUpdatingTwoFactor = false;
   late AnimationController _animCtrl;
   Uint8List? _localAvatarBytes;
 
@@ -225,6 +226,68 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                         const SizedBox(height: 6),
                         const Text('Email tidak dapat diubah',
                             style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Login 2FA',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Minta kode verifikasi email saat login',
+                                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _isUpdatingTwoFactor
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : Switch(
+                                      value: user?.twoFactorEnabled ?? false,
+                                      activeThumbColor: AppColors.primary,
+                                      onChanged: (enabled) async {
+                                        setState(() => _isUpdatingTwoFactor = true);
+                                        try {
+                                          await context.read<AuthProvider>().updateTwoFactorSetting(enabled: enabled);
+                                          if (!mounted) return;
+                                          showSnackBar(
+                                            context,
+                                            enabled ? '2FA berhasil diaktifkan' : '2FA berhasil dinonaktifkan',
+                                          );
+                                        } catch (e) {
+                                          if (!mounted) return;
+                                          showSnackBar(
+                                            context,
+                                            e.toString().replaceFirst('Exception: ', ''),
+                                            isError: true,
+                                          );
+                                        } finally {
+                                          if (mounted) setState(() => _isUpdatingTwoFactor = false);
+                                        }
+                                      },
+                                    ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),

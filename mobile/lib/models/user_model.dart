@@ -4,6 +4,7 @@ class UserSession {
   final String email;
   final String? phoneNumber;
   final String? avatarUrl;
+  final bool twoFactorEnabled;
   final String role;
 
   UserSession({
@@ -12,6 +13,7 @@ class UserSession {
     required this.email,
     this.phoneNumber,
     this.avatarUrl,
+    this.twoFactorEnabled = false,
     required this.role,
   });
 
@@ -22,6 +24,7 @@ class UserSession {
       email: json['email'] ?? '',
       phoneNumber: json['phone'] ?? json['phoneNumber'],
       avatarUrl: json['avatarUrl'],
+      twoFactorEnabled: json['twoFactorEnabled'] == true,
       role: (json['role'] ?? 'USER').toLowerCase() == 'admin' ? 'admin' : 'user',
     );
   }
@@ -32,6 +35,7 @@ class UserSession {
     'email': email,
     'phoneNumber': phoneNumber,
     'avatarUrl': avatarUrl,
+    'twoFactorEnabled': twoFactorEnabled,
     'role': role,
   };
 }

@@ -18,7 +18,7 @@ class BookingPassengerScreen extends StatefulWidget {
 class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isInitialized = false;
-  bool _isSubmitting = false;
+  final bool _isSubmitting = false;
 
   late int _adults;
   late int _children;
@@ -249,7 +249,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
             _labelText('Gelar / Sapaan'),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _titles[i],
+              initialValue: _titles[i],
               decoration: InputDecoration(
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
