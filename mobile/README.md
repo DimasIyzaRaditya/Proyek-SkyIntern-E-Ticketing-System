@@ -81,21 +81,36 @@ flutter run
 
 ### 7.2 HP Fisik (USB atau Wireless Debugging)
 
+Edit host API di source code mobile:
+
+- File: lib/services/api_client.dart
+- Ubah nilai `_hardcodedApiHost` sesuai IP laptop Wi-Fi Anda
+
+Contoh:
+
+```dart
+static const String _hardcodedApiHost = '192.168.1.7';
+```
+
+Lalu jalankan:
+
 ```bash
-flutter run --dart-define=API_HOST=192.168.1.7 --dart-define=API_PORT=3000
+flutter run
 ```
 NOTE:
-Ganti API_HOST dengan IP laptop Anda.
+Jika ganti Wi-Fi/jaringan, cukup update `_hardcodedApiHost` lalu jalankan ulang `flutter run`.
 
 ## 8. Build APK Release Untuk HP Fisik
 
 Di folder mobile:
 
+Pastikan `_hardcodedApiHost` di `lib/services/api_client.dart` sudah sesuai IP laptop.
+
 ```bash
-flutter build apk --release --dart-define=API_HOST=192.168.1.7 --dart-define=API_PORT=3000
+flutter build apk --release
 ```
 NOTE :
-Ganti API_HOST dengan IP laptop Anda.
+Untuk APK release, jika IP backend berubah maka perlu build ulang APK.
 
 Output APK:
 
@@ -137,7 +152,8 @@ Langkah:
 
 Catatan penting:
 
-- Jika IP laptop berubah, APK perlu dibuild ulang dengan API_HOST yang baru.
+- Jika IP laptop berubah, APK perlu dibuild ulang dengan host baru.
+- Karena host sekarang disimpan di source code (`_hardcodedApiHost`).
 
 ## 11. Wireless Debugging (Tanpa Kabel Saat Development)
 
@@ -156,7 +172,7 @@ adb devices
 4. Jalankan app:
 
 ```bash
-flutter run -d <DEVICE_ID> --dart-define=API_HOST=192.168.1.7 --dart-define=API_PORT=3000
+flutter run -d <DEVICE_ID>
 ```
 
 ## 12. Validasi Koneksi Sebelum Login
@@ -182,9 +198,10 @@ Checklist:
 
 - Backend sudah jalan (npm run dev)
 - HP dan laptop satu Wi-Fi
-- API_HOST benar (IP Wi-Fi laptop)
+- `_hardcodedApiHost` benar (IP Wi-Fi laptop) di `lib/services/api_client.dart`
 - Firewall mengizinkan inbound TCP port 3000 (Private profile)
-- APK sudah di-rebuild dan di-install ulang setelah perubahan konfigurasi
+- Untuk `flutter run`: tidak perlu build APK ulang, cukup run ulang
+- Untuk APK release: build ulang jika host berubah
 
 ### 14.2 adb is not recognized
 
@@ -226,6 +243,6 @@ Mobile build + install:
 ```bash
 flutter clean
 flutter pub get
-flutter build apk --release --dart-define=API_HOST=192.168.1.7 --dart-define=API_PORT=3000
+flutter build apk --release
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```

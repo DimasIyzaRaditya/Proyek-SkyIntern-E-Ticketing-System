@@ -4,16 +4,19 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
-  // Optional override saat run app:
-  // flutter run --dart-define=API_HOST=192.168.1.7 --dart-define=API_PORT=3000
-  static const String _apiHostOverride = String.fromEnvironment('API_HOST', defaultValue: '');
-  static const String _apiPort = String.fromEnvironment('API_PORT', defaultValue: '3000');
+  // Ubah host ini jika pindah jaringan Wi-Fi (khusus device fisik).
+  // Cukup edit nilai ini di source code lalu jalankan ulang `flutter run`.
+  // Contoh: 192.168.1.10
+  static const String _hardcodedApiHost = '192.168.1.7';
+
+  static const String _apiPort = '3000';
+  static const String _apiScheme = 'http';
   static const Duration _requestTimeout = Duration(seconds: 20);
 
   static String get _resolvedHost {
-    if (_apiHostOverride.isNotEmpty) return _apiHostOverride;
+    if (_hardcodedApiHost.isNotEmpty) return _hardcodedApiHost;
 
-    // Default yang aman per platform, tanpa perlu edit manual.
+    // Fallback default per platform jika hardcoded host dikosongkan.
     if (kIsWeb) return 'localhost';
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -23,7 +26,7 @@ class ApiClient {
     }
   }
 
-  static String get baseUrl => 'http://$_resolvedHost:$_apiPort';
+  static String get baseUrl => '$_apiScheme://$_resolvedHost:$_apiPort';
 
   static String? _authToken;
   

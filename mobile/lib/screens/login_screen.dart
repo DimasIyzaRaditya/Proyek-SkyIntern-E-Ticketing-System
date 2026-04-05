@@ -326,7 +326,9 @@ class _LoginScreenState extends State<LoginScreen>
                                       foregroundColor: AppColors.primary),
                                   child: const Text('Lupa Password?',
                                       style:
-                                          TextStyle(fontWeight: FontWeight.w600)),
+                                          TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    )),
                                 ),
                               ),
                               // Inline error banner

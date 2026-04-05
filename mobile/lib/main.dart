@@ -130,8 +130,10 @@ class MyApp extends StatelessWidget {
           '/search-results': (_) => const SearchResultsScreen(),
           '/dashboard': (_) => const DashboardScreen(),
           '/admin': (_) => const AdminGuard(child: AdminDashboardScreen()),
-          '/admin/airlines': (_) => const AdminGuard(child: AdminAirlinesScreen()),
-          '/admin/airports': (_) => const AdminGuard(child: AdminAirportsScreen()),
+          '/admin/airlines': (_) =>
+              const AdminGuard(child: AdminAirlinesScreen()),
+          '/admin/airports': (_) =>
+              const AdminGuard(child: AdminAirportsScreen()),
           '/admin/users': (_) => const AdminGuard(child: AdminUsersScreen()),
           '/bookings': (_) => const BookingsScreen(),
           '/edit-profile': (_) => const EditProfileScreen(),
@@ -163,7 +165,9 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
       page = const BookingVerifyScreen();
     case '/login-2fa':
       final rawArg = settings.arguments;
-      final args = rawArg is Map ? Map<String, dynamic>.from(rawArg) : <String, dynamic>{};
+      final args = rawArg is Map
+          ? Map<String, dynamic>.from(rawArg)
+          : <String, dynamic>{};
       page = LoginTwoFactorScreen(
         twoFactorToken: (args['twoFactorToken'] ?? '').toString(),
         email: (args['email'] ?? '').toString(),
@@ -214,4 +218,3 @@ PageRouteBuilder<dynamic> _slideRoute(Widget page, RouteSettings settings) {
     },
   );
 }
-
