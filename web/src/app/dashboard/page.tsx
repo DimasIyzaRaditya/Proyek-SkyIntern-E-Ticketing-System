@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, Clock3, Plane, ReceiptText, Ticket, TrendingUp, Wallet, XCircle } from "lucide-react";
+import { CalendarDays, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";

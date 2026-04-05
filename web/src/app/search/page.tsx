@@ -546,27 +546,27 @@ export default function SearchPage() {
   return (
     <>
       <div
-        className="min-h-screen bg-cover bg-center bg-no-repeat"
+        className="min-h-[52vh] bg-cover bg-center bg-no-repeat md:min-h-[58vh]"
         style={{
           backgroundImage:
             "linear-gradient(160deg, rgba(6,24,44,0.58) 0%, rgba(12,45,84,0.42) 45%, rgba(8,20,36,0.62) 100%), url('/bg.jpg'), url('/home-hero.svg')",
         }}
       >
         <MainNav />
-        <main className="mx-auto w-full max-w-screen-2xl overflow-x-clip px-4 pb-12 pt-6 md:px-6 md:pt-8 lg:px-8">
+        <main className="mx-auto w-full max-w-screen-2xl overflow-x-clip px-4 pb-8 pt-4 md:px-6 md:pt-6 lg:px-8">
         <LazySection>
         <section
-          className="relative overflow-visible rounded-4xl bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-8 text-white shadow-xl md:px-8 md:py-10 lg:px-10 lg:py-12"
+          className="relative overflow-visible rounded-4xl bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-5 text-white shadow-xl md:px-8 md:py-7 lg:px-10 lg:py-8"
         >
           <div className="pointer-events-none absolute inset-0 opacity-20 [background:radial-gradient(circle_at_20%_10%,white,transparent_35%),radial-gradient(circle_at_80%_20%,white,transparent_30%)]" />
 
           <div ref={wrapperRef} className="relative mx-auto max-w-7xl">
             {/* Hero headline */}
-            <div className="mb-6 text-center page-enter md:mb-8">
-              <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-lg sm:text-4xl md:text-5xl lg:text-6xl">
+            <div className="mb-4 text-center page-enter md:mb-5">
+              <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-lg sm:text-3xl md:text-4xl lg:text-5xl">
                 Terbang ke mana hari ini?
               </h1>
-              <p className="mt-2 text-sm text-blue-200 sm:text-base md:text-lg lg:text-2xl">
+              <p className="mt-1.5 text-xs text-blue-200 sm:text-sm md:text-base lg:text-xl">
                 Temukan tiket penerbangan terbaik dengan mudah &amp; cepat.
               </p>
             </div>

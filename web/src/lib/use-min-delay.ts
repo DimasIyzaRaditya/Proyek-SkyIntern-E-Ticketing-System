@@ -5,16 +5,17 @@ import { useEffect, useState } from "react";
  * Prevents flashes where skeleton appears and disappears in < 300ms.
  */
 export function useMinDelay(loading: boolean, minMs = 400): boolean {
-  const [show, setShow] = useState(loading);
+  const [readyToHide, setReadyToHide] = useState(!loading);
 
   useEffect(() => {
     if (loading) {
-      setShow(true);
+      const timer = setTimeout(() => setReadyToHide(false), 0);
+      return () => clearTimeout(timer);
     } else {
-      const timer = setTimeout(() => setShow(false), minMs);
+      const timer = setTimeout(() => setReadyToHide(true), minMs);
       return () => clearTimeout(timer);
     }
   }, [loading, minMs]);
 
-  return show;
+  return loading || !readyToHide;
 }

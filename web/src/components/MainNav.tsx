@@ -36,7 +36,10 @@ export default function MainNav() {
   }, []);
 
   // Close on route change
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    const timer = setTimeout(() => setMenuOpen(false), 0);
+    return () => clearTimeout(timer);
+  }, [pathname]);
 
   // Close on Escape
   useEffect(() => {

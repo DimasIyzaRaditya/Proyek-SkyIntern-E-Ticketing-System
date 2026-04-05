@@ -6,6 +6,7 @@ import { LayoutDashboard } from "lucide-react";
 
 const menus = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/scan", label: "Scan QR" },
   { href: "/admin/airports", label: "Airports" },
   { href: "/admin/airlines", label: "Airlines" },
   { href: "/admin/schedules", label: "Schedules" },

@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
-import LazySection from "@/components/LazySection";
 import { isAuthenticated } from "@/lib/auth";
 import { getMyBookingsFromApi, createPaymentFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 

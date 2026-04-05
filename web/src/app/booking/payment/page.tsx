@@ -133,7 +133,6 @@ function PaymentSummaryPageContent() {
     } else {
       localStorage.setItem(countdownKey, String(Date.now()));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdownKey]);
 
   // Auto-cancel booking when countdown expires

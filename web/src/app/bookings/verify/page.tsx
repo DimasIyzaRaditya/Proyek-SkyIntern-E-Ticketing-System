@@ -43,20 +43,20 @@ function VerifyPageContent() {
   const [result, setResult]   = useState<VerifyBookingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
-  const [qrValue, setQrValue] = useState("");
+  const qrValue =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/bookings/verify?code=${encodeURIComponent(code)}`
+      : `/bookings/verify?code=${encodeURIComponent(code)}`;
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setQrValue(`${window.location.origin}/bookings/verify?code=${encodeURIComponent(code)}`);
-    }
-
     if (!code) {
-      setError("Kode booking tidak ditemukan dalam QR code.");
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    const startTimer = setTimeout(() => {
+      setLoading(true);
+      setError(null);
+    }, 0);
 
     verifyBookingFromApi(code)
       .then((data) => setResult(data))
@@ -65,9 +65,12 @@ function VerifyPageContent() {
         setError(message);
       })
       .finally(() => setLoading(false));
+
+    return () => clearTimeout(startTimer);
   }, [code]);
 
   const booking      = result?.booking;
+  const displayedError = error ?? (!code ? "Kode booking tidak ditemukan dalam QR code." : null);
   const statusKey    = (booking?.status ?? "") as StatusKey;
   const statusConfig = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.PENDING;
   const { Icon: StatusIcon } = statusConfig;
@@ -98,7 +101,7 @@ function VerifyPageContent() {
         )}
 
         {/* ── Error ── */}
-        {error && !loading && (
+        {displayedError && !loading && (
           <div className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
             <div className="relative flex items-start justify-between overflow-hidden px-8 pt-7 pb-5">
               <div>
@@ -118,7 +121,7 @@ function VerifyPageContent() {
             <div className="flex flex-col items-center gap-3 px-8 py-12 text-center">
               <XCircle className="h-14 w-14 text-rose-400" />
               <p className="text-lg font-bold text-rose-600">Booking Tidak Ditemukan</p>
-              <p className="max-w-xs text-sm text-slate-500">{error}</p>
+              <p className="max-w-xs text-sm text-slate-500">{displayedError}</p>
               {code && (
                 <p className="mt-1 text-xs text-slate-400">
                   Kode: <span className="font-mono font-bold">{code}</span>

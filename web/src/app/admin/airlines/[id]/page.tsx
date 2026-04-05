@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
@@ -39,7 +39,7 @@ export default function AdminAirlineDetailPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const loadAirline = async () => {
+  const loadAirline = useCallback(async () => {
     if (Number.isNaN(airlineId)) {
       setMessage("Invalid airline ID.");
       setLoading(false);
@@ -59,11 +59,11 @@ export default function AdminAirlineDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [airlineId]);
 
   useEffect(() => {
     void loadAirline();
-  }, [airlineId]);
+  }, [loadAirline]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;

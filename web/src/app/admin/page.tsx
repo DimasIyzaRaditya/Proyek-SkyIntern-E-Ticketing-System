@@ -40,7 +40,6 @@ const MONTHS_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep"
 
 export default function AdminPage() {
   const router = useRouter();
-  const [authenticated, setAuthenticated] = useState(true);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
@@ -51,7 +50,6 @@ export default function AdminPage() {
 
   useEffect(() => {
     const auth = isAuthenticated();
-    setAuthenticated(auth);
     if (!auth) {
       router.replace("/auth/login?redirect=/admin");
       return;

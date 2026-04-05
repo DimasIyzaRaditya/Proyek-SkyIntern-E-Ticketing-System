@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
@@ -95,7 +96,14 @@ function FlightDetailPageContent() {
             <div>
               <div className="flex items-center gap-3">
                 {flight.logo.startsWith("http") ? (
-                  <img src={flight.logo} alt={flight.airline} className="h-10 w-10 rounded-full object-contain" />
+                  <Image
+                    src={flight.logo}
+                    alt={flight.airline}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-full object-contain"
+                    unoptimized
+                  />
                 ) : (
                   <span className="text-3xl">{flight.logo}</span>
                 )}

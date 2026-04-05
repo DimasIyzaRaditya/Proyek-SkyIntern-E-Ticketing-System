@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
@@ -195,7 +196,14 @@ function SearchResultsPageContent() {
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="inline-flex items-center gap-2">
                           {flight.logo.startsWith("http") ? (
-                            <img src={flight.logo} alt={flight.airline} className="h-8 w-8 rounded-full object-contain border border-slate-100 bg-white p-0.5 shadow-sm" />
+                            <Image
+                              src={flight.logo}
+                              alt={flight.airline}
+                              width={32}
+                              height={32}
+                              className="h-8 w-8 rounded-full object-contain border border-slate-100 bg-white p-0.5 shadow-sm"
+                              unoptimized
+                            />
                           ) : (
                             <span className="text-2xl">{flight.logo}</span>
                           )}
