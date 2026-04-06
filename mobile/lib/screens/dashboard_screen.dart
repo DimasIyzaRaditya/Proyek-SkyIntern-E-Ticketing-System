@@ -10,6 +10,7 @@ import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/mobile_side_menu.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -198,76 +199,21 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             Consumer<AuthProvider>(
               builder: (_, auth, __) {
-                final user = auth.user;
-                ImageProvider? avatarImage;
-                if (user?.avatarUrl != null && user!.avatarUrl!.startsWith('data:image')) {
-                  final base64Data = user.avatarUrl!.split(',').last;
-                  avatarImage = MemoryImage(base64Decode(base64Data));
-                } else if (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty) {
-                  avatarImage = NetworkImage(ApiClient.normalizePublicUrl(user.avatarUrl!));
-                }
-                return PopupMenuButton<String>(
-                  offset: const Offset(0, 50),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  icon: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Colors.white.withValues(alpha: 0.25),
-                    backgroundImage: avatarImage,
-                    child: avatarImage == null
-                        ? Text(
-                            StringHelper.getInitials(auth.user?.fullName ?? 'U'),
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14),
-                          )
-                        : null,
+                return IconButton(
+                  tooltip: 'Menu',
+                  onPressed: () => MobileSideMenu.show(context, activeItem: 'Dashboard'),
+                  icon: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white30),
+                      color: Colors.white10,
+                    ),
+                    child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
                   ),
-                onSelected: (v) {
-                  if (v == 'profile') Navigator.pushNamed(context, '/edit-profile');
-                  if (v == 'bookings') Navigator.pushNamed(context, '/bookings');
-                  if (v == 'switch-account') _switchAccount();
-                  if (v == 'logout') _showLogoutDialog();
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'profile',
-                    child: Row(children: [
-                      Icon(Icons.person_outline, size: 20),
-                      SizedBox(width: 10),
-                      Text('Profil')
-                    ]),
-                  ),
-                  const PopupMenuItem(
-                    value: 'bookings',
-                    child: Row(children: [
-                      Icon(Icons.confirmation_number_outlined, size: 20),
-                      SizedBox(width: 10),
-                      Text('Booking Saya')
-                    ]),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'switch-account',
-                    child: Row(children: [
-                      Icon(Icons.switch_account_rounded, size: 20, color: AppColors.primary),
-                      SizedBox(width: 10),
-                      Text('Beralih Akun')
-                    ]),
-                  ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(children: [
-                      Icon(Icons.logout, color: AppColors.error, size: 20),
-                      SizedBox(width: 10),
-                      Text('Keluar',
-                          style: TextStyle(color: AppColors.error))
-                    ]),
-                  ),
-                ],
-              );
-            },
+                );
+              },
             ),
             const SizedBox(width: 8),
           ],
@@ -742,41 +688,4 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Future<void> _switchAccount() async {
-    await context.read<AuthProvider>().logout();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-  }
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Keluar',
-            style:
-                TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-        content: const Text('Anda yakin ingin keluar dari akun?',
-            style: TextStyle(color: AppColors.textSecondary)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal',
-                  style: TextStyle(color: AppColors.textSecondary))),
-          ElevatedButton(
-            onPressed: () {
-              context.read<AuthProvider>().logout();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12))),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-  }
 }

@@ -12,6 +12,8 @@ class Booking {
   final String bookingCode;
   final String status;
   final String createdAt;
+  final int totalPrice;
+  final String? selectedSeats;
   final FlightInfo flight;
   final List<PassengerInfo> passengers;
   final TicketInfo? ticket;
@@ -22,6 +24,8 @@ class Booking {
     required this.bookingCode,
     required this.status,
     required this.createdAt,
+    required this.totalPrice,
+    this.selectedSeats,
     required this.flight,
     required this.passengers,
     this.ticket,
@@ -34,6 +38,8 @@ class Booking {
       bookingCode: json['bookingCode'] ?? '',
       status: json['status'] ?? 'PENDING',
       createdAt: json['createdAt'] ?? '',
+        totalPrice: (json['totalPrice'] as num?)?.toInt() ?? 0,
+        selectedSeats: json['selectedSeats'] as String?,
       flight: FlightInfo.fromJson(json['flight'] ?? {}),
       passengers: ((json['passengers'] ?? []) as List)
           .map((e) => PassengerInfo.fromJson(e as Map<String, dynamic>))
@@ -47,9 +53,12 @@ class FlightInfo {
   final int id;
   final String flightNumber;
   final String departureTime;
+  final String arrivalTime;
   final String airline;
+  final String originName;
   final String originCity;
   final String originCode;
+  final String destinationName;
   final String destinationCity;
   final String destinationCode;
 
@@ -57,9 +66,12 @@ class FlightInfo {
     required this.id,
     required this.flightNumber,
     required this.departureTime,
+    required this.arrivalTime,
     required this.airline,
+    required this.originName,
     required this.originCity,
     required this.originCode,
+    required this.destinationName,
     required this.destinationCity,
     required this.destinationCode,
   });
@@ -69,9 +81,12 @@ class FlightInfo {
       id: json['id'] as int? ?? 0,
       flightNumber: json['flightNumber'] ?? '',
       departureTime: json['departureTime'] ?? '',
+      arrivalTime: json['arrivalTime'] ?? '',
       airline: json['airline']?['name'] ?? 'Unknown',
+      originName: json['origin']?['name'] ?? '',
       originCity: json['origin']?['city'] ?? '',
       originCode: _deriveCode(json['origin']?['city'] as String?),
+      destinationName: json['destination']?['name'] ?? '',
       destinationCity: json['destination']?['city'] ?? '',
       destinationCode: _deriveCode(json['destination']?['city'] as String?),
     );
@@ -79,21 +94,30 @@ class FlightInfo {
 }
 
 class PassengerInfo {
+  final String title;
   final String firstName;
   final String lastName;
   final String type;
+  final String? documentType;
+  final String? documentNumber;
 
   PassengerInfo({
+    required this.title,
     required this.firstName,
     required this.lastName,
     required this.type,
+    this.documentType,
+    this.documentNumber,
   });
 
   factory PassengerInfo.fromJson(Map<String, dynamic> json) {
     return PassengerInfo(
+      title: json['title'] ?? '',
       firstName: json['firstName'] ?? '',
       lastName: json['lastName'] ?? '',
       type: json['type'] ?? 'ADULT',
+      documentType: json['documentType'] as String?,
+      documentNumber: json['documentNumber'] as String?,
     );
   }
 }

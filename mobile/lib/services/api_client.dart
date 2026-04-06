@@ -7,7 +7,7 @@ class ApiClient {
   // Ubah host ini jika pindah jaringan Wi-Fi (khusus device fisik).
   // Cukup edit nilai ini di source code lalu jalankan ulang `flutter run`.
   // Contoh: 192.168.1.10
-  static const String _hardcodedApiHost = '192.168.18.39';
+  static const String _hardcodedApiHost = '192.168.18.38';
 
   static const String _apiPort = '3000';
   static const String _apiScheme = 'http';
@@ -217,6 +217,53 @@ class ApiClient {
           throw Exception('Hapus gagal (status ${response.statusCode})');
         }
       }
+    } on TimeoutException {
+      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  static Future<({Uint8List bytes, String? contentDisposition, String? contentType})> getBytes(
+    String endpoint, {
+    bool requireAuth = false,
+  }) async {
+    try {
+      final headers = {
+        'X-Platform': 'mobile',
+        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+      };
+
+      final response = await http.get(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+      ).timeout(_requestTimeout);
+
+      if (response.statusCode == 401) {
+        clearAuthToken();
+        throw Exception('Sesi login tidak valid. Silakan login kembali.');
+      }
+
+      if (response.statusCode == 403) {
+        throw Exception('Tidak diizinkan mengakses tiket ini.');
+      }
+
+      if (response.statusCode != 200) {
+        String? message;
+        try {
+          final parsed = json.decode(response.body) as Map<String, dynamic>;
+          message = parsed['message']?.toString();
+        } catch (_) {
+          message = null;
+        }
+        throw Exception(message ?? 'Download gagal (status ${response.statusCode})');
+      }
+
+      return (
+        bytes: response.bodyBytes,
+        contentDisposition: response.headers['content-disposition'],
+        contentType: response.headers['content-type'],
+      );
     } on TimeoutException {
       throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
     } catch (e) {

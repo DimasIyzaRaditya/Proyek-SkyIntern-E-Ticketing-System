@@ -1,6 +1,18 @@
 import '../models/booking_model.dart';
 import 'api_client.dart';
 
+class TicketDownloadResult {
+  final List<int> bytes;
+  final String fileName;
+  final String contentType;
+
+  const TicketDownloadResult({
+    required this.bytes,
+    required this.fileName,
+    required this.contentType,
+  });
+}
+
 class BookingService {
   static Future<List<Booking>> getMyBookings() async {
     final response = await ApiClient.get(
@@ -70,5 +82,28 @@ class BookingService {
   static Future<Map<String, dynamic>> verifyBooking(String code) async {
     final normalizedCode = Uri.encodeQueryComponent(code.trim());
     return await ApiClient.get('/api/bookings/verify?code=$normalizedCode');
+  }
+
+  static Future<TicketDownloadResult> downloadTicket(int ticketId) async {
+    final response = await ApiClient.getBytes(
+      '/api/bookings/tickets/$ticketId/download',
+      requireAuth: true,
+    );
+
+    String fileName = 'e-ticket-$ticketId.txt';
+    final disposition = response.contentDisposition;
+    if (disposition != null) {
+      final fileNameMatch = RegExp(r'filename="?([^";]+)"?', caseSensitive: false).firstMatch(disposition);
+      final parsedName = fileNameMatch?.group(1)?.trim();
+      if (parsedName != null && parsedName.isNotEmpty) {
+        fileName = parsedName;
+      }
+    }
+
+    return TicketDownloadResult(
+      bytes: response.bytes,
+      fileName: fileName,
+      contentType: response.contentType ?? 'application/octet-stream',
+    );
   }
 }

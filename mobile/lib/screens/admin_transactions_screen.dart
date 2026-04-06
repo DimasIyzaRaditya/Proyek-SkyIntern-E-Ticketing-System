@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/booking_model.dart';
 import '../utils/app_theme.dart';
+import '../utils/ticket_download.dart';
 import '../widgets/common_widgets.dart';
 import '../services/admin_service.dart';
+import '../services/booking_service.dart';
 
 class AdminTransactionsScreen extends StatefulWidget {
   const AdminTransactionsScreen({super.key});
@@ -179,6 +181,41 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
     Navigator.of(context).pushNamed('/e-ticket', arguments: {'booking': model});
   }
 
+  Future<void> _downloadTicket(Map<String, dynamic> booking) async {
+    final ticket = booking['ticket'] as Map<String, dynamic>?;
+    final ticketId = (ticket?['id'] as num?)?.toInt();
+    if (ticketId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data tiket tidak ditemukan')));
+      return;
+    }
+
+    try {
+      final model = _toBookingModel(booking);
+      final downloaded = await BookingService.downloadTicket(ticketId);
+      final saved = await saveTicketFile(
+        booking: model,
+        downloaded: downloaded,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved.opened
+                ? 'E-tiket berhasil diunduh dan dibuka.'
+                : 'E-tiket berhasil diunduh ke ${saved.filePath}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
   void _showDetailDialog(Map<String, dynamic> booking) {
     final user = booking['user'] as Map<String, dynamic>?;
     final flight = booking['flight'] as Map<String, dynamic>?;
@@ -289,10 +326,19 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
           if (booking['ticket'] != null)
             TextButton.icon(
               icon: const Icon(Icons.airplane_ticket_rounded, size: 16, color: AppColors.primary),
-              label: const Text('Lihat E-Tiket', style: TextStyle(color: AppColors.primary)),
+              label: const Text('Lihat Tiket', style: TextStyle(color: AppColors.primary)),
               onPressed: () {
                 Navigator.pop(ctx);
                 _openETicket(booking);
+              },
+            ),
+          if (booking['ticket'] != null)
+            TextButton.icon(
+              icon: const Icon(Icons.download_rounded, size: 16, color: AppColors.primary),
+              label: const Text('Unduh Tiket', style: TextStyle(color: AppColors.primary)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _downloadTicket(booking);
               },
             ),
           if (actions.isNotEmpty)
@@ -626,10 +672,20 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
                                                       action),
                                             ),
                                           if (b['ticket'] != null)
-                                            IconButton(
-                                              tooltip: 'Lihat E-Tiket',
-                                              icon: const Icon(Icons.airplane_ticket_outlined, color: AppColors.primary),
-                                              onPressed: () => _openETicket(b),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  tooltip: 'Lihat Tiket',
+                                                  icon: const Icon(Icons.airplane_ticket_outlined, color: AppColors.primary),
+                                                  onPressed: () => _openETicket(b),
+                                                ),
+                                                IconButton(
+                                                  tooltip: 'Unduh Tiket',
+                                                  icon: const Icon(Icons.download_rounded, color: AppColors.primary),
+                                                  onPressed: () => _downloadTicket(b),
+                                                ),
+                                              ],
                                             ),
                                         ],
                                       ),

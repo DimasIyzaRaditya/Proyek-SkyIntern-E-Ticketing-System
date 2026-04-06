@@ -5,7 +5,7 @@ import '../providers/flight_provider.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
-import '../widgets/common_widgets.dart';
+import '../widgets/mobile_side_menu.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -116,6 +116,118 @@ class _SearchScreenState extends State<SearchScreen>
     } catch (e) {
       if (mounted) showSnackBar(context, e.toString(), isError: true);
     }
+  }
+
+  Future<void> _showGuestPicker() async {
+    int tempAdults = adults;
+    int tempChildren = childCount;
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Guests',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 16),
+                  _guestCounterRow(
+                    label: 'Adult',
+                    count: tempAdults,
+                    onDec: tempAdults > 1
+                        ? () => setModalState(() => tempAdults--)
+                        : null,
+                    onInc: () => setModalState(() => tempAdults++),
+                  ),
+                  const SizedBox(height: 12),
+                  _guestCounterRow(
+                    label: 'Child',
+                    count: tempChildren,
+                    onDec: tempChildren > 0
+                        ? () => setModalState(() => tempChildren--)
+                        : null,
+                    onInc: () => setModalState(() => tempChildren++),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Terapkan'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true && mounted) {
+      setState(() {
+        adults = tempAdults;
+        childCount = tempChildren;
+      });
+    }
+  }
+
+  Widget _guestCounterRow({
+    required String label,
+    required int count,
+    required VoidCallback? onDec,
+    required VoidCallback onInc,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+        IconButton(
+          onPressed: onDec,
+          icon: const Icon(Icons.remove_circle_outline),
+          color: onDec == null ? AppColors.textHint : AppColors.primary,
+        ),
+        SizedBox(
+          width: 30,
+          child: Text(
+            '$count',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ),
+        IconButton(
+          onPressed: onInc,
+          icon: const Icon(Icons.add_circle_outline),
+          color: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openMobileMenu() async {
+    await MobileSideMenu.show(context, activeItem: 'Flights');
   }
 
   void _showAirportPicker(bool isOrigin) {
@@ -339,292 +451,347 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 600;
+    final originAirport =
+        originCode != null ? airports.where((a) => a.code == originCode).firstOrNull : null;
+    final destinationAirport =
+        destinationCode != null ? airports.where((a) => a.code == destinationCode).firstOrNull : null;
+    final originDisplay = originAirport != null
+        ? '${originAirport.city}, ${originAirport.country} (${originAirport.code})'
+        : 'Pilih keberangkatan';
+    final destinationDisplay = destinationAirport != null
+        ? '${destinationAirport.city}, ${destinationAirport.country} (${destinationAirport.code})'
+        : 'Pilih tujuan';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: const CustomAppBar(
-          title: 'Cari Penerbangan',
-          showBackButton: false),
+      backgroundColor: const Color(0xFFF3F6FB),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.pushNamed(context, '/chatbot'),
+        backgroundColor: const Color(0xFF3B5BFF),
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.chat_bubble_outline_rounded),
+      ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-            horizontal: isWide ? 80 : 16, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Trip type toggle
             Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
+              padding: EdgeInsets.fromLTRB(isWide ? 34 : 16, 14, isWide ? 34 : 16, 26),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0C3B7E), Color(0xFF1D4E9B)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
-              child: Row(
-                children: [
-                  _TripToggle(
-                    label: 'Sekali Jalan',
-                    icon: Icons.arrow_right_alt_rounded,
-                    selected: !isRoundTrip,
-                    onTap: () => setState(() => isRoundTrip = false),
-                  ),
-                  _TripToggle(
-                    label: 'Pulang Pergi',
-                    icon: Icons.swap_horiz_rounded,
-                    selected: isRoundTrip,
-                    onTap: () => setState(() => isRoundTrip = true),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Route selection card
-            GlassCard(
-              padding: const EdgeInsets.all(4),
               child: Column(
                 children: [
-                  _AirportTile(
-                    label: 'Dari',
-                    icon: Icons.flight_takeoff_rounded,
-                    code: originCode,
-                    airports: airports,
-                    onTap: () => _showAirportPicker(true),
+                  Row(
+                    children: [
+                      const Icon(Icons.airplanemode_active_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'SkyIntern',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white54),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: InkWell(
+                          onTap: _openMobileMenu,
+                          borderRadius: BorderRadius.circular(14),
+                          child: const Icon(Icons.menu_rounded, color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xBA1B4E8A), Color(0xAA2B6CB0)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      border: Border.all(color: Colors.white30),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x26071A38),
+                          blurRadius: 18,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                            child: Divider(
-                                color: AppColors.border.withValues(alpha: 0.6))),
-                        GestureDetector(
-                          onTap: () => setState(() {
-                            final tmp = originCode;
-                            originCode = destinationCode;
-                            destinationCode = tmp;
-                          }),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.swap_vert_rounded,
-                                color: Colors.white, size: 18),
+                        const Text(
+                          'Terbang ke mana hari ini?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        Expanded(
-                            child: Divider(
-                                color: AppColors.border.withValues(alpha: 0.6))),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Temukan tiket penerbangan terbaik dengan mudah & cepat.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFD0E2FF),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0xFFD8DEE9)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x12111827),
+                                blurRadius: 14,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(14, 14, 14, 8),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Keberangkatan & Tujuan',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () => _showAirportPicker(true),
+                                          borderRadius: const BorderRadius.only(topLeft: Radius.circular(22)),
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.flight_takeoff_rounded, color: Color(0xFF2563EB), size: 20),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    originDisplay,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 18),
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () => _showAirportPicker(false),
+                                          borderRadius: const BorderRadius.only(topRight: Radius.circular(22)),
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(8, 12, 12, 12),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.flight_land_rounded, color: Color(0xFF2563EB), size: 20),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    destinationDisplay,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => setState(() {
+                                      final tmpCode = originCode;
+                                      originCode = destinationCode;
+                                      destinationCode = tmpCode;
+                                      final tmpId = originId;
+                                      originId = destinationId;
+                                      destinationId = tmpId;
+                                    }),
+                                    child: Container(
+                                      width: 46,
+                                      height: 46,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFFFFF),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: const Color(0xFFD5DCE8)),
+                                        boxShadow: const [
+                                          BoxShadow(color: Color(0x330F172A), blurRadius: 8, offset: Offset(0, 2)),
+                                        ],
+                                      ),
+                                      child: const Icon(Icons.swap_vert_rounded, color: Color(0xFF2563EB), size: 22),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(14, 8, 14, 0),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Tanggal Pergi & Pulang',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+                              InkWell(
+                                onTap: () async {
+                                  await _selectDate(false);
+                                  if (!mounted) return;
+                                  await _selectDate(true);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today_rounded, color: Color(0xFF2563EB), size: 20),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        '${DateFormatter.formatShortDate(DateFormatter.formatDate(departureDate))} - ${DateFormatter.formatShortDate(DateFormatter.formatDate(returnDate))}',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(14, 8, 14, 0),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Penumpang',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+                              InkWell(
+                                onTap: _showGuestPicker,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.people_outline_rounded, color: Color(0xFF2563EB), size: 22),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        '$adults Adult(s), $childCount Child',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+                              Consumer<FlightProvider>(
+                                builder: (_, fp, __) => SizedBox(
+                                  width: double.infinity,
+                                  child: TextButton.icon(
+                                    onPressed: fp.isLoadingFlights ? null : _handleSearch,
+                                    icon: const Icon(Icons.search_rounded, color: Colors.white, size: 28),
+                                    label: Text(
+                                      fp.isLoadingFlights ? 'Mencari...' : 'Cari Tiket',
+                                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: Colors.white),
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFF7A1A),
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.only(
+                                          bottomLeft: Radius.circular(20),
+                                          bottomRight: Radius.circular(20),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  _AirportTile(
-                    label: 'Ke',
-                    icon: Icons.flight_land_rounded,
-                    code: destinationCode,
-                    airports: airports,
-                    onTap: () => _showAirportPicker(false),
-                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-
-            // Date selection
-            Row(
-              children: [
-                Expanded(
-                  child: _DateCard(
-                    label: 'Tanggal Berangkat',
-                    date: departureDate,
-                    onTap: () => _selectDate(false),
-                  ),
-                ),
-                if (isRoundTrip) ...[
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _DateCard(
-                      label: 'Tanggal Kembali',
-                      date: returnDate,
-                      onTap: () => _selectDate(true),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Passenger count
-            GlassCard(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _PassengerCounter(
-                      label: 'Dewasa',
-                      icon: Icons.person_rounded,
-                      count: adults,
-                      onDec: adults > 1 ? () => setState(() => adults--) : null,
-                      onInc: () => setState(() => adults++),
-                    ),
-                  ),
-                  Container(
-                      height: 40,
-                      width: 1,
-                      color: AppColors.border,
-                      margin: const EdgeInsets.symmetric(horizontal: 12)),
-                  Expanded(
-                    child: _PassengerCounter(
-                      label: 'Anak',
-                      icon: Icons.child_care_rounded,
-                      count: childCount,
-                      onDec: childCount > 0
-                          ? () => setState(() => childCount--)
-                          : null,
-                      onInc: () => setState(() => childCount++),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            Consumer<FlightProvider>(
-              builder: (_, fp, __) => PrimaryButton(
-                label: 'Cari Penerbangan',
-                icon: Icons.search_rounded,
-                isLoading: fp.isLoadingFlights,
-                onPressed: _handleSearch,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Helper Widgets ───────────────────────────────────────────────────────────
-
-class _TripToggle extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _TripToggle(
-      {required this.label,
-      required this.icon,
-      required this.selected,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(4),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            gradient: selected ? AppColors.primaryGradient : null,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 16,
-                  color: selected ? Colors.white : AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          selected ? Colors.white : AppColors.textSecondary)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AirportTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final String? code;
-  final List<Airport> airports;
-  final VoidCallback onTap;
-
-  const _AirportTile(
-      {required this.label,
-      required this.icon,
-      required this.code,
-      required this.airports,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final airport =
-        code != null ? airports.where((a) => a.code == code).firstOrNull : null;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: code != null
-                    ? AppColors.primary.withValues(alpha: 0.1)
-                    : AppColors.background,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon,
-                  color: code != null ? AppColors.primary : AppColors.textHint,
-                  size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+            Padding(
+              padding: EdgeInsets.fromLTRB(isWide ? 26 : 16, 24, isWide ? 26 : 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textHint,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 2),
-                  Text(
-                    airport != null
-                        ? '${airport.city} (${airport.code})'
-                        : 'Pilih bandara...',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: code != null
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: code != null
-                            ? AppColors.textPrimary
-                            : AppColors.textHint),
+                  const Text(
+                    'Domestic Flight Best Deals for You',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                   ),
-                  if (airport != null)
-                    Text(airport.airportName,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: const [
+                        _DealTab(label: 'Lampung', active: true),
+                        SizedBox(width: 10),
+                        _DealTab(label: 'Jawa Selatan'),
+                        SizedBox(width: 10),
+                        _DealTab(label: 'Malang'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textHint, size: 20),
           ],
         ),
       ),
@@ -632,138 +799,30 @@ class _AirportTile extends StatelessWidget {
   }
 }
 
-class _DateCard extends StatelessWidget {
+class _DealTab extends StatelessWidget {
   final String label;
-  final DateTime date;
-  final VoidCallback onTap;
+  final bool active;
 
-  const _DateCard(
-      {required this.label, required this.date, required this.onTap});
+  const _DealTab({required this.label, this.active = false});
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const Icon(Icons.calendar_today_rounded,
-                  color: AppColors.primary, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textHint,
-                            fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 2),
-                    Text(
-                      DateFormatter.formatShortDate(
-                          DateFormatter.formatDate(date)),
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFFE8F0FF) : Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: active ? const Color(0xFFBFD3FF) : const Color(0xFFD7DEEA),
         ),
       ),
-    );
-  }
-}
-
-class _PassengerCounter extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final int count;
-  final VoidCallback? onDec;
-  final VoidCallback onInc;
-
-  const _PassengerCounter(
-      {required this.label,
-      required this.icon,
-      required this.count,
-      required this.onDec,
-      required this.onInc});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: AppColors.primary),
-            const SizedBox(width: 6),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500)),
-          ],
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+          color: active ? const Color(0xFF1D4ED8) : const Color(0xFF64748B),
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _CounterBtn(
-              icon: Icons.remove_rounded,
-              onTap: onDec,
-              enabled: onDec != null,
-            ),
-            Expanded(
-              child: Center(
-                child: Text(
-                  '$count',
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary),
-                ),
-              ),
-            ),
-            _CounterBtn(icon: Icons.add_rounded, onTap: onInc, enabled: true),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _CounterBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool enabled;
-
-  const _CounterBtn(
-      {required this.icon, required this.onTap, required this.enabled});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: enabled
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : AppColors.border,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon,
-            size: 18,
-            color: enabled ? AppColors.primary : AppColors.textHint),
       ),
     );
   }

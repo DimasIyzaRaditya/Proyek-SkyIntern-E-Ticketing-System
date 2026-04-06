@@ -9,7 +9,9 @@ import '../models/booking_model.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
+import '../utils/ticket_download.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/mobile_side_menu.dart';
 import 'midtrans_payment_webview_screen.dart';
 
 class BookingsScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _BookingsScreenState extends State<BookingsScreen>
   late TabController _tabController;
   final Set<int> _payingIds = {};
   final Set<int> _syncingIds = {};
+  final Set<int> _downloadingTicketIds = {};
   Timer? _pollTimer;
 
   @override
@@ -169,6 +172,40 @@ class _BookingsScreenState extends State<BookingsScreen>
     }
   }
 
+  Future<void> _downloadTicket(Booking booking) async {
+    final ticketId = booking.ticket?.id;
+    if (ticketId == null || _downloadingTicketIds.contains(ticketId)) return;
+
+    setState(() => _downloadingTicketIds.add(ticketId));
+    try {
+      final downloaded = await BookingService.downloadTicket(ticketId);
+      final saved = await saveTicketFile(
+        booking: booking,
+        downloaded: downloaded,
+      );
+
+      if (!mounted) return;
+      showSnackBar(
+        context,
+        saved.opened
+            ? 'E-tiket berhasil diunduh dan dibuka.'
+            : 'E-tiket berhasil diunduh ke ${saved.filePath}',
+      );
+    } catch (e) {
+      if (mounted) {
+        showSnackBar(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingTicketIds.remove(ticketId));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,6 +228,13 @@ class _BookingsScreenState extends State<BookingsScreen>
                 ),
                 title: const Text('Pemesanan Saya',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                actions: [
+                  IconButton(
+                    tooltip: 'Menu',
+                    icon: const Icon(Icons.menu_rounded, color: Colors.white),
+                    onPressed: () => MobileSideMenu.show(context, activeItem: 'Bookings'),
+                  ),
+                ],
               ),
               TabBar(
                 controller: _tabController,
@@ -397,12 +441,14 @@ class _BookingsScreenState extends State<BookingsScreen>
                   ],
                 ),
               ),
-            if (isIssued)
+            if (isIssued) ...[
               OutlinedButton.icon(
-                onPressed: () =>
-                    Navigator.of(context).pushNamed('/e-ticket', arguments: {'booking': booking}),
+                onPressed: () => Navigator.of(context).pushNamed(
+                  '/e-ticket',
+                  arguments: {'booking': booking},
+                ),
                 icon: const Icon(Icons.airplane_ticket_outlined, size: 16),
-                label: const Text('Lihat E-Tiket'),
+                label: const Text('Lihat Tiket'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(38),
                   foregroundColor: AppColors.primary,
@@ -410,6 +456,31 @@ class _BookingsScreenState extends State<BookingsScreen>
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: _downloadingTicketIds.contains(booking.ticket!.id)
+                    ? null
+                    : () => _downloadTicket(booking),
+                icon: _downloadingTicketIds.contains(booking.ticket!.id)
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.download_rounded, size: 16),
+                label: Text(
+                  _downloadingTicketIds.contains(booking.ticket!.id)
+                      ? 'Mengunduh...'
+                      : 'Unduh Tiket',
+                ),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(38),
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
             if (isPending) ...[
               Row(
                 children: [
