@@ -29,6 +29,7 @@ function SearchResultsPageContent() {
   const searchParams = useSearchParams();
   const [sortBy, setSortBy] = useState<"price-low" | "price-high" | "duration" | "departure">("price-low");
   const [activeTabs, setActiveTabs] = useState<Record<string, FlightInfoTab>>({});
+  const [selectedPromoByFlight, setSelectedPromoByFlight] = useState<Record<string, number>>({});
   const [sortedFlights, setSortedFlights] = useState<FlightCardItem[]>([]);
   const [isLoadingFlights, setIsLoadingFlights] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
@@ -75,6 +76,27 @@ function SearchResultsPageContent() {
     };
   }, [adult, child, departureDate, destination, origin, sortBy]);
 
+  useEffect(() => {
+    setSelectedPromoByFlight((prev) => {
+      const next = { ...prev };
+      for (const flight of sortedFlights) {
+        if (!flight.promos?.length) {
+          delete next[flight.id];
+          continue;
+        }
+
+        const current = next[flight.id];
+        if (current && flight.promos.some((promo) => promo.id === current)) {
+          continue;
+        }
+
+        const bestPromo = [...flight.promos].sort((a, b) => b.discount - a.discount)[0];
+        next[flight.id] = bestPromo.id;
+      }
+      return next;
+    });
+  }, [sortedFlights]);
+
   const getActiveTab = (flightId: string): FlightInfoTab => activeTabs[flightId] ?? "details";
 
   const renderTabContent = (flightId: string) => {
@@ -107,7 +129,60 @@ function SearchResultsPageContent() {
       return <p className="text-sm text-slate-600">Jadwal dapat diubah sebelum keberangkatan dengan potensi selisih tarif dan biaya layanan.</p>;
     }
 
-    return <p className="text-sm text-slate-600">Promo aktif: potongan bundling pulang-pergi, bonus poin member, dan voucher check-in prioritas.</p>;
+    const promoCount = flight.promos?.length ?? 0;
+    if (promoCount === 0) {
+      return <p className="text-sm text-slate-600">Saat ini belum ada promo aktif untuk flight ini.</p>;
+    }
+
+    const promoNames = flight.promos
+      .sort((a, b) => b.discount - a.discount)
+      .map((promo) => `${promo.title} (${promo.discount}%)`)
+      .join(" • ");
+
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-slate-600">Promo aktif dari backend: {promoNames}</p>
+        <div className="rounded-xl border border-emerald-200 bg-linear-to-b from-emerald-50 to-white p-2.5">
+          <p className="text-xs font-semibold tracking-wide text-emerald-800">PILIH 1 PROMO UNTUK CHECKOUT</p>
+          <div className="mt-2 space-y-2">
+            {flight.promos
+              .sort((a, b) => b.discount - a.discount)
+              .map((promo) => (
+                <label
+                  key={promo.id}
+                  className={`group block cursor-pointer rounded-lg border px-3 py-2 text-sm transition ${
+                    selectedPromoByFlight[flight.id] === promo.id
+                      ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                      : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2.5 text-slate-700">
+                    <input
+                      type="radio"
+                      name={`selected-promo-${flight.id}`}
+                      checked={selectedPromoByFlight[flight.id] === promo.id}
+                      onChange={() => setSelectedPromoByFlight((prev) => ({ ...prev, [flight.id]: promo.id }))}
+                      className="h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="font-medium">{promo.title}</span>
+                  </span>
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                      {promo.discount}%
+                    </span>
+                  </div>
+                  {promo.description && (
+                    <p className="mt-1 pl-6.5 text-xs text-slate-500">{promo.description}</p>
+                  )}
+                  {selectedPromoByFlight[flight.id] === promo.id && (
+                    <p className="mt-1 pl-6.5 text-xs font-semibold text-emerald-700">Promo terpilih</p>
+                  )}
+                </label>
+              ))}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -186,7 +261,14 @@ function SearchResultsPageContent() {
             )}
 
             {sortedFlights.map((flight, idx) => {
-              const query = new URLSearchParams({ origin, destination, departureDate, returnDate, adult, child });
+              const queryData: Record<string, string> = { origin, destination, departureDate, returnDate, adult, child };
+              const selectedPromoId = selectedPromoByFlight[flight.id];
+              const selectedPromo = flight.promos.find((promo) => promo.id === selectedPromoId) ?? null;
+              const badgeDiscount = selectedPromo?.discount ?? (flight.promos.length > 0 ? Math.max(...flight.promos.map((promo) => promo.discount)) : 0);
+              if (selectedPromoId) {
+                queryData.promoId = String(selectedPromoId);
+              }
+              const query = new URLSearchParams(queryData);
 
               return (
                 <LazySection key={flight.id} delay={Math.min(5, (idx % 5) + 1) as 1 | 2 | 3 | 4 | 5}>
@@ -244,6 +326,11 @@ function SearchResultsPageContent() {
                     </div>
 
                     <div className="w-full lg:w-auto lg:min-w-42.5 lg:text-right">
+                      {flight.promos.length > 0 && (
+                        <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                          Promo aktif {badgeDiscount}%
+                        </div>
+                      )}
                       <p className="text-3xl font-black text-orange-600">{formatRupiah(flight.price)}<span className="text-sm font-semibold text-slate-500">/pax</span></p>
 
                       <Link

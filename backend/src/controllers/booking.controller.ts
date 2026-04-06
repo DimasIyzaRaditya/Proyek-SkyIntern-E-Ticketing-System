@@ -10,6 +10,27 @@ import { uploadFile, deleteFile } from "../utils/minio"
 import { sendBookingConfirmation, sendNewTransactionReminderEmail, sendTodayDepartureReminderEmail } from "../utils/email"
 import { createTransaction, checkTransactionStatus, verifySignature, mapMidtransStatus } from "../utils/midtrans"
 import { emitToUser } from "../utils/socket"
+import { expirePendingBookings } from "../utils/booking-expiry"
+
+const getApplicablePromosForFlight = async (flightId: number) => {
+  const now = new Date()
+  return prisma.promo.findMany({
+    where: {
+      isActive: true,
+      startDate: { lte: now },
+      endDate: { gte: now },
+      OR: [
+        { flightId: null },
+        { flightId }
+      ]
+    },
+    select: {
+      id: true,
+      title: true,
+      discount: true
+    }
+  })
+}
 
 const getJakartaDateParts = (date: Date) => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -81,7 +102,7 @@ const sendTransactionReminderIfNeeded = async (bookingId: number) => {
 // Step 1: Create Booking with Passenger Data
 export const createBooking = async (req: AuthRequest, res: Response) => {
   try {
-    const { flightId, passengers, seatIds } = req.body // ID penerbangan, data penumpang, dan ID kursi yang dipilih
+    const { flightId, passengers, seatIds, promoId } = req.body // ID penerbangan, data penumpang, ID kursi, dan promo opsional
     // passengers: [{ type, title, firstName, lastName, documentType, documentNumber, nationality, dateOfBirth }]
     // documentType: 'KTP' atau 'PASSPORT'
     // seatIds: [flightSeatId1, flightSeatId2, ...]
@@ -123,13 +144,32 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       selectedSeatNumbers = seats.map(s => s.seat.seatNumber) // Simpan nomor kursi (misal ["7A","7B"])
     }
 
-    const totalPrice = calculateTotalPrice( // Hitung total harga: (base + seat) x penumpang + pajak + admin fee
+    const rawTotalPrice = calculateTotalPrice( // Hitung total harga: (base x penumpang) + total seat extra + pajak + admin fee
       flight.basePrice,
       flight.tax,
       flight.adminFee,
       seatPrice,
       passengers.length
     )
+
+    const applicablePromos = await getApplicablePromosForFlight(flightId)
+    const requestedPromoId = promoId != null ? Number(promoId) : null
+
+    let selectedPromo: { id: number; title: string; discount: number } | null = null
+
+    if (requestedPromoId != null && !Number.isNaN(requestedPromoId)) {
+      selectedPromo = applicablePromos.find((promo) => promo.id === requestedPromoId) ?? null
+      if (!selectedPromo) {
+        return res.status(400).json({ message: "Promo yang dipilih tidak valid atau sudah tidak aktif" })
+      }
+    } else if (applicablePromos.length > 0) {
+      // Fallback untuk kompatibilitas klien lama: tetap gunakan promo terbaik jika promoId tidak dikirim.
+      selectedPromo = applicablePromos.reduce((best, promo) => (promo.discount > best.discount ? promo : best))
+    }
+
+    const discountPercent = selectedPromo?.discount ?? 0
+    const promoAmount = Math.round(rawTotalPrice * (discountPercent / 100))
+    const totalPrice = Math.max(0, rawTotalPrice - promoAmount)
 
     // Create booking
     const bookingCode = generateBookingCode() // Kode booking 6 karakter unik (A-Z0-9)
@@ -191,6 +231,18 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     res.status(201).json({
       message: "Pemesanan berhasil dibuat",
       booking,
+      pricing: {
+        rawTotalPrice,
+        discountPercent,
+        promoAmount,
+        totalPrice,
+        appliedPromo: selectedPromo
+          ? {
+              id: selectedPromo.id,
+              title: selectedPromo.title
+            }
+          : null
+      },
       expiresIn: 15 * 60
     })
   } catch (error) {
@@ -323,6 +375,8 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
 // Get User Bookings
 export const getMyBookings = async (req: AuthRequest, res: Response) => {
   try {
+    await expirePendingBookings(req.user!.id)
+
     const { status } = req.query // Filter status booking (PENDING/PAID/CANCELLED) dari query string
 
     const where: any = {
@@ -362,6 +416,8 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
 // Admin: Get All Bookings
 export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
   try {
+    await expirePendingBookings()
+
     const { status } = req.query // Filter status booking dari query string (opsional)
 
     const where: any = {} // Kondisi filter, kosong berarti tampilkan semua booking

@@ -89,6 +89,7 @@ function SeatSelectionPageContent() {
     tax: 0,
     adminFee: 0,
     facilities: ["Cabin Bag 7kg"],
+    promos: [],
   }), [flightId, searchParams]);
 
   useEffect(() => {
@@ -257,6 +258,8 @@ function SeatSelectionPageContent() {
       seatFlightIds: flightSeatIds.join(","),
       extraPrice: String(extraPrice),
     };
+    const promoId = searchParams.get("promoId") ?? "";
+    if (promoId) params.promoId = promoId;
     if (existingBookingId) params.existingBookingId = existingBookingId;
 
     router.push(`/booking/passenger?${new URLSearchParams(params).toString()}`);

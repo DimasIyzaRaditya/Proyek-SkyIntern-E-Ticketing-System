@@ -14,6 +14,12 @@ export type FlightCardItem = {
   tax: number;
   adminFee: number;
   facilities: string[];
+  promos: {
+    id: number;
+    title: string;
+    discount: number;
+    description?: string | null;
+  }[];
 };
 
 type BackendFlight = {
@@ -41,6 +47,12 @@ type BackendFlight = {
     country: string;
     name: string;
   };
+  promos?: {
+    id: number;
+    title: string;
+    discount: number;
+    description?: string | null;
+  }[];
 };
 
 type SearchFlightsResponse = {
@@ -113,6 +125,7 @@ const toCardItem = (flight: BackendFlight): FlightCardItem => ({
   adminFee: flight.adminFee ?? 0,
   price: flight.basePrice + (flight.tax ?? 0) + (flight.adminFee ?? 0),
   facilities: parseFacilities(flight.facilities),
+  promos: flight.promos ?? [],
 });
 
 export const searchFlightsFromApi = async (params: {

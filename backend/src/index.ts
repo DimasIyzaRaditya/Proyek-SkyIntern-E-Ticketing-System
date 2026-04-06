@@ -14,6 +14,7 @@ import { getActivePromos } from "./controllers/promo.controller"
 import swaggerSpec from "./config/swagger"
 import { initializeBucket } from "./utils/minio"
 import { startDepartureReminderScheduler } from "./utils/departure-reminder"
+import { startBookingExpiryScheduler } from "./utils/booking-expiry"
 import { initSocketServer } from "./utils/socket"
 
 const app = express() // Instance utama aplikasi Express
@@ -21,6 +22,7 @@ const app = express() // Instance utama aplikasi Express
 // Initialize Minio bucket
 initializeBucket().catch(console.error)
 startDepartureReminderScheduler()
+startBookingExpiryScheduler()
 
 // CORS configuration
 app.use(cors({

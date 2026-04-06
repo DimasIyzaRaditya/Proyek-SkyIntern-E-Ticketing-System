@@ -1,30 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import Script from "next/script";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import { isAuthenticated } from "@/lib/auth";
-import { getMyBookingsFromApi, createPaymentFromApi, syncPaymentFromApi } from "@/lib/booking-api";
-
-declare global {
-  interface Window {
-    snap: {
-      pay: (
-        token: string,
-        options: {
-          onSuccess?: (result: unknown) => void;
-          onPending?: (result: unknown) => void;
-          onError?: (result: unknown) => void;
-          onClose?: () => void;
-        }
-      ) => void;
-    };
-  }
-}
+import { getMyBookingsFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 
 type TabKey = "Upcoming" | "Completed" | "Cancelled";
 type BookingStatus = "Pending" | "Processing" | "Paid" | "Issued" | "Cancelled";
@@ -83,7 +66,6 @@ function MyBookingsPageContent() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [payingId, setPayingId] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
@@ -183,91 +165,27 @@ function MyBookingsPageContent() {
   };
 
   const handlePayBooking = async (bookingId: string) => {
-    setPayingId(bookingId);
-    setPayError(null);
-    try {
-      const result = await createPaymentFromApi(Number(bookingId));
-      const snapToken = result.payment?.snapToken;
-      const redirectUrl = result.payment?.redirectUrl;
+    const booking = liveBookings.find((item) => item.id === bookingId)
+    if (!booking) return
 
-      const reloadBookings = async () => {
-        try {
-          const bookings = await getMyBookingsFromApi();
-          const mapped: BookingView[] = bookings.map((item) => {
-            const passenger = item.passengers[0]
-              ? `${item.passengers[0].firstName} ${item.passengers[0].lastName}`.trim()
-              : "Passenger";
-            let status: BookingStatus = "Pending";
-            if (item.status === "CANCELLED" || item.status === "EXPIRED") status = "Cancelled";
-            else if (item.ticket) status = "Issued";
-            else if (item.status === "PAID") status = "Paid";
-            return {
-              id: String(item.id),
-              bookingCode: item.bookingCode,
-              airline: item.flight.airline.name,
-              route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
-              date: formatDate(item.flight.departureTime),
-              status,
-              seat: item.selectedSeats ?? "-",
-              passenger,
-              flightNumber: item.flight.flightNumber,
-              pdfUrl: item.ticket?.pdfUrl ?? "",
-              tab: getTabByStatus(status),
-              flightId: String(item.flightId),
-              origin: item.flight.origin.code ?? item.flight.origin.city,
-              destination: item.flight.destination.code ?? item.flight.destination.city,
-              departureDate: item.flight.departureTime.slice(0, 10),
-              pTitle: item.passengers[0]?.title ?? "Mr",
-              pFirstName: item.passengers[0]?.firstName ?? "Passenger",
-              pLastName: item.passengers[0]?.lastName ?? "",
-              pIdType: item.passengers[0]?.documentType ?? "KTP",
-              pIdNumber: item.passengers[0]?.documentNumber ?? "",
-              pNationality: item.passengers[0]?.nationality ?? "Indonesian",
-              departureIso: item.flight.departureTime,
-              arrivalIso: item.flight.arrivalTime,
-              originAirportName: item.flight.origin.name,
-              destAirportName: item.flight.destination.name,
-              originCity: item.flight.origin.city,
-              destCity: item.flight.destination.city,
-              totalPriceAmt: item.totalPrice,
-            };
-          });
-          setLiveBookings(mapped);
-        } catch { /* silent */ }
-      };
+    const params = new URLSearchParams({
+      existingBookingId: booking.id,
+      flightId: booking.flightId,
+      origin: booking.origin,
+      destination: booking.destination,
+      departureDate: booking.departureDate,
+      adult: "1",
+      child: "0",
+      extraPrice: "0",
+      pTitle: booking.pTitle,
+      pFirstName: booking.pFirstName,
+      pLastName: booking.pLastName,
+      pIdType: booking.pIdType,
+      pIdNumber: booking.pIdNumber,
+      pNationality: booking.pNationality,
+    })
 
-      if (snapToken && typeof window !== "undefined" && window.snap) {
-        window.snap.pay(snapToken, {
-          onSuccess: () => void reloadBookings(),
-          onPending: () => void reloadBookings(),
-          onError: () => setPayError("Pembayaran gagal. Silakan coba lagi."),
-          onClose: () => { /* token still valid, user can retry */ },
-        });
-      } else if (redirectUrl) {
-        window.location.href = redirectUrl;
-      } else {
-        setPayError("Gagal memuat gateway pembayaran.");
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "";
-      const isExpired =
-        msg.toLowerCase().includes("kedaluwarsa") ||
-        msg.toLowerCase().includes("expired");
-      if (isExpired) {
-        setLiveBookings((prev) =>
-          prev.map((b) =>
-            b.id === bookingId
-              ? { ...b, status: "Cancelled" as BookingStatus, tab: "Cancelled" as TabKey }
-              : b
-          )
-        );
-        setActiveTab("Cancelled");
-      } else {
-        setPayError(msg || "Gagal memuat pembayaran.");
-      }
-    } finally {
-      setPayingId(null);
-    }
+    router.push(`/booking/payment?${params.toString()}`)
   };
 
   useEffect(() => {
@@ -383,15 +301,6 @@ function MyBookingsPageContent() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
-      <Script
-        src={
-          process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === "true"
-            ? "https://app.midtrans.com/snap/snap.js"
-            : "https://app.sandbox.midtrans.com/snap/snap.js"
-        }
-        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-        strategy="afterInteractive"
-      />
       <MainNav />
       <main className="mx-auto max-w-6xl px-6 py-10 page-enter">
         <h1 className="inline-flex items-center gap-2 text-3xl font-black text-slate-900">
@@ -507,10 +416,9 @@ function MyBookingsPageContent() {
                             </Link>
                             <button
                               onClick={() => void handlePayBooking(booking.id)}
-                              disabled={payingId === booking.id}
-                              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                             >
-                              {payingId === booking.id ? "Memuat..." : "Bayar Sekarang"}
+                              Bayar Sekarang
                             </button>
                             <button
                               onClick={() => void handleSyncPayment(booking.id)}

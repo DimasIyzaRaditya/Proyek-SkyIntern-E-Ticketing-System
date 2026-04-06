@@ -326,9 +326,39 @@ export const searchFlights = async (req: Request, res: Response) => {
       ...(limit ? { take: Math.min(parseInt(limit as string), 5000) } : {})
     })
 
+    const activeGlobalPromos = await prisma.promo.findMany({
+      where: {
+        isActive: true,
+        startDate: { lte: new Date() },
+        endDate: { gte: new Date() },
+        flightId: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        discount: true,
+        description: true,
+      },
+    })
+
+    const flightsWithAllPromos = flights.map((flight) => {
+      const mergedPromos = [...activeGlobalPromos, ...(flight.promos || [])]
+      const seenPromo = new Set<number>()
+      const dedupedPromos = mergedPromos.filter((promo) => {
+        if (seenPromo.has(promo.id)) return false
+        seenPromo.add(promo.id)
+        return true
+      })
+
+      return {
+        ...flight,
+        promos: dedupedPromos,
+      }
+    })
+
     res.json({
-      flights,
-      count: flights.length,
+      flights: flightsWithAllPromos,
+      count: flightsWithAllPromos.length,
       passengers: passengerCount ? parseInt(passengerCount as string) : 1
     })
   } catch (error) {
@@ -365,7 +395,30 @@ export const getFlightDetail = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Penerbangan tidak ditemukan" })
     }
 
-    res.json({ flight })
+    const activePromos = await prisma.promo.findMany({
+      where: {
+        isActive: true,
+        startDate: { lte: new Date() },
+        endDate: { gte: new Date() },
+        OR: [
+          { flightId: null },
+          { flightId: flight.id }
+        ]
+      },
+      select: {
+        id: true,
+        title: true,
+        discount: true,
+        description: true,
+      }
+    })
+
+    res.json({
+      flight: {
+        ...flight,
+        promos: activePromos
+      }
+    })
   } catch (error) {
     console.error("Get flight detail error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })

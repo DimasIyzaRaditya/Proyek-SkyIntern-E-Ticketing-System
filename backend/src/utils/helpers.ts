@@ -32,7 +32,8 @@ export const calculateTotalPrice = (
   seatPrice: number = 0,
   passengerCount: number = 1
 ): number => {
-  return (basePrice + seatPrice) * passengerCount + tax + adminFee
+  // seatPrice diasumsikan sudah berupa total tambahan dari semua kursi terpilih.
+  return (basePrice * passengerCount) + seatPrice + tax + adminFee
 }
 
 export const addMinutes = (date: Date, minutes: number): Date => {

@@ -21,6 +21,7 @@ function FlightDetailPageContent() {
   const returnDate = searchParams.get("returnDate") ?? departureDate;
   const adult = searchParams.get("adult") ?? "1";
   const child = searchParams.get("child") ?? "0";
+  const promoId = searchParams.get("promoId") ?? "";
 
   useEffect(() => {
     let isMounted = true;
@@ -83,6 +84,7 @@ function FlightDetailPageContent() {
     returnDate,
     adult,
     child,
+    ...(promoId ? { promoId } : {}),
   });
 
   return (

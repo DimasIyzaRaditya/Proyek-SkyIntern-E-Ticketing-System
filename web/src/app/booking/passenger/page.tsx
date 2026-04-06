@@ -65,6 +65,8 @@ function PassengerFormPageContent() {
       pNationality: nationality,
       pDob: dob,
     };
+    const promoId = searchParams.get("promoId") ?? "";
+    if (promoId) params.promoId = promoId;
     if (existingBookingId) params.existingBookingId = existingBookingId;
 
     router.push(`/booking/payment?${new URLSearchParams(params).toString()}`);

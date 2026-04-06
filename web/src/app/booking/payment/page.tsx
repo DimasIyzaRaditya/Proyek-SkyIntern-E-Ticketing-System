@@ -8,7 +8,7 @@ import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
 import { isAuthenticated } from "@/lib/auth";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
-import { createBookingFromApi, createPaymentFromApi, cancelBookingFromApi } from "@/lib/booking-api";
+import { createBookingFromApi, createPaymentFromApi, cancelBookingFromApi, getBookingDetailFromApi, getMyBookingsFromApi } from "@/lib/booking-api";
 
 declare global {
   interface Window {
@@ -28,6 +28,13 @@ declare global {
 
 const COUNTDOWN_DURATION = 15 * 60;
 
+const getRemainingSeconds = (expiresAt?: string | null) => {
+  if (!expiresAt) return COUNTDOWN_DURATION;
+  const expiresAtMs = new Date(expiresAt).getTime();
+  if (Number.isNaN(expiresAtMs)) return COUNTDOWN_DURATION;
+  return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+};
+
 function PaymentSummaryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -40,6 +47,15 @@ function PaymentSummaryPageContent() {
   const [snapClosed, setSnapClosed] = useState(false);
   const [paymentPending, setPaymentPending] = useState(false);
   const [bookingIdForPayment, setBookingIdForPayment] = useState<number | null>(null);
+  const [persistedBookingTotalPrice, setPersistedBookingTotalPrice] = useState<number | null>(null);
+  const [persistedBreakdown, setPersistedBreakdown] = useState<{
+    ticketPrice: number;
+    tax: number;
+    adminFee: number;
+    seatExtra: number;
+    promoAmount: number;
+  } | null>(null);
+  const [persistedSeatDetails, setPersistedSeatDetails] = useState<Array<{ seatNumber: string; additionalPrice: number }>>([]);
   const [changingMethod, setChangingMethod] = useState(false);
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
   const [isLoadingFlight, setIsLoadingFlight] = useState(true);
@@ -51,6 +67,63 @@ function PaymentSummaryPageContent() {
   const adult = Number(searchParams.get("adult") ?? "1");
   const child = Number(searchParams.get("child") ?? "0");
   const extraPrice = Number(searchParams.get("extraPrice") ?? "0");
+  const promoIdFromQuery = Number(searchParams.get("promoId") ?? "");
+  const draftCountdownKey = `payment_draft_start_${flightId || "unknown"}`;
+  const selectedSeatNumbersFromQuery = useMemo(
+    () => (searchParams.get("seats") ?? "")
+      .split(",")
+      .map((seat) => seat.trim())
+      .filter(Boolean),
+    [searchParams],
+  );
+
+  const buildPassengersFromQuery = () => {
+    const passengers = [];
+    const adultCount = adult;
+    const childCount = child;
+    const totalPassengers = Math.max(1, adultCount + childCount);
+
+    const firstName = searchParams.get("pFirstName") ?? "Passenger";
+    const lastName = searchParams.get("pLastName") ?? "";
+    const title = searchParams.get("pTitle") ?? "Mr";
+    const documentType = searchParams.get("pIdType") || "KTP";
+    const documentNumber = searchParams.get("pIdNumber") || "0000000000000000";
+    const nationality = searchParams.get("pNationality") ?? "Indonesian";
+    const dob = searchParams.get("pDob") ?? undefined;
+
+    for (let i = 0; i < adultCount; i++) {
+      passengers.push({
+        type: "ADULT" as const,
+        title,
+        firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
+        lastName,
+        documentType,
+        documentNumber: i === 0 ? documentNumber : `${documentNumber}${i}`,
+        nationality,
+        dateOfBirth: dob,
+      });
+    }
+    for (let i = 0; i < childCount; i++) {
+      passengers.push({
+        type: "CHILD" as const,
+        title: "Ms",
+        firstName: `Child${i + 1}`,
+        lastName,
+        documentType,
+        documentNumber: `${documentNumber}C${i}`,
+        nationality,
+      });
+    }
+
+    return passengers.slice(0, Math.max(1, totalPassengers));
+  };
+
+  const getSeatIdsFromQuery = () => {
+    const seatFlightIdsParam = searchParams.get("seatFlightIds") ?? "";
+    return seatFlightIdsParam
+      ? seatFlightIdsParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0)
+      : [];
+  };
 
   const fallbackFlight = useMemo<FlightCardItem>(() => ({
     id: flightId || "-",
@@ -68,6 +141,7 @@ function PaymentSummaryPageContent() {
     tax: 0,
     adminFee: 0,
     facilities: ["Cabin Bag 7kg"],
+    promos: [],
   }), [flightId, searchParams]);
 
   useEffect(() => {
@@ -105,11 +179,21 @@ function PaymentSummaryPageContent() {
   }, [fallbackFlight, flightId]);
 
   const activeFlight = flight ?? fallbackFlight;
+  const availablePromos = [...(activeFlight.promos ?? [])].sort((a, b) => b.discount - a.discount);
 
   const ticketPrice = activeFlight.basePrice * adult + Math.round(activeFlight.basePrice * 0.75 * child);
   const tax = activeFlight.tax;
   const adminFee = activeFlight.adminFee;
-  const totalPrice = ticketPrice + tax + adminFee + extraPrice;
+  const subtotalBeforePromo = ticketPrice + tax + adminFee + extraPrice;
+  const selectedPromoFromQuery = Number.isNaN(promoIdFromQuery)
+    ? null
+    : availablePromos.find((promo) => promo.id === promoIdFromQuery) ?? null;
+  const selectedPromo = selectedPromoFromQuery ?? availablePromos[0] ?? null;
+  const promoDiscountPercent = selectedPromo?.discount ?? 0;
+  const promoAmount = Math.round(subtotalBeforePromo * (promoDiscountPercent / 100));
+  const totalPrice = Math.max(0, subtotalBeforePromo - promoAmount);
+  const usePersistedPrice = Boolean(existingBookingId) && persistedBookingTotalPrice != null;
+  const displayedTotalPrice = usePersistedPrice ? persistedBookingTotalPrice : totalPrice;
 
   // Fix hydration: read auth state only on client
   useEffect(() => {
@@ -121,37 +205,139 @@ function PaymentSummaryPageContent() {
     }
   }, [router, searchParams]);
 
-  // Persist countdown across refreshes using localStorage
-  // Key is tied to existingBookingId if editing, otherwise flightId
-  const countdownKey = `payment_start_${existingBookingId || flightId || "unknown"}`;
   useEffect(() => {
-    const stored = localStorage.getItem(countdownKey);
-    if (stored) {
-      const elapsed = Math.floor((Date.now() - Number(stored)) / 1000);
-      const remaining = Math.max(0, COUNTDOWN_DURATION - elapsed);
-      setCountdown(remaining);
-    } else {
-      localStorage.setItem(countdownKey, String(Date.now()));
-    }
-  }, [countdownKey]);
+    let isMounted = true;
+
+    const syncCountdownFromBooking = async (bookingId: number) => {
+      const detail = await getBookingDetailFromApi(bookingId);
+      if (!isMounted) return;
+      setBookingIdForPayment(bookingId);
+      setPersistedBookingTotalPrice(detail.booking.totalPrice);
+
+      const passengerCount = Math.max(1, detail.booking.passengers?.length ?? 1);
+      const flightBasePrice = detail.booking.flight.basePrice ?? 0;
+      const ticketPriceSaved = flightBasePrice * passengerCount;
+      const taxSaved = detail.booking.flight.tax ?? 0;
+      const adminFeeSaved = detail.booking.flight.adminFee ?? 0;
+      const seatExtraSaved = (detail.booking.flightSeats ?? []).reduce(
+        (sum, seat) => sum + (seat.additionalPrice ?? 0),
+        0,
+      );
+      const seatDetailsSaved = (detail.booking.flightSeats ?? [])
+        .map((seat) => ({
+          seatNumber: seat.seat?.seatNumber ?? "-",
+          additionalPrice: seat.additionalPrice ?? 0,
+        }))
+        .sort((a, b) => a.seatNumber.localeCompare(b.seatNumber));
+      const rawSaved = ticketPriceSaved + taxSaved + adminFeeSaved + seatExtraSaved;
+      const promoSaved = Math.max(0, rawSaved - detail.booking.totalPrice);
+
+      setPersistedBreakdown({
+        ticketPrice: ticketPriceSaved,
+        tax: taxSaved,
+        adminFee: adminFeeSaved,
+        seatExtra: seatExtraSaved,
+        promoAmount: promoSaved,
+      });
+      setPersistedSeatDetails(seatDetailsSaved);
+
+      const status = detail.booking.status;
+      if (status === "CANCELLED" || status === "EXPIRED") {
+        setCountdown(0);
+        return;
+      }
+      setCountdown(getRemainingSeconds(detail.booking.expiresAt ?? null));
+    };
+
+    const loadCountdown = async () => {
+      if (!existingBookingId) {
+        try {
+          const bookings = await getMyBookingsFromApi();
+          if (!isMounted) return;
+
+          const pendingSameFlight = bookings
+            .filter((item) => item.status === "PENDING" && String(item.flightId) === String(flightId))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+          if (pendingSameFlight) {
+            await syncCountdownFromBooking(pendingSameFlight.id);
+            const nextParams = new URLSearchParams(searchParams.toString());
+            nextParams.set("existingBookingId", String(pendingSameFlight.id));
+            router.replace(`/booking/payment?${nextParams.toString()}`);
+            return;
+          }
+
+          // Belum ada booking pending untuk user+flight ini -> buat draft booking
+          // agar langsung muncul di halaman My Bookings meskipun user belum klik bayar.
+          if (flightId) {
+            const seatIds = getSeatIdsFromQuery();
+            const draft = await createBookingFromApi({
+              flightId: Number(flightId),
+              passengers: buildPassengersFromQuery(),
+              seatIds: seatIds.length > 0 ? seatIds : undefined,
+              promoId: selectedPromo?.id,
+            });
+
+            if (!isMounted) return;
+
+            await syncCountdownFromBooking(draft.booking.id);
+            localStorage.removeItem(draftCountdownKey);
+            const nextParams = new URLSearchParams(searchParams.toString());
+            nextParams.set("existingBookingId", String(draft.booking.id));
+            router.replace(`/booking/payment?${nextParams.toString()}`);
+            return;
+          }
+        } catch {
+          // fallback to local draft timer below
+        }
+
+        const stored = localStorage.getItem(draftCountdownKey);
+        if (stored) {
+          const elapsed = Math.floor((Date.now() - Number(stored)) / 1000);
+          const remaining = Math.max(0, COUNTDOWN_DURATION - elapsed);
+          setCountdown(remaining);
+        } else {
+          localStorage.setItem(draftCountdownKey, String(Date.now()));
+          setCountdown(COUNTDOWN_DURATION);
+        }
+        return;
+      }
+
+      try {
+        const bookingId = Number(existingBookingId);
+        if (Number.isNaN(bookingId)) return;
+        await syncCountdownFromBooking(bookingId);
+      } catch {
+        if (!isMounted) return;
+        // fallback: keep default countdown
+      }
+    };
+
+    void loadCountdown();
+    return () => {
+      isMounted = false;
+    };
+  }, [existingBookingId, draftCountdownKey, flightId, router, searchParams]);
 
   // Auto-cancel booking when countdown expires
   useEffect(() => {
     if (countdown !== 0 || paid || paymentPending) return;
     const idToCancel = bookingIdForPayment ?? (existingBookingId ? Number(existingBookingId) : null);
-    if (!idToCancel) return;
+    if (!idToCancel) {
+      localStorage.removeItem(draftCountdownKey);
+      return;
+    }
     cancelBookingFromApi(idToCancel).catch(() => { /* silent – backend also auto-expires */ });
-    localStorage.removeItem(countdownKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countdown]);
+  }, [countdown, draftCountdownKey]);
 
   useEffect(() => {
     if (paid) return;
+    if (countdown <= 0) return;
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          localStorage.removeItem(countdownKey);
           return 0;
         }
         return prev - 1;
@@ -160,7 +346,7 @@ function PaymentSummaryPageContent() {
 
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paid]);
+  }, [paid, countdown]);
 
   const countdownText = `${Math.floor(countdown / 60)
     .toString()
@@ -174,7 +360,7 @@ function PaymentSummaryPageContent() {
           setPaid(true);
           setPaymentPending(false);
           setPendingSnapToken(null);
-          localStorage.removeItem(countdownKey);
+          localStorage.removeItem(draftCountdownKey);
           setTimeout(() => router.push("/bookings?status=success"), 800);
         },
         onPending: () => {
@@ -184,7 +370,7 @@ function PaymentSummaryPageContent() {
           setPendingSnapToken(null);
           setPendingRedirectUrl(null);
           setSnapClosed(false);
-          localStorage.removeItem(countdownKey);
+          localStorage.removeItem(draftCountdownKey);
         },
         onError: () => {
           // Token consumed — clear so user can start fresh
@@ -246,65 +432,31 @@ function PaymentSummaryPageContent() {
     try {
       let bookingId: number;
 
-      if (existingBookingId) {
+      if (bookingIdForPayment) {
+        bookingId = bookingIdForPayment;
+      } else if (existingBookingId) {
         // Editing flow: reuse the existing booking, skip createBooking
         bookingId = Number(existingBookingId);
         setBookingIdForPayment(bookingId);
       } else {
-        // New booking flow
-        const adultCount = adult;
-        const childCount = child;
-        const totalPassengers = Math.max(1, adultCount + childCount);
-
-        const buildPassengers = () => {
-          const passengers = [];
-          const firstName = searchParams.get("pFirstName") ?? "Passenger";
-          const lastName = searchParams.get("pLastName") ?? "";
-          const title = searchParams.get("pTitle") ?? "Mr";
-          const documentType = searchParams.get("pIdType") || "KTP";
-          const documentNumber = searchParams.get("pIdNumber") || "0000000000000000";
-          const nationality = searchParams.get("pNationality") ?? "Indonesian";
-          const dob = searchParams.get("pDob") ?? undefined;
-
-          for (let i = 0; i < adultCount; i++) {
-            passengers.push({
-              type: "ADULT" as const,
-              title,
-              firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
-              lastName,
-              documentType,
-              documentNumber: i === 0 ? documentNumber : `${documentNumber}${i}`,
-              nationality,
-              dateOfBirth: dob,
-            });
-          }
-          for (let i = 0; i < childCount; i++) {
-            passengers.push({
-              type: "CHILD" as const,
-              title: "Ms",
-              firstName: `Child${i + 1}`,
-              lastName,
-              documentType,
-              documentNumber: `${documentNumber}C${i}`,
-              nationality,
-            });
-          }
-          return passengers.slice(0, Math.max(1, totalPassengers));
-        };
-
-        // Ambil FlightSeat IDs dari URL (dikirim oleh halaman seat selection)
-        const seatFlightIdsParam = searchParams.get("seatFlightIds") ?? "";
-        const seatIds = seatFlightIdsParam
-          ? seatFlightIdsParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0)
-          : [];
+        // Fallback: jika draft booking belum sempat dibuat otomatis, buat di sini.
+        const seatIds = getSeatIdsFromQuery();
 
         const bookingResult = await createBookingFromApi({
           flightId: Number(flightId),
-          passengers: buildPassengers(),
+          passengers: buildPassengersFromQuery(),
           seatIds: seatIds.length > 0 ? seatIds : undefined,
+          promoId: selectedPromo?.id,
         });
         bookingId = bookingResult.booking.id;
         setBookingIdForPayment(bookingId);
+
+        setCountdown(getRemainingSeconds(bookingResult.booking.expiresAt ?? null));
+        localStorage.removeItem(draftCountdownKey);
+
+        const nextParams = new URLSearchParams(searchParams.toString());
+        nextParams.set("existingBookingId", String(bookingId));
+        router.replace(`/booking/payment?${nextParams.toString()}`);
       }
 
       // Create Midtrans payment and get Snap token
@@ -346,7 +498,7 @@ function PaymentSummaryPageContent() {
         <MainNav />
         <main className="mx-auto max-w-3xl px-6 py-12">
           <section className="rounded-3xl border border-blue-100 bg-white p-8 text-sm text-slate-600 shadow-lg">
-            Memuat ringkasan penerbangan dari backend...
+            Memuat ringkasan penerbangan dari...
           </section>
         </main>
       </div>
@@ -378,11 +530,55 @@ function PaymentSummaryPageContent() {
 
           <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
             {flightError && <p className="text-xs text-amber-700">{flightError}</p>}
-            <div className="flex justify-between text-sm"><span>Ticket Price</span><span>{formatRupiah(ticketPrice)}</span></div>
-            <div className="flex justify-between text-sm"><span>Tax</span><span>{formatRupiah(tax)}</span></div>
-            <div className="flex justify-between text-sm"><span>Admin Fee</span><span>{formatRupiah(adminFee)}</span></div>
-            <div className="flex justify-between text-sm"><span>Seat Extra</span><span>{formatRupiah(extraPrice)}</span></div>
-            <div className="flex justify-between border-t border-blue-200 pt-3 text-lg font-bold text-blue-700"><span>Total Price</span><span>{formatRupiah(totalPrice)}</span></div>
+
+            {usePersistedPrice ? (
+              <>
+                <div className="flex justify-between text-sm"><span>Ticket Price</span><span>{formatRupiah(persistedBreakdown?.ticketPrice ?? 0)}</span></div>
+                <div className="flex justify-between text-sm"><span>Tax</span><span>{formatRupiah(persistedBreakdown?.tax ?? 0)}</span></div>
+                <div className="flex justify-between text-sm"><span>Admin Fee</span><span>{formatRupiah(persistedBreakdown?.adminFee ?? 0)}</span></div>
+                <div className="flex justify-between text-sm"><span>Seat Extra</span><span>{formatRupiah(persistedBreakdown?.seatExtra ?? 0)}</span></div>
+                {persistedSeatDetails.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-600">Detail Kursi</p>
+                    <div className="mt-2 space-y-1.5">
+                      {persistedSeatDetails.map((seat) => (
+                        <div key={seat.seatNumber} className="flex justify-between text-xs text-slate-600">
+                          <span>Kursi {seat.seatNumber}</span>
+                          <span>{seat.additionalPrice > 0 ? formatRupiah(seat.additionalPrice) : "Termasuk"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(persistedBreakdown?.promoAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-sm font-semibold text-emerald-700">
+                    <span>Promo Discount</span>
+                    <span>-{formatRupiah(persistedBreakdown?.promoAmount ?? 0)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-blue-200 pt-3 text-lg font-bold text-blue-700"><span>Total Price</span><span>{formatRupiah(displayedTotalPrice)}</span></div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between text-sm"><span>Ticket Price</span><span>{formatRupiah(ticketPrice)}</span></div>
+                <div className="flex justify-between text-sm"><span>Tax</span><span>{formatRupiah(tax)}</span></div>
+                <div className="flex justify-between text-sm"><span>Admin Fee</span><span>{formatRupiah(adminFee)}</span></div>
+                <div className="flex justify-between text-sm"><span>Seat Extra</span><span>{formatRupiah(extraPrice)}</span></div>
+                {selectedSeatNumbersFromQuery.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-600">Detail Kursi</p>
+                    <p className="mt-1 text-xs text-slate-600">{selectedSeatNumbersFromQuery.join(", ")}</p>
+                  </div>
+                )}
+                {promoAmount > 0 && (
+                  <div className="flex justify-between text-sm font-semibold text-emerald-700">
+                    <span>Promo Discount{selectedPromo?.title ? ` (${selectedPromo.title})` : ""} ({promoDiscountPercent}%)</span>
+                    <span>-{formatRupiah(promoAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-blue-200 pt-3 text-lg font-bold text-blue-700"><span>Total Price</span><span>{formatRupiah(displayedTotalPrice)}</span></div>
+              </>
+            )}
           </div>
 
 
