@@ -6,7 +6,7 @@ import { Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateBookingCode, generateTicketNumber, calculateTotalPrice, addMinutes } from "../utils/helpers"
-import { uploadFile, deleteFile } from "../utils/minio"
+import { uploadFile, deleteFile, normalizeFileUrl, extractFileKeyFromUrl, MINIO_BUCKET_NAME, minioClient } from "../utils/minio"
 import { sendBookingConfirmation, sendNewTransactionReminderEmail, sendTodayDepartureReminderEmail } from "../utils/email"
 import { createTransaction, checkTransactionStatus, verifySignature, mapMidtransStatus } from "../utils/midtrans"
 import { emitToUser } from "../utils/socket"
@@ -583,6 +583,126 @@ export const getTicket = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("Get ticket error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+const buildTicketTextFile = (ticket: any) => {
+  const booking = ticket.booking
+  const flight = booking.flight
+  const passengers = booking.passengers as Array<any>
+  const seats = booking.flightSeats?.map((flightSeat: any) => flightSeat.seat?.seatNumber).filter(Boolean).join(", ") || "-"
+
+  const passengerLines = passengers
+    .map((passenger: any, index: number) => {
+      const fullName = `${passenger.title} ${passenger.firstName} ${passenger.lastName}`.replace(/\s+/g, " ").trim()
+      return `${index + 1}. ${fullName} (${passenger.type})`
+    })
+    .join("\n")
+
+  return [
+    "SKYINTERN E-TICKET",
+    "",
+    `Ticket Number : ${ticket.ticketNumber}`,
+    `Booking Code  : ${booking.bookingCode}`,
+    `Issued At     : ${new Date(ticket.issuedAt).toISOString()}`,
+    `Status        : ${booking.status}`,
+    "",
+    "Flight",
+    `Airline       : ${flight.airline.name}`,
+    `Flight Number : ${flight.flightNumber}`,
+    `Route         : ${flight.origin.city} (${flight.origin.country}) -> ${flight.destination.city} (${flight.destination.country})`,
+    `Departure     : ${new Date(flight.departureTime).toISOString()}`,
+    `Arrival       : ${new Date(flight.arrivalTime).toISOString()}`,
+    `Seats         : ${seats}`,
+    "",
+    "Passengers",
+    passengerLines || "-",
+    "",
+    "QR Payload",
+    ticket.qrCode
+  ].join("\n")
+}
+
+// Download e-ticket file (for mobile app in-app download flow)
+export const downloadTicket = async (req: AuthRequest, res: Response) => {
+  try {
+    const ticketId = Number(req.params.id)
+
+    if (Number.isNaN(ticketId)) {
+      return res.status(400).json({ message: "ID tiket tidak valid" })
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        booking: {
+          include: {
+            flight: {
+              include: {
+                airline: true,
+                origin: true,
+                destination: true
+              }
+            },
+            passengers: true,
+            flightSeats: {
+              include: {
+                seat: true
+              }
+            }
+          }
+        }
+      }
+    })
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Tiket tidak ditemukan" })
+    }
+
+    if (ticket.booking.userId !== req.user!.id && req.user!.role !== "ADMIN") {
+      return res.status(403).json({ message: "Tidak diizinkan" })
+    }
+
+    const safeBookingCode = ticket.booking.bookingCode.replace(/[^A-Za-z0-9_-]/g, "") || String(ticket.id)
+
+    if (ticket.pdfUrl) {
+      const normalizedPdfUrl = normalizeFileUrl(ticket.pdfUrl)
+      const fileKey = normalizedPdfUrl ? extractFileKeyFromUrl(normalizedPdfUrl) : null
+
+      if (fileKey) {
+        try {
+          const stat = await minioClient.statObject(MINIO_BUCKET_NAME, fileKey)
+          const contentType = stat.metaData?.["content-type"] || "application/pdf"
+          const objectStream = await minioClient.getObject(MINIO_BUCKET_NAME, fileKey)
+
+          res.setHeader("Content-Type", contentType)
+          res.setHeader("Content-Disposition", `attachment; filename=\"e-ticket-${safeBookingCode}.pdf\"`)
+          res.setHeader("Cache-Control", "private, no-store")
+          objectStream.pipe(res)
+          return
+        } catch (error: any) {
+          if (error?.code === "NoSuchKey") {
+            return res.status(404).json({ message: "File e-ticket tidak ditemukan" })
+          }
+
+          if (error?.code === "ECONNREFUSED") {
+            return res.status(503).json({ message: "Server penyimpanan file tidak tersedia" })
+          }
+
+          console.error("Download ticket PDF error:", error)
+          return res.status(500).json({ message: "Gagal mengunduh file e-ticket" })
+        }
+      }
+    }
+
+    const textContent = buildTicketTextFile(ticket)
+    res.setHeader("Content-Type", "text/plain; charset=utf-8")
+    res.setHeader("Content-Disposition", `attachment; filename=\"e-ticket-${safeBookingCode}.txt\"`)
+    res.setHeader("Cache-Control", "private, no-store")
+    return res.status(200).send(textContent)
+  } catch (error) {
+    console.error("Download ticket error:", error)
+    return res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }
 

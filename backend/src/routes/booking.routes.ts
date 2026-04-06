@@ -293,6 +293,30 @@ router.post("/:id/cancel", bookingController.cancelBooking)
 
 /**
  * @swagger
+ * /api/bookings/tickets/{id}/download:
+ *   get:
+ *     summary: Download e-ticket file (mobile in-app)
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: E-ticket file downloaded
+ *       403:
+ *         description: Tidak diizinkan mengakses tiket ini
+ *       404:
+ *         description: Tiket tidak ditemukan
+ */
+router.get("/tickets/:id/download", bookingController.downloadTicket)
+
+/**
+ * @swagger
  * /api/bookings/tickets/{id}:
  *   get:
  *     summary: Get ticket detail
