@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
+import '../services/api_client.dart';
 import '../services/promo_service.dart';
 import '../services/websocket_service.dart';
 import '../utils/app_theme.dart';
@@ -203,7 +204,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   final base64Data = user.avatarUrl!.split(',').last;
                   avatarImage = MemoryImage(base64Decode(base64Data));
                 } else if (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty) {
-                  avatarImage = NetworkImage(user.avatarUrl!);
+                  avatarImage = NetworkImage(ApiClient.normalizePublicUrl(user.avatarUrl!));
                 }
                 return PopupMenuButton<String>(
                   offset: const Offset(0, 50),
@@ -286,7 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           final base64Data = user.avatarUrl!.split(',').last;
           avatarImage = MemoryImage(base64Decode(base64Data));
         } else if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) {
-          avatarImage = NetworkImage(user.avatarUrl!);
+          avatarImage = NetworkImage(ApiClient.normalizePublicUrl(user.avatarUrl!));
         }
 
         return GradientCard(

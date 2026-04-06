@@ -9,7 +9,7 @@ import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateResetToken, addMinutes } from "../utils/helpers"
 import { sendResetPasswordEmail, sendTwoFactorCodeEmail } from "../utils/email"
-import { uploadFile, deleteFile } from "../utils/minio"
+import { uploadFile, deleteFile, extractFileKeyFromUrl, normalizeFileUrl } from "../utils/minio"
 
 const TWO_FACTOR_CODE_TTL_MINUTES = 10
 
@@ -313,7 +313,12 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
-    res.json({ user })
+    res.json({
+      user: {
+        ...user,
+        avatarUrl: normalizeFileUrl(user.avatarUrl)
+      }
+    })
   } catch (error) {
     console.error("Get profile error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
@@ -345,7 +350,10 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
 
     res.json({
       message: "Profil berhasil diperbarui",
-      user
+      user: {
+        ...user,
+        avatarUrl: normalizeFileUrl(user.avatarUrl)
+      }
     })
   } catch (error) {
     console.error("Update profile error:", error)
@@ -414,8 +422,8 @@ export const uploadAvatar = async (req: AuthRequest, res: Response) => {
       where: { id: req.user?.id },
       select: { avatarUrl: true }
     })
-    if (existing?.avatarUrl && existing.avatarUrl.includes("/avatars/")) {
-      const oldKey = existing.avatarUrl.split(`/skyintern/`)[1]
+    if (existing?.avatarUrl) {
+      const oldKey = extractFileKeyFromUrl(existing.avatarUrl)
       if (oldKey) await deleteFile(oldKey).catch(() => { /* silent */ })
     }
 
@@ -427,7 +435,13 @@ export const uploadAvatar = async (req: AuthRequest, res: Response) => {
       select: { id: true, name: true, email: true, phone: true, avatarUrl: true, role: true }
     })
 
-    res.json({ message: "Foto profil berhasil diperbarui", user })
+    res.json({
+      message: "Foto profil berhasil diperbarui",
+      user: {
+        ...user,
+        avatarUrl: normalizeFileUrl(user.avatarUrl)
+      }
+    })
   } catch (error: any) {
     console.error("Upload avatar error:", error)
     if (error.message?.includes("MinIO") || error.code === "ECONNREFUSED") {

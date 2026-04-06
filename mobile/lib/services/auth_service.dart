@@ -1,5 +1,8 @@
 import '../models/user_model.dart';
 import 'api_client.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class LoginResult {
   final String? token;
@@ -122,19 +125,76 @@ class AuthService {
   static Future<UserSession> updateProfile({
     String? name,
     String? phone,
-    String? avatarUrl,
   }) async {
     final response = await ApiClient.put(
       '/api/auth/profile',
       body: {
         if (name != null) 'name': name,
         if (phone != null) 'phone': phone,
-        if (avatarUrl != null) 'avatarUrl': avatarUrl,
       },
       requireAuth: true,
     );
 
     final userJson = response['user'] as Map<String, dynamic>?;
+    if (userJson == null) throw Exception('User not found in response');
+
+    return UserSession.fromJson(userJson);
+  }
+
+  static Future<UserSession> uploadAvatar({
+    required List<int> bytes,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final token = ApiClient.authToken;
+    if (token == null || token.isEmpty) {
+      throw Exception('Sesi login tidak valid. Silakan login kembali.');
+    }
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiClient.baseUrl}/api/auth/avatar'),
+    )
+      ..headers['Authorization'] = 'Bearer $token'
+      ..headers['X-Platform'] = 'mobile';
+
+    final mimeParts = mimeType.split('/');
+    final mediaType = mimeParts.length == 2
+        ? MediaType(mimeParts[0], mimeParts[1])
+      : MediaType('image', 'jpeg');
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'avatar',
+        bytes,
+        filename: fileName,
+        contentType: mediaType,
+      ),
+    );
+
+    final streamed = await request.send();
+    final responseBody = await streamed.stream.bytesToString();
+
+    if (streamed.statusCode == 401) {
+      ApiClient.clearAuthToken();
+      throw Exception('Sesi login tidak valid. Silakan login kembali.');
+    }
+
+    if (streamed.statusCode != 200) {
+      try {
+        final body = responseBody.isEmpty
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(jsonDecode(responseBody) as Map);
+        throw Exception(body['message']?.toString() ?? 'Upload avatar gagal');
+      } catch (_) {
+        throw Exception('Upload avatar gagal (status ${streamed.statusCode})');
+      }
+    }
+
+    final parsed = Map<String, dynamic>.from(
+      jsonDecode(responseBody) as Map<String, dynamic>,
+    );
+    final userJson = parsed['user'] as Map<String, dynamic>?;
     if (userJson == null) throw Exception('User not found in response');
 
     return UserSession.fromJson(userJson);

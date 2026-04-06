@@ -13,6 +13,15 @@ export const minioClient = new Client({
 })
 
 const BUCKET_NAME = "skyintern" // Nama bucket penyimpanan semua file aplikasi
+export const MINIO_BUCKET_NAME = BUCKET_NAME
+
+const getPublicBaseUrl = () => {
+  if (process.env.FILE_PUBLIC_BASE_URL) return process.env.FILE_PUBLIC_BASE_URL
+  if (process.env.BACKEND_PUBLIC_URL) return process.env.BACKEND_PUBLIC_URL
+
+  const port = process.env.PORT || "3000"
+  return `http://localhost:${port}`
+}
 
 const PUBLIC_READ_POLICY = JSON.stringify({
   Version: "2012-10-17",
@@ -57,7 +66,7 @@ export const uploadFile = async (
       "Content-Type": contentType
     })
 
-    return `${process.env.MINIO_URL || "http://localhost:9000"}/${BUCKET_NAME}/${fileName}`
+    return `${getPublicBaseUrl()}/api/files?key=${encodeURIComponent(fileName)}`
   } catch (error: any) {
     if (error.code === "ECONNREFUSED") {
       throw new Error("Server MinIO tidak berjalan. Fitur upload file dinonaktifkan.")
@@ -67,7 +76,38 @@ export const uploadFile = async (
 }
 
 export const getFileUrl = (fileName: string): string => {
-  return `${process.env.MINIO_URL || "http://localhost:9000"}/${BUCKET_NAME}/${fileName}`
+  return `${getPublicBaseUrl()}/api/files?key=${encodeURIComponent(fileName)}`
+}
+
+export const extractFileKeyFromUrl = (fileUrl: string): string | null => {
+  const trimmed = fileUrl.trim()
+  if (!trimmed) return null
+
+  try {
+    const uri = new URL(trimmed)
+
+    const queryKey = uri.searchParams.get("key")
+    if (queryKey && queryKey.trim()) return decodeURIComponent(queryKey)
+
+    const bucketSegment = `/${BUCKET_NAME}/`
+    const bucketIndex = uri.pathname.indexOf(bucketSegment)
+    if (bucketIndex >= 0) {
+      const start = bucketIndex + bucketSegment.length
+      const key = uri.pathname.slice(start)
+      if (key) return decodeURIComponent(key)
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+export const normalizeFileUrl = (fileUrl: string | null | undefined): string | null => {
+  if (!fileUrl) return null
+  const key = extractFileKeyFromUrl(fileUrl)
+  if (!key) return fileUrl
+  return getFileUrl(key)
 }
 
 export const deleteFile = async (fileName: string): Promise<void> => {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_client.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
@@ -60,10 +61,11 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     try {
       final bytes = await picked.readAsBytes();
       final mimeType = picked.mimeType ?? 'image/jpeg';
-      final base64Str = base64Encode(bytes);
-      final dataUrl = 'data:$mimeType;base64,$base64Str';
-
-      await authProvider.updateProfile(avatarUrl: dataUrl);
+      await authProvider.uploadAvatar(
+        bytes: bytes,
+        fileName: picked.name,
+        mimeType: mimeType,
+      );
       if (mounted) {
         setState(() => _localAvatarBytes = bytes);
         showSnackBar(context, 'Foto profil berhasil diperbarui');
@@ -102,7 +104,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       final base64Data = avatarUrl.split(',').last;
       imageProvider = MemoryImage(base64Decode(base64Data));
     } else if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      imageProvider = NetworkImage(avatarUrl);
+      imageProvider = NetworkImage(ApiClient.normalizePublicUrl(avatarUrl));
     }
 
     return GestureDetector(

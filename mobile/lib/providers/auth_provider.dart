@@ -145,7 +145,6 @@ class AuthProvider extends ChangeNotifier {
   Future<void> updateProfile({
     String? name,
     String? phone,
-    String? avatarUrl,
   }) async {
     if (!isAuthenticated) throw Exception('Not authenticated');
 
@@ -153,7 +152,29 @@ class AuthProvider extends ChangeNotifier {
       final user = await AuthService.updateProfile(
         name: name,
         phone: phone,
-        avatarUrl: avatarUrl,
+      );
+      _user = user;
+      if (_token != null) await LocalStorage.saveUser(_user!, _token!);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> uploadAvatar({
+    required List<int> bytes,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    if (!isAuthenticated) throw Exception('Not authenticated');
+
+    try {
+      final user = await AuthService.uploadAvatar(
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: mimeType,
       );
       _user = user;
       if (_token != null) await LocalStorage.saveUser(_user!, _token!);
