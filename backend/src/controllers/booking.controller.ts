@@ -107,6 +107,10 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     // documentType: 'KTP' atau 'PASSPORT'
     // seatIds: [flightSeatId1, flightSeatId2, ...]
 
+    if (!Array.isArray(passengers) || passengers.length === 0) {
+      return res.status(400).json({ message: "Data penumpang wajib diisi" })
+    }
+
     const flight = await prisma.flight.findUnique({
       where: { id: flightId }
     })
@@ -185,16 +189,28 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
         expiresAt,
         status: "PENDING",
         passengers: {
-          create: passengers.map((p: any) => ({
-            type: p.type,
-            title: p.title ?? (p.type === 'CHILD' ? 'Mstr.' : 'Mr.'),
-            firstName: p.firstName,
-            lastName: p.lastName,
-            documentType: p.documentType || p.idType || "KTP",
-            documentNumber: p.documentNumber || p.idNumber || "0000000000000000",
-            nationality: p.nationality || "Indonesian",
-            dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : (p.dob ? new Date(p.dob) : undefined)
-          }))
+          create: passengers.map((p: any) => {
+            const rawType = String(p.documentType || p.idType || "KTP").toUpperCase()
+            const documentType = rawType === "PASSPORT" ? "PASSPORT" : "KTP"
+
+            const rawDocumentNumber = String(p.documentNumber || p.idNumber || "0000000000000000").trim()
+            const documentNumber = rawDocumentNumber.slice(0, 16) || "0000000000000000"
+
+            const rawDob = p.dateOfBirth || p.dob
+            const parsedDob = rawDob ? new Date(rawDob) : undefined
+            const dateOfBirth = parsedDob && !Number.isNaN(parsedDob.getTime()) ? parsedDob : undefined
+
+            return {
+              type: p.type,
+              title: p.title ?? (p.type === 'CHILD' ? 'Mstr.' : 'Mr.'),
+              firstName: p.firstName,
+              lastName: p.lastName,
+              documentType,
+              documentNumber,
+              nationality: p.nationality || "Indonesian",
+              dateOfBirth
+            }
+          })
         }
       },
       include: {

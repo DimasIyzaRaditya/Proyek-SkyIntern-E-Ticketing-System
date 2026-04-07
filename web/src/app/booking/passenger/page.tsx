@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { isAuthenticated, getUserSession } from "@/lib/auth";
+import { getPassengerProfile } from "@/lib/passenger-profile";
 
 function PassengerFormPageContent() {
   const router = useRouter();
@@ -11,7 +12,7 @@ function PassengerFormPageContent() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [idType, setIdType] = useState("KTP");
+  const [idType, setIdType] = useState<"KTP" | "PASSPORT">("KTP");
   const [idNumber, setIdNumber] = useState("");
   const [nationality, setNationality] = useState("Indonesian");
   const [dob, setDob] = useState("");
@@ -41,11 +42,22 @@ function PassengerFormPageContent() {
       setFirstName(parts[0] ?? "");
       setLastName(parts.slice(1).join(" "));
     }
+
+    const savedPassengerProfile = getPassengerProfile(session?.id);
+    if (savedPassengerProfile) {
+      setFirstName(savedPassengerProfile.firstName);
+      setLastName(savedPassengerProfile.lastName);
+      setIdType(savedPassengerProfile.idType);
+      setIdNumber(savedPassengerProfile.idNumber);
+      setNationality(savedPassengerProfile.nationality);
+      setDob(savedPassengerProfile.dateOfBirth);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const continueToPayment = () => {
     if (!isFormValid) return;
+
     const existingBookingId = searchParams.get("existingBookingId") ?? "";
     const params: Record<string, string> = {
       flightId: searchParams.get("flightId") ?? "",
@@ -115,12 +127,11 @@ function PassengerFormPageContent() {
               </label>
               <select
                 value={idType}
-                onChange={(e) => setIdType(e.target.value)}
+                onChange={(e) => setIdType(e.target.value === "PASSPORT" ? "PASSPORT" : "KTP")}
                 className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
               >
                 <option>KTP</option>
-                <option>Passport</option>
-                <option>SIM</option>
+                <option value="PASSPORT">Passport</option>
               </select>
             </div>
 

@@ -10,6 +10,7 @@ import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi, updateProfileFromApi, updateTwoFactorSettingFromApi, uploadAvatarToApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
+import { getPassengerProfile, maskIdentityNumber, setPassengerProfile } from "@/lib/passenger-profile";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -23,6 +24,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [savingTwoFactor, setSavingTwoFactor] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [identityFirstName, setIdentityFirstName] = useState("");
+  const [identityLastName, setIdentityLastName] = useState("");
+  const [identityType, setIdentityType] = useState<"KTP" | "PASSPORT">("KTP");
+  const [identityNumber, setIdentityNumber] = useState("");
+  const [identityNationality, setIdentityNationality] = useState("Indonesian");
+  const [identityDob, setIdentityDob] = useState("");
+  const [editingIdentityNumber, setEditingIdentityNumber] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const showSkeleton = useMinDelay(loading);
   const [message, setMessage] = useState("");
@@ -46,6 +54,20 @@ export default function ProfilePage() {
         setEmail(profile.email);
         setTwoFactorEnabled(Boolean(profile.twoFactorEnabled));
         setUserSession(profile);
+
+        const savedPassengerProfile = getPassengerProfile(profile.id);
+        if (savedPassengerProfile) {
+          setIdentityFirstName(savedPassengerProfile.firstName);
+          setIdentityLastName(savedPassengerProfile.lastName);
+          setIdentityType(savedPassengerProfile.idType);
+          setIdentityNumber(savedPassengerProfile.idNumber);
+          setIdentityNationality(savedPassengerProfile.nationality);
+          setIdentityDob(savedPassengerProfile.dateOfBirth);
+        } else {
+          const nameParts = profile.fullName.split(" ");
+          setIdentityFirstName(nameParts[0] ?? "");
+          setIdentityLastName(nameParts.slice(1).join(" "));
+        }
       } catch {
         clearSession();
         router.replace("/auth/login?redirect=/profile");
@@ -227,6 +249,78 @@ export default function ProfilePage() {
               </div>
 
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">Data Identitas Penumpang Default</p>
+                <p className="mt-1 text-xs text-slate-600">Data ini otomatis dipakai di form booking, tetapi tetap bisa Anda ubah saat pemesanan.</p>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Nama Depan</label>
+                    <input value={identityFirstName} onChange={(event) => setIdentityFirstName(event.target.value)} className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Nama Belakang</label>
+                    <input value={identityLastName} onChange={(event) => setIdentityLastName(event.target.value)} className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3" />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Jenis Identitas</label>
+                    <select
+                      value={identityType}
+                      onChange={(event) => setIdentityType(event.target.value === "PASSPORT" ? "PASSPORT" : "KTP")}
+                      className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3"
+                    >
+                      <option value="KTP">KTP</option>
+                      <option value="PASSPORT">Passport</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Kewarganegaraan</label>
+                    <input value={identityNationality} onChange={(event) => setIdentityNationality(event.target.value)} className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3" />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Nomor Identitas (NIK/Paspor)</label>
+                    {editingIdentityNumber ? (
+                      <input
+                        value={identityNumber}
+                        onChange={(event) => setIdentityNumber(event.target.value)}
+                        placeholder="Masukkan nomor identitas"
+                        className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3"
+                      />
+                    ) : (
+                      <input
+                        value={maskIdentityNumber(identityNumber)}
+                        readOnly
+                        placeholder="Belum diisi"
+                        className="w-full rounded-2xl border border-blue-100 bg-slate-100 px-3 py-2.5 font-mono text-sm text-slate-600 sm:px-4 sm:py-3"
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingIdentityNumber((prev) => !prev)}
+                    className="h-10.5 rounded-xl border border-blue-200 bg-white px-4 text-xs font-semibold text-blue-700 hover:bg-blue-50 sm:h-12 sm:text-sm"
+                  >
+                    {editingIdentityNumber ? "Sembunyikan" : "Ubah NIK"}
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Tanggal Lahir</label>
+                  <input
+                    type="date"
+                    value={identityDob}
+                    onChange={(event) => setIdentityDob(event.target.value)}
+                    className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-800">Two-Factor Authentication (2FA)</p>
@@ -268,13 +362,30 @@ export default function ProfilePage() {
                   setMessage("");
                   setSaved(false);
 
+                  if (identityNumber.trim().length > 0 && identityNumber.trim().length < 8) {
+                    setMessage("Nomor identitas minimal 8 karakter.");
+                    setSaving(false);
+                    return;
+                  }
+
                   try {
                     const profile = await updateProfileFromApi({
                       name: fullName.trim(),
                       phone: phoneNumber.trim(),
                     });
+
+                    setPassengerProfile(profile.id, {
+                      firstName: identityFirstName.trim(),
+                      lastName: identityLastName.trim(),
+                      idType: identityType,
+                      idNumber: identityNumber.trim(),
+                      nationality: identityNationality.trim() || "Indonesian",
+                      dateOfBirth: identityDob,
+                    });
+
                     setUserSession(profile);
                     setAvatarUrl(profile.avatarUrl ?? "");
+                    setEditingIdentityNumber(false);
                     setSaved(true);
                   } catch (error) {
                     setMessage(error instanceof Error ? error.message : "Gagal menyimpan profil.");

@@ -303,7 +303,7 @@ function SeatSelectionPageContent() {
               <div className="mb-3 sm:mb-4 flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
                 <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-green-500" /> Tersedia</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-blue-600" /> Dipilih</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-red-400" /> Terisi</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-slate-400" /> Terisi</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 sm:h-4 sm:w-4 rounded bg-orange-500" /> Spesial (+harga)</span>
               </div>
 

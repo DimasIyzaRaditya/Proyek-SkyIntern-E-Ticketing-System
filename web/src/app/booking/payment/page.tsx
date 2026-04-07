@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
@@ -77,7 +77,7 @@ function PaymentSummaryPageContent() {
     [searchParams],
   );
 
-  const buildPassengersFromQuery = () => {
+  const buildPassengersFromQuery = useCallback(() => {
     const passengers = [];
     const adultCount = adult;
     const childCount = child;
@@ -98,7 +98,7 @@ function PaymentSummaryPageContent() {
         firstName: i === 0 ? firstName : `${firstName}${i + 1}`,
         lastName,
         documentType,
-        documentNumber: i === 0 ? documentNumber : `${documentNumber}${i}`,
+        documentNumber,
         nationality,
         dateOfBirth: dob,
       });
@@ -110,20 +110,20 @@ function PaymentSummaryPageContent() {
         firstName: `Child${i + 1}`,
         lastName,
         documentType,
-        documentNumber: `${documentNumber}C${i}`,
+        documentNumber,
         nationality,
       });
     }
 
     return passengers.slice(0, Math.max(1, totalPassengers));
-  };
+  }, [adult, child, searchParams]);
 
-  const getSeatIdsFromQuery = () => {
+  const getSeatIdsFromQuery = useCallback(() => {
     const seatFlightIdsParam = searchParams.get("seatFlightIds") ?? "";
     return seatFlightIdsParam
       ? seatFlightIdsParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0)
       : [];
-  };
+  }, [searchParams]);
 
   const fallbackFlight = useMemo<FlightCardItem>(() => ({
     id: flightId || "-",
@@ -214,6 +214,18 @@ function PaymentSummaryPageContent() {
       setBookingIdForPayment(bookingId);
       setPersistedBookingTotalPrice(detail.booking.totalPrice);
 
+      const status = detail.booking.status;
+      if (status === "PAID") {
+        setPaid(true);
+        setPaymentPending(false);
+        setBookingError(null);
+        const params = new URLSearchParams({ status: "success", bookingId: String(bookingId) });
+        setTimeout(() => {
+          router.replace(`/bookings?${params.toString()}`);
+        }, 300);
+        return;
+      }
+
       const passengerCount = Math.max(1, detail.booking.passengers?.length ?? 1);
       const flightBasePrice = detail.booking.flight.basePrice ?? 0;
       const ticketPriceSaved = flightBasePrice * passengerCount;
@@ -241,7 +253,6 @@ function PaymentSummaryPageContent() {
       });
       setPersistedSeatDetails(seatDetailsSaved);
 
-      const status = detail.booking.status;
       if (status === "CANCELLED" || status === "EXPIRED") {
         setCountdown(0);
         return;
@@ -317,7 +328,7 @@ function PaymentSummaryPageContent() {
     return () => {
       isMounted = false;
     };
-  }, [existingBookingId, draftCountdownKey, flightId, router, searchParams]);
+  }, [buildPassengersFromQuery, draftCountdownKey, existingBookingId, flightId, getSeatIdsFromQuery, router, searchParams, selectedPromo?.id]);
 
   // Auto-cancel booking when countdown expires
   useEffect(() => {
@@ -328,8 +339,7 @@ function PaymentSummaryPageContent() {
       return;
     }
     cancelBookingFromApi(idToCancel).catch(() => { /* silent – backend also auto-expires */ });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countdown, draftCountdownKey]);
+  }, [bookingIdForPayment, countdown, draftCountdownKey, existingBookingId, paid, paymentPending]);
 
   useEffect(() => {
     if (paid) return;
@@ -345,7 +355,6 @@ function PaymentSummaryPageContent() {
     }, 1000);
 
     return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paid, countdown]);
 
   const countdownText = `${Math.floor(countdown / 60)
@@ -361,7 +370,11 @@ function PaymentSummaryPageContent() {
           setPaymentPending(false);
           setPendingSnapToken(null);
           localStorage.removeItem(draftCountdownKey);
-          setTimeout(() => router.push("/bookings?status=success"), 800);
+          const params = new URLSearchParams({ status: "success" });
+          if (bookingIdForPayment) {
+            params.set("bookingId", String(bookingIdForPayment));
+          }
+          setTimeout(() => router.push(`/bookings?${params.toString()}`), 800);
         },
         onPending: () => {
           // Async payment initiated (GoPay QR shown, VA number shown, etc.)
@@ -479,7 +492,15 @@ function PaymentSummaryPageContent() {
         setBookingError("Gagal memuat gateway pembayaran. Coba refresh halaman.");
       }
     } catch (error) {
-      setBookingError(error instanceof Error ? error.message : "Gagal membuat booking. Silakan coba lagi.");
+      const message = error instanceof Error ? error.message : "Gagal membuat booking. Silakan coba lagi.";
+      if (message.toLowerCase().includes("bukan dalam status menunggu")) {
+        if (bookingIdForPayment) {
+          const params = new URLSearchParams({ status: "success", bookingId: String(bookingIdForPayment) });
+          router.replace(`/bookings?${params.toString()}`);
+          return;
+        }
+      }
+      setBookingError(message);
       setBookingLoading(false);
     }
   };
@@ -621,7 +642,7 @@ function PaymentSummaryPageContent() {
             </div>
           )}
 
-          {!paymentPending && (
+          {!paymentPending && !paid && (
             <button
               onClick={() => void handlePayNow()}
               disabled={countdown === 0 || bookingLoading}

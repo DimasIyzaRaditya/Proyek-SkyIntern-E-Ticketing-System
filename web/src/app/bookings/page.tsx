@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
 import { isAuthenticated } from "@/lib/auth";
-import { getMyBookingsFromApi, syncPaymentFromApi } from "@/lib/booking-api";
+import { cancelBookingFromApi, getMyBookingsFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 
 type TabKey = "Upcoming" | "Completed" | "Cancelled";
 type BookingStatus = "Pending" | "Processing" | "Paid" | "Issued" | "Cancelled";
@@ -47,7 +46,7 @@ type BookingView = {
 
 const getTabByStatus = (status: BookingStatus): TabKey => {
   if (status === "Cancelled") return "Cancelled";
-  if (status === "Paid" || status === "Issued") return "Completed";
+  if (status === "Issued") return "Completed";
   return "Upcoming";
 };
 
@@ -68,6 +67,8 @@ function MyBookingsPageContent() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   const handleViewETicket = (booking: BookingView) => {
@@ -165,8 +166,65 @@ function MyBookingsPageContent() {
   };
 
   const handlePayBooking = async (bookingId: string) => {
+    if (payingId === bookingId) return;
     const booking = liveBookings.find((item) => item.id === bookingId)
     if (!booking) return
+    if (booking.status === "Paid" || booking.status === "Issued" || booking.status === "Cancelled") return;
+
+    setPayingId(bookingId);
+    setPayError(null);
+
+    try {
+      const sync = await syncPaymentFromApi(Number(bookingId));
+      if (sync.status === "PAID") {
+        setLiveBookings((prev) =>
+          prev.map((item) =>
+            item.id === bookingId
+              ? {
+                  ...item,
+                  status: "Paid" as BookingStatus,
+                  tab: "Upcoming" as TabKey,
+                }
+              : item,
+          ),
+        );
+        setPayError("Pembayaran booking ini sudah berhasil, tidak perlu bayar ulang.");
+        return;
+      }
+
+      if (sync.status === "CANCELLED") {
+        setLiveBookings((prev) =>
+          prev.map((item) =>
+            item.id === bookingId
+              ? {
+                  ...item,
+                  status: "Cancelled" as BookingStatus,
+                  tab: "Cancelled" as TabKey,
+                }
+              : item,
+          ),
+        );
+        setPayError("Booking sudah dibatalkan atau kedaluwarsa.");
+        return;
+      }
+
+      setLiveBookings((prev) =>
+        prev.map((item) =>
+          item.id === bookingId
+            ? {
+                ...item,
+                status: "Processing" as BookingStatus,
+                tab: "Upcoming" as TabKey,
+              }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setPayError(error instanceof Error ? error.message : "Gagal sinkronisasi status pembayaran.");
+      return;
+    } finally {
+      setPayingId(null);
+    }
 
     const params = new URLSearchParams({
       existingBookingId: booking.id,
@@ -188,6 +246,40 @@ function MyBookingsPageContent() {
     router.push(`/booking/payment?${params.toString()}`)
   };
 
+  const handleCancelBooking = async (bookingId: string) => {
+    const booking = liveBookings.find((item) => item.id === bookingId);
+    if (!booking) return;
+    if (booking.status !== "Pending" && booking.status !== "Processing" && booking.status !== "Paid") return;
+
+    const confirmed = window.confirm("Yakin ingin membatalkan booking ini? Tindakan ini tidak dapat dibatalkan.");
+    if (!confirmed) return;
+
+    setCancellingId(bookingId);
+    setMessage("");
+    setPayError(null);
+
+    try {
+      await cancelBookingFromApi(Number(bookingId));
+      setLiveBookings((prev) =>
+        prev.map((item) =>
+          item.id === bookingId
+            ? {
+                ...item,
+                status: "Cancelled" as BookingStatus,
+                tab: "Cancelled" as TabKey,
+              }
+            : item,
+        ),
+      );
+      setMessage("Booking berhasil dibatalkan.");
+      setActiveTab("Cancelled");
+    } catch (error) {
+      setPayError(error instanceof Error ? error.message : "Gagal membatalkan booking.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   useEffect(() => {
     const auth = isAuthenticated();
     setAuthenticated(auth);
@@ -206,6 +298,17 @@ function MyBookingsPageContent() {
       setMessage("");
 
       try {
+        const statusFromQuery = searchParams.get("status");
+        const bookingIdFromQuery = searchParams.get("bookingId");
+
+        if (statusFromQuery === "success" && bookingIdFromQuery) {
+          try {
+            await syncPaymentFromApi(Number(bookingIdFromQuery));
+          } catch {
+            // Keep UI responsive even if sync endpoint temporarily fails.
+          }
+        }
+
         const bookings = await getMyBookingsFromApi();
         const mapped: BookingView[] = bookings.map((item) => {
           const passenger = item.passengers[0]
@@ -254,6 +357,12 @@ function MyBookingsPageContent() {
         });
 
         setLiveBookings(mapped);
+
+        if (statusFromQuery === "success") {
+          setActiveTab("Upcoming");
+          setMessage("Pembayaran berhasil. Booking tampil di tab Upcoming sampai e-ticket terbit.");
+          router.replace("/bookings");
+        }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Gagal memuat data booking.");
       } finally {
@@ -399,40 +508,55 @@ function MyBookingsPageContent() {
                       <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(booking.status)}`}>
                         <CheckCircle2 className="h-3.5 w-3.5" /> {booking.status}
                       </span>
+                      {booking.status === "Paid" && (
+                        <p className="mt-1 text-xs font-semibold text-blue-700">
+                          Sudah dibayar, menunggu e-ticket terbit
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
                         {booking.status === "Pending" && (
                           <>
-                            <Link
-                              href={`/booking/seat?${new URLSearchParams({ flightId: booking.flightId, origin: booking.origin, destination: booking.destination, departureDate: booking.departureDate, flightNumber: booking.flightNumber, existingBookingId: booking.id }).toString()}`}
-                              className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                            <button
+                              onClick={() => void handleCancelBooking(booking.id)}
+                              disabled={cancellingId === booking.id || payingId === booking.id || syncingId === booking.id}
+                              className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                             >
-                              Ubah Kursi
-                            </Link>
-                            <Link
-                              href={`/booking/passenger?${new URLSearchParams({ flightId: booking.flightId, origin: booking.origin, destination: booking.destination, departureDate: booking.departureDate, flightNumber: booking.flightNumber, existingBookingId: booking.id, pTitle: booking.pTitle, pFirstName: booking.pFirstName, pLastName: booking.pLastName, pIdType: booking.pIdType, pIdNumber: booking.pIdNumber, pNationality: booking.pNationality }).toString()}`}
-                              className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                            >
-                              Ubah Data Penumpang
-                            </Link>
+                              {cancellingId === booking.id ? "Membatalkan..." : "Cancel"}
+                            </button>
                             <button
                               onClick={() => void handlePayBooking(booking.id)}
-                              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                              disabled={payingId === booking.id || syncingId === booking.id || cancellingId === booking.id || booking.status === "Paid" || booking.status === "Issued" || booking.status === "Cancelled"}
+                              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              Bayar Sekarang
+                              {payingId === booking.id ? "Memproses..." : "Bayar Sekarang"}
                             </button>
                             <button
                               onClick={() => void handleSyncPayment(booking.id)}
-                              disabled={syncingId === booking.id}
+                              disabled={syncingId === booking.id || payingId === booking.id || cancellingId === booking.id}
                               className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
                             >
                               {syncingId === booking.id ? "Mengecek..." : "Cek Status Bayar"}
                             </button>
                           </>
                         )}
-                        {booking.status === "Paid" && (
-                          <span className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600">
-                            Menunggu Penerbitan Tiket...
+                        {booking.status === "Processing" && (
+                          <span className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700">
+                            Membuka pembayaran...
                           </span>
+                        )}
+                        {booking.status === "Paid" && (
+                          <>
+                            <span className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600">
+                              Menunggu Penerbitan Tiket...
+                            </span>
+                            <button
+                              onClick={() => void handleCancelBooking(booking.id)}
+                              disabled={cancellingId === booking.id || payingId === booking.id || syncingId === booking.id}
+                              className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                            >
+                              {cancellingId === booking.id ? "Membatalkan..." : "Cancel"}
+                            </button>
+                          </>
                         )}
                         {booking.status === "Issued" && (
                           <button
