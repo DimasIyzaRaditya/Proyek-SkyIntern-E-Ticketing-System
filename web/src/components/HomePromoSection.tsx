@@ -424,23 +424,26 @@ function PromoCard({ promo }: { promo: Promo }) {
   const colorClass = colors[promo.id % colors.length];
 
   return (
-    <div className={`relative w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-85 sm:min-w-64 md:max-w-95 md:min-w-72 lg:max-w-105 lg:min-w-80 overflow-hidden rounded-2xl bg-linear-to-br ${colorClass} p-4 sm:p-5 text-white shadow-md`}>
-      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
+    <div className={`group relative shrink-0 w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-85 sm:min-w-64 md:max-w-95 md:min-w-72 lg:max-w-105 lg:min-w-80 overflow-hidden rounded-2xl bg-linear-to-br ${colorClass} p-4 sm:p-5 text-white shadow-md ring-1 ring-white/20 transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg`}>
+      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/12" />
       <div className="pointer-events-none absolute -bottom-4 -left-4 h-20 w-20 rounded-full bg-white/10" />
-      <div className="relative">
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-white/5" />
+      <div className="relative flex h-44 flex-col sm:h-48">
         <div className="mb-1 flex items-center gap-1.5">
           <Tag className="h-4 w-4 shrink-0" />
           {promo.discount > 0 && (
-            <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-black">
+            <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-black backdrop-blur-sm">
               Diskon {promo.discount}%
             </span>
           )}
         </div>
-        <p className="mt-2 text-base sm:text-lg font-black leading-snug">{promo.title}</p>
-        {promo.description && (
-          <p className="mt-1 text-xs sm:text-sm text-white/80 line-clamp-2">{promo.description}</p>
-        )}
-        <p className="mt-3 text-xs text-white/70">
+        <p className="mt-2 line-clamp-2 wrap-break-word text-base font-black leading-snug text-white sm:text-lg">
+          {promo.title}
+        </p>
+        <p className="mt-1 min-h-10 whitespace-normal wrap-break-word text-xs leading-relaxed text-white/85 line-clamp-2 sm:text-sm">
+          {promo.description ?? ""}
+        </p>
+        <p className="mt-auto pt-3 text-xs font-medium text-white/75">
           {fmtPromoDate(promo.startDate)} – {fmtPromoDate(promo.endDate)}
         </p>
       </div>
@@ -451,17 +454,51 @@ function PromoCard({ promo }: { promo: Promo }) {
 // ── HorizontalScroll wrapper ─────────────────────────────────────────────────
 function HorizontalScroll({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pressedDir, setPressedDir] = useState<"left" | "right" | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = () => {
+    if (!ref.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = ref.current;
+    const maxLeft = scrollWidth - clientWidth;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < maxLeft - 4);
+  };
 
   const scroll = (dir: "left" | "right") => {
     if (!ref.current) return;
     ref.current.scrollBy({ left: dir === "left" ? -300 : 300, behavior: "smooth" });
+    setPressedDir(dir);
+    window.setTimeout(() => setPressedDir(null), 180);
+    window.setTimeout(updateScrollButtons, 200);
   };
+
+  useEffect(() => {
+    updateScrollButtons();
+    const container = ref.current;
+    if (!container) return;
+
+    const onScroll = () => updateScrollButtons();
+    const onResize = () => updateScrollButtons();
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [children]);
 
   return (
     <div className="relative">
       <button
         onClick={() => scroll("left")}
-        className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 shadow-md transition hover:bg-gray-50 sm:flex"
+        disabled={!canScrollLeft}
+        className={`absolute -left-3 top-1/2 z-10 flex -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 shadow-md transition-all duration-200 hover:bg-gray-50 active:scale-90 ${
+          pressedDir === "left" ? "-translate-x-1 ring-2 ring-blue-200" : ""
+        } ${!canScrollLeft ? "pointer-events-none opacity-0" : "opacity-100"}`}
         aria-label="Scroll left"
       >
         <ChevronLeft className="h-4 w-4 text-gray-600" />
@@ -475,7 +512,10 @@ function HorizontalScroll({ children }: { children: React.ReactNode }) {
       </div>
       <button
         onClick={() => scroll("right")}
-        className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 shadow-md transition hover:bg-gray-50 sm:flex"
+        disabled={!canScrollRight}
+        className={`absolute -right-3 top-1/2 z-10 flex -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 shadow-md transition-all duration-200 hover:bg-gray-50 active:scale-90 ${
+          pressedDir === "right" ? "translate-x-1 ring-2 ring-blue-200" : ""
+        } ${!canScrollRight ? "pointer-events-none opacity-0" : "opacity-100"}`}
         aria-label="Scroll right"
       >
         <ChevronRight className="h-4 w-4 text-gray-600" />
@@ -487,25 +527,64 @@ function HorizontalScroll({ children }: { children: React.ReactNode }) {
 // ── Tab scroll wrapper ────────────────────────────────────────────────────────
 function TabScroller({ children, label }: { children: React.ReactNode; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pressedDir, setPressedDir] = useState<"left" | "right" | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = () => {
+    if (!ref.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = ref.current;
+    const maxLeft = scrollWidth - clientWidth;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < maxLeft - 4);
+  };
+
   const scrollTab = (dir: "left" | "right") => {
     if (!ref.current) return;
     ref.current.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" });
+    setPressedDir(dir);
+    window.setTimeout(() => setPressedDir(null), 180);
+    window.setTimeout(updateScrollButtons, 200);
   };
+
+  useEffect(() => {
+    updateScrollButtons();
+    const container = ref.current;
+    if (!container) return;
+
+    const onScroll = () => updateScrollButtons();
+    const onResize = () => updateScrollButtons();
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [children]);
+
   return (
     <div className="mb-5">
-      {/* Scroll buttons – only on desktop */}
-      <div className="hidden sm:flex justify-end gap-1 mb-1">
+      {/* Scroll buttons */}
+      <div className="flex justify-end gap-1 mb-1">
         {label && <span className="mr-auto text-xs text-slate-400 self-center">{label}</span>}
         <button
           onClick={() => scrollTab("left")}
-          className="flex items-center justify-center h-6 w-6 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition"
+          disabled={!canScrollLeft}
+          className={`flex items-center justify-center h-6 w-6 rounded-full border border-slate-200 bg-white transition-all duration-200 hover:bg-slate-50 active:scale-90 ${
+            pressedDir === "left" ? "-translate-x-0.5 ring-2 ring-blue-200" : ""
+          } ${!canScrollLeft ? "pointer-events-none opacity-0" : "opacity-100"}`}
           aria-label="Scroll tabs left"
         >
           <ChevronLeft className="h-3 w-3 text-slate-500" />
         </button>
         <button
           onClick={() => scrollTab("right")}
-          className="flex items-center justify-center h-6 w-6 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition"
+          disabled={!canScrollRight}
+          className={`flex items-center justify-center h-6 w-6 rounded-full border border-slate-200 bg-white transition-all duration-200 hover:bg-slate-50 active:scale-90 ${
+            pressedDir === "right" ? "translate-x-0.5 ring-2 ring-blue-200" : ""
+          } ${!canScrollRight ? "pointer-events-none opacity-0" : "opacity-100"}`}
           aria-label="Scroll tabs right"
         >
           <ChevronRight className="h-3 w-3 text-slate-500" />
@@ -630,13 +709,17 @@ export default function HomePromoSection() {
             {loadingPromos ? (
               <div className="flex gap-3 sm:gap-4 overflow-hidden">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-85 sm:min-w-64 md:max-w-95 md:min-w-72 lg:max-w-105 lg:min-w-80 h-28 sm:h-32 md:h-36 animate-pulse rounded-2xl bg-slate-200" />
+                  <div key={i} className="shrink-0 w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-85 sm:min-w-64 md:max-w-95 md:min-w-72 lg:max-w-105 lg:min-w-80 h-28 sm:h-32 md:h-36 animate-pulse rounded-2xl bg-slate-200" />
                 ))}
               </div>
             ) : (
               <HorizontalScroll>
                 {promos.map((promo) => (
-                  <div key={promo.id} style={{ scrollSnapAlign: "start" }}>
+                  <div
+                    key={promo.id}
+                    className="shrink-0"
+                    style={{ scrollSnapAlign: "center", scrollSnapStop: "always" }}
+                  >
                     <PromoCard promo={promo} />
                   </div>
                 ))}

@@ -241,9 +241,9 @@ export default function AdminPromosPage() {
                             <Tag className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-800">{promo.title}</p>
+                            <p className="max-w-72 wrap-break-word text-sm font-semibold leading-snug text-slate-800 line-clamp-2">{promo.title}</p>
                             {promo.description && (
-                              <p className="text-[11px] text-slate-400 line-clamp-1">{promo.description}</p>
+                              <p className="mt-0.5 max-w-72 whitespace-normal wrap-break-word text-[11px] leading-relaxed text-slate-400 line-clamp-2">{promo.description}</p>
                             )}
                           </div>
                         </div>
@@ -362,8 +362,12 @@ export default function AdminPromosPage() {
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Deskripsi singkat promo (opsional)"
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  maxLength={240}
+                  className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Maksimal 240 karakter agar tampilan kartu promo tetap rapi.
+                </p>
               </div>
 
               {/* Discount */}
@@ -375,7 +379,7 @@ export default function AdminPromosPage() {
                   max="100"
                   value={form.discount}
                   onChange={(e) => setForm((f) => ({ ...f, discount: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 

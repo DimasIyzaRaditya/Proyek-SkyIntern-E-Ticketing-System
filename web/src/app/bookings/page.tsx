@@ -244,7 +244,7 @@ function MyBookingsPageContent() {
   const handleCancelBooking = async (bookingId: string) => {
     const booking = liveBookings.find((item) => item.id === bookingId);
     if (!booking) return;
-    if (booking.status !== "Pending" && booking.status !== "Processing" && booking.status !== "Paid") return;
+    if (booking.status !== "Pending") return;
 
     const confirmed = window.confirm("Yakin ingin membatalkan booking ini? Tindakan ini tidak dapat dibatalkan.");
     if (!confirmed) return;
@@ -588,13 +588,6 @@ function MyBookingsPageContent() {
                             <span className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600">
                               Menunggu Penerbitan Tiket...
                             </span>
-                            <button
-                              onClick={() => void handleCancelBooking(booking.id)}
-                              disabled={cancellingId === booking.id || payingId === booking.id || syncingId === booking.id}
-                              className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                            >
-                              {cancellingId === booking.id ? "Membatalkan..." : "Cancel"}
-                            </button>
                           </>
                         )}
                         {booking.status === "Issued" && (
