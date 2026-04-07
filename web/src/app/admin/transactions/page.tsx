@@ -48,14 +48,6 @@ const statusTransitions: Record<
   ],
 };
 
-// Status baru setelah aksi dijalankan
-const statusAfterAction: Record<StatusAction, TransactionStatus> = {
-  markpending: "Pending",
-  markpaid:    "Paid",
-  markissued:  "Issued",
-  cancel:      "Cancelled",
-};
-
 // Teks sukses per aksi
 const actionSuccessText: Record<StatusAction, string> = {
   markpending: "Status berhasil diubah ke Pending.",
@@ -79,8 +71,8 @@ type TransactionItem = {
 
 // Mengubah status dari data API menjadi status transaksi
 const mapStatus = (item: AdminBooking): TransactionStatus => {
+  if (item.ticket) return "Issued"; // jika tiket sudah ada, status mengikuti tiket
   if (item.status === "CANCELLED" || item.status === "EXPIRED") return "Cancelled";
-  if (item.ticket) return "Issued"; // tiket sudah diterbitkan
   if (item.status === "PAID") return "Paid"; // sudah dibayar
   return "Pending"; // belum dibayar
 };
@@ -119,6 +111,20 @@ export default function AdminTransactionsPage() {
     label: string;
   } | null>(null);
 
+  const refreshTransactions = async () => {
+    const bookings = await getAdminBookings();
+    const mapped: TransactionItem[] = bookings.map((item) => ({
+      id: String(item.id),
+      customer: item.user.name,
+      flight: item.flight.flightNumber,
+      amount: item.totalPrice,
+      status: mapStatus(item),
+      bookingCode: item.bookingCode,
+      createdAt: item.createdAt,
+    }));
+    setTransactions(mapped);
+  };
+
 
   useEffect(() => {
 
@@ -129,21 +135,7 @@ export default function AdminTransactionsPage() {
       setMessage("");
 
       try {
-
-        const bookings = await getAdminBookings();
-
-        // mengubah data booking dari API menjadi format transaksi
-        const mapped: TransactionItem[] = bookings.map((item) => ({
-          id: String(item.id),
-          customer: item.user.name,
-          flight: item.flight.flightNumber,
-          amount: item.totalPrice,
-          status: mapStatus(item),
-          bookingCode: item.bookingCode,
-          createdAt: item.createdAt,
-        }));
-
-        setTransactions(mapped);
+        await refreshTransactions();
 
       } catch (error) {
 
@@ -175,12 +167,8 @@ export default function AdminTransactionsPage() {
     setPendingAction(null);
     try {
       await updateAdminBookingStatus(Number(item.id), action);
-      const newStatus = statusAfterAction[action];
+      await refreshTransactions();
       setActionMessage({ id: item.id, text: actionSuccessText[action], ok: true });
-      // perbarui status di list lokal
-      setTransactions((prev) =>
-        prev.map((t) => (t.id === item.id ? { ...t, status: newStatus } : t))
-      );
     } catch (err) {
       setActionMessage({
         id: item.id,

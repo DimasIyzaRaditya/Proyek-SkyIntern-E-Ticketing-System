@@ -1,15 +1,16 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
 import MainNav from "@/components/MainNav";
-import { isAuthenticated } from "@/lib/auth";
+import { getAuthToken, isAuthenticated } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/api-client";
 import { cancelBookingFromApi, getMyBookingsFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 
 type TabKey = "Upcoming" | "Completed" | "Cancelled";
-type BookingStatus = "Pending" | "Processing" | "Paid" | "Issued" | "Cancelled";
+type BookingStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
 
 type BookingView = {
   id: string;
@@ -57,6 +58,52 @@ const formatDate = (value: string) =>
     year: "numeric",
   }).format(new Date(value));
 
+const mapBookingToView = (item: Awaited<ReturnType<typeof getMyBookingsFromApi>>[number]): BookingView => {
+  const passenger = item.passengers[0]
+    ? `${item.passengers[0].firstName} ${item.passengers[0].lastName}`.trim()
+    : "Passenger";
+
+  let status: BookingStatus = "Pending";
+  if (item.ticket) {
+    status = "Issued";
+  } else if (item.status === "CANCELLED" || item.status === "EXPIRED") {
+    status = "Cancelled";
+  } else if (item.status === "PAID") {
+    status = "Paid";
+  }
+
+  return {
+    id: String(item.id),
+    bookingCode: item.bookingCode,
+    airline: item.flight.airline.name,
+    route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
+    date: formatDate(item.flight.departureTime),
+    status,
+    seat: item.selectedSeats ?? "-",
+    passenger,
+    flightNumber: item.flight.flightNumber,
+    pdfUrl: item.ticket?.pdfUrl ?? "",
+    tab: getTabByStatus(status),
+    flightId: String(item.flightId),
+    origin: item.flight.origin.code ?? item.flight.origin.city,
+    destination: item.flight.destination.code ?? item.flight.destination.city,
+    departureDate: item.flight.departureTime.slice(0, 10),
+    pTitle: item.passengers[0]?.title ?? "Mr",
+    pFirstName: item.passengers[0]?.firstName ?? "Passenger",
+    pLastName: item.passengers[0]?.lastName ?? "",
+    pIdType: item.passengers[0]?.documentType ?? "KTP",
+    pIdNumber: item.passengers[0]?.documentNumber ?? "",
+    pNationality: item.passengers[0]?.nationality ?? "Indonesian",
+    departureIso: item.flight.departureTime,
+    arrivalIso: item.flight.arrivalTime,
+    originAirportName: item.flight.origin.name,
+    destAirportName: item.flight.destination.name,
+    originCity: item.flight.origin.city,
+    destCity: item.flight.destination.city,
+    totalPriceAmt: item.totalPrice,
+  };
+};
+
 function MyBookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -70,6 +117,11 @@ function MyBookingsPageContent() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+
+  const refreshBookings = useCallback(async () => {
+    const bookings = await getMyBookingsFromApi();
+    setLiveBookings(bookings.map(mapBookingToView));
+  }, []);
 
   const handleViewETicket = (booking: BookingView) => {
     const data = {
@@ -103,47 +155,7 @@ function MyBookingsPageContent() {
     try {
       const result = await syncPaymentFromApi(Number(bookingId));
       if (result.status === "PAID") {
-        const bookings = await getMyBookingsFromApi();
-        const mapped: BookingView[] = bookings.map((item) => {
-          const passenger = item.passengers[0]
-            ? `${item.passengers[0].firstName} ${item.passengers[0].lastName}`.trim()
-            : "Passenger";
-          let status: BookingStatus = "Pending";
-          if (item.status === "CANCELLED" || item.status === "EXPIRED") status = "Cancelled";
-          else if (item.ticket) status = "Issued";
-          else if (item.status === "PAID") status = "Paid";
-          return {
-            id: String(item.id),
-            bookingCode: item.bookingCode,
-            airline: item.flight.airline.name,
-            route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
-            date: formatDate(item.flight.departureTime),
-            status,
-            seat: item.selectedSeats ?? "-",
-            passenger,
-            flightNumber: item.flight.flightNumber,
-            pdfUrl: item.ticket?.pdfUrl ?? "",
-            tab: getTabByStatus(status),
-            flightId: String(item.flightId),
-            origin: item.flight.origin.code ?? item.flight.origin.city,
-            destination: item.flight.destination.code ?? item.flight.destination.city,
-            departureDate: item.flight.departureTime.slice(0, 10),
-            pTitle: item.passengers[0]?.title ?? "Mr",
-            pFirstName: item.passengers[0]?.firstName ?? "Passenger",
-            pLastName: item.passengers[0]?.lastName ?? "",
-            pIdType: item.passengers[0]?.documentType ?? "KTP",
-            pIdNumber: item.passengers[0]?.documentNumber ?? "",
-            pNationality: item.passengers[0]?.nationality ?? "Indonesian",
-            departureIso: item.flight.departureTime,
-            arrivalIso: item.flight.arrivalTime,
-            originAirportName: item.flight.origin.name,
-            destAirportName: item.flight.destination.name,
-            originCity: item.flight.origin.city,
-            destCity: item.flight.destination.city,
-            totalPriceAmt: item.totalPrice,
-          };
-        });
-        setLiveBookings(mapped);
+        await refreshBookings();
         setActiveTab("Upcoming");
       } else if (result.status === "CANCELLED") {
         setLiveBookings((prev) =>
@@ -177,17 +189,7 @@ function MyBookingsPageContent() {
     try {
       const sync = await syncPaymentFromApi(Number(bookingId));
       if (sync.status === "PAID") {
-        setLiveBookings((prev) =>
-          prev.map((item) =>
-            item.id === bookingId
-              ? {
-                  ...item,
-                  status: "Paid" as BookingStatus,
-                  tab: "Upcoming" as TabKey,
-                }
-              : item,
-          ),
-        );
+        await refreshBookings();
         setPayError("Pembayaran booking ini sudah berhasil, tidak perlu bayar ulang.");
         return;
       }
@@ -207,21 +209,14 @@ function MyBookingsPageContent() {
         setPayError("Booking sudah dibatalkan atau kedaluwarsa.");
         return;
       }
-
-      setLiveBookings((prev) =>
-        prev.map((item) =>
-          item.id === bookingId
-            ? {
-                ...item,
-                status: "Processing" as BookingStatus,
-                tab: "Upcoming" as TabKey,
-              }
-            : item,
-        ),
-      );
     } catch (error) {
-      setPayError(error instanceof Error ? error.message : "Gagal sinkronisasi status pembayaran.");
-      return;
+      const message = error instanceof Error ? error.message : "Gagal sinkronisasi status pembayaran.";
+      // Jika transaksi payment belum dibuat, langsung lanjut ke halaman payment
+      // agar user bisa mulai proses bayar tanpa terblokir.
+      if (!message.toLowerCase().includes("belum ada transaksi pembayaran")) {
+        setPayError(message);
+        return;
+      }
     } finally {
       setPayingId(null);
     }
@@ -372,10 +367,60 @@ function MyBookingsPageContent() {
 
     void loadBookings();
 
-    // Poll every 10 seconds so admin status changes (Tandai Paid/Issued/Batalkan) are reflected in real-time
+    // Poll fallback every 10 seconds for non-websocket updates.
     const pollInterval = setInterval(() => { void loadBookings(); }, 10000);
     return () => clearInterval(pollInterval);
-  }, [authenticated, router, searchParams]);
+  }, [authenticated, refreshBookings, router, searchParams]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const pendingIds = liveBookings
+      .filter((booking) => booking.status === "Pending")
+      .map((booking) => Number(booking.id))
+      .filter((id) => !Number.isNaN(id));
+
+    if (pendingIds.length === 0) return;
+
+    const interval = setInterval(() => {
+      void Promise.all(
+        pendingIds.map((id) =>
+          syncPaymentFromApi(id).catch(() => null)
+        )
+      ).then(() => refreshBookings()).catch(() => null);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [authenticated, liveBookings, refreshBookings]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const token = getAuthToken();
+    if (!token) return;
+
+    let cleanup: (() => void) | undefined;
+
+    const init = async () => {
+      const { io } = await import("socket.io-client");
+      const socket = io(API_BASE_URL, {
+        transports: ["websocket"],
+        auth: { token },
+      });
+
+      socket.on("booking:updated", () => {
+        void refreshBookings();
+      });
+
+      cleanup = () => {
+        socket.disconnect();
+      };
+    };
+
+    void init();
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [authenticated, refreshBookings]);
 
   const bookingList = useMemo(() => {
     const filtered = liveBookings.filter((item) => item.tab === activeTab);
@@ -387,7 +432,6 @@ function MyBookingsPageContent() {
   const getStatusClass = (status: BookingStatus) => {
     if (status === "Issued") return "bg-emerald-100 text-emerald-700";
     if (status === "Paid") return "bg-blue-100 text-blue-700";
-    if (status === "Processing") return "bg-violet-100 text-violet-700";
     if (status === "Cancelled") return "bg-rose-100 text-rose-700";
     return "bg-amber-100 text-amber-700";
   };
@@ -538,11 +582,6 @@ function MyBookingsPageContent() {
                               {syncingId === booking.id ? "Mengecek..." : "Cek Status Bayar"}
                             </button>
                           </>
-                        )}
-                        {booking.status === "Processing" && (
-                          <span className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700">
-                            Membuka pembayaran...
-                          </span>
                         )}
                         {booking.status === "Paid" && (
                           <>

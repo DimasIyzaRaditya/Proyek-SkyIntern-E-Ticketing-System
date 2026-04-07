@@ -261,7 +261,7 @@ function DomesticFlightCard({ flight, promos, index = 0 }: { flight: DealFlight;
   return (
     <Link
       href={`/booking/seat?${params.toString()}`}
-      className="group card-enter w-[78vw] max-w-74 shrink-0 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl sm:w-60 md:w-64 lg:w-72"
+      className="group card-enter w-[calc(100vw-2rem)] max-w-none shrink-0 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl sm:w-60 sm:max-w-none md:w-64 lg:w-72"
       style={{ scrollSnapAlign: "start", animationDelay: `${index * 55}ms` }}
     >
       {/* ── Image ── */}
@@ -351,7 +351,7 @@ function IntlFlightCard({ flight, promos, index = 0 }: { flight: DealFlight; pro
   return (
     <Link
       href={`/booking/seat?${params.toString()}`}
-      className="group card-enter w-[78vw] max-w-74 shrink-0 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl sm:w-60 md:w-64 lg:w-72"
+      className="group card-enter w-[calc(100vw-2rem)] max-w-none shrink-0 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl sm:w-60 sm:max-w-none md:w-64 lg:w-72"
       style={{ scrollSnapAlign: "start", animationDelay: `${index * 55}ms` }}
     >
       {/* ── Image ── */}
@@ -424,7 +424,7 @@ function PromoCard({ promo }: { promo: Promo }) {
   const colorClass = colors[promo.id % colors.length];
 
   return (
-    <div className={`relative w-[78vw] max-w-85 sm:min-w-64 md:min-w-72 lg:min-w-80 overflow-hidden rounded-2xl bg-linear-to-br ${colorClass} p-4 sm:p-5 text-white shadow-md`}>
+    <div className={`relative w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-85 sm:min-w-64 md:max-w-95 md:min-w-72 lg:max-w-105 lg:min-w-80 overflow-hidden rounded-2xl bg-linear-to-br ${colorClass} p-4 sm:p-5 text-white shadow-md`}>
       <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
       <div className="pointer-events-none absolute -bottom-4 -left-4 h-20 w-20 rounded-full bg-white/10" />
       <div className="relative">
@@ -527,7 +527,7 @@ function DomesticSkeletons() {
   return (
     <div className="flex gap-3 sm:gap-4 overflow-hidden">
       {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="w-[72vw] max-w-70 sm:w-52 md:w-60 lg:w-72 shrink-0 rounded-2xl overflow-hidden bg-slate-200 animate-pulse">
+              <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-52 md:w-60 lg:w-72 shrink-0 rounded-2xl overflow-hidden bg-slate-200 animate-pulse">
           <div className="h-32 sm:h-36 md:h-40 bg-slate-300" />
           <div className="p-3.5 space-y-2">
             <div className="h-3.5 w-36 bg-slate-300 rounded" />
@@ -625,12 +625,12 @@ export default function HomePromoSection() {
         {(loadingPromos || hasPromos) && (
           <section>
             <h2 className="mb-3 sm:mb-4 text-lg font-black text-slate-900 sm:text-xl md:text-2xl">
-              🎉 Promo Spesial
+              Promo Spesial
             </h2>
             {loadingPromos ? (
               <div className="flex gap-3 sm:gap-4 overflow-hidden">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="w-[76vw] max-w-[320px] sm:min-w-64 md:min-w-72 lg:min-w-80 h-28 sm:h-32 md:h-36 animate-pulse rounded-2xl bg-slate-200" />
+                  <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-85 sm:min-w-64 md:max-w-95 md:min-w-72 lg:max-w-105 lg:min-w-80 h-28 sm:h-32 md:h-36 animate-pulse rounded-2xl bg-slate-200" />
                 ))}
               </div>
             ) : (
@@ -717,7 +717,7 @@ export default function HomePromoSection() {
             {loadingDeals ? (
               <div className="flex gap-3 sm:gap-4 overflow-hidden">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-[72vw] max-w-70 sm:w-52 md:w-60 lg:w-72 shrink-0 h-36 sm:h-40 md:h-44 animate-pulse rounded-2xl bg-slate-200" />
+                  <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-52 md:w-60 lg:w-72 shrink-0 h-36 sm:h-40 md:h-44 animate-pulse rounded-2xl bg-slate-200" />
                 ))}
               </div>
             ) : (

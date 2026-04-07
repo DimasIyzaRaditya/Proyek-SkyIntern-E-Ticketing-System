@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
-import { isAuthenticated } from "@/lib/auth";
+import { getAuthToken, isAuthenticated } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/api-client";
 import { getFlightDetailFromApi, type FlightCardItem } from "@/lib/flight-api";
-import { createBookingFromApi, createPaymentFromApi, cancelBookingFromApi, getBookingDetailFromApi, getMyBookingsFromApi } from "@/lib/booking-api";
+import { createBookingFromApi, createPaymentFromApi, cancelBookingFromApi, getBookingDetailFromApi, getMyBookingsFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 
 declare global {
   interface Window {
@@ -361,20 +362,92 @@ function PaymentSummaryPageContent() {
     .toString()
     .padStart(2, "0")}:${(countdown % 60).toString().padStart(2, "0")}`;
 
+  const handlePaidConfirmed = useCallback((bookingId: number) => {
+    setPaid(true);
+    setPaymentPending(false);
+    setPendingSnapToken(null);
+    setPendingRedirectUrl(null);
+    setBookingError(null);
+    localStorage.removeItem(draftCountdownKey);
+    const params = new URLSearchParams({ status: "success", bookingId: String(bookingId) });
+    setTimeout(() => router.replace(`/bookings?${params.toString()}`), 500);
+  }, [draftCountdownKey, router]);
+
+  useEffect(() => {
+    if (!authenticated || !bookingIdForPayment || paid || countdown === 0) return;
+
+    const interval = setInterval(() => {
+      void syncPaymentFromApi(bookingIdForPayment)
+        .then((result) => {
+          if (result.status === "PAID") {
+            handlePaidConfirmed(bookingIdForPayment);
+            return;
+          }
+
+          if (result.status === "CANCELLED") {
+            setPaymentPending(false);
+            setPendingSnapToken(null);
+            setPendingRedirectUrl(null);
+            setCountdown(0);
+            setBookingError("Booking sudah dibatalkan atau kedaluwarsa.");
+          }
+        })
+        .catch(() => {
+          // Keep silent on periodic sync failures.
+        });
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [authenticated, bookingIdForPayment, countdown, handlePaidConfirmed, paid]);
+
+  useEffect(() => {
+    if (!authenticated || !bookingIdForPayment) return;
+    const token = getAuthToken();
+    if (!token) return;
+
+    let cleanup: (() => void) | undefined;
+
+    const initSocket = async () => {
+      const { io } = await import("socket.io-client");
+      const socket = io(API_BASE_URL, {
+        transports: ["websocket"],
+        auth: { token },
+      });
+
+      socket.on("booking:updated", (payload: { bookingId?: number; status?: string }) => {
+        if (!payload?.bookingId || payload.bookingId !== bookingIdForPayment) return;
+
+        if (payload.status === "PAID") {
+          handlePaidConfirmed(bookingIdForPayment);
+          return;
+        }
+
+        if (payload.status === "CANCELLED") {
+          setPaymentPending(false);
+          setPendingSnapToken(null);
+          setPendingRedirectUrl(null);
+          setCountdown(0);
+          setBookingError("Booking dibatalkan sebelum pembayaran selesai.");
+        }
+      });
+
+      cleanup = () => socket.disconnect();
+    };
+
+    void initSocket();
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [authenticated, bookingIdForPayment, handlePaidConfirmed]);
+
   const openSnap = (token: string, fallbackUrl: string | null) => {
     if (typeof window !== "undefined" && window.snap) {
       window.snap.pay(token, {
         onSuccess: () => {
-          // Actual payment confirmed
-          setPaid(true);
-          setPaymentPending(false);
-          setPendingSnapToken(null);
-          localStorage.removeItem(draftCountdownKey);
-          const params = new URLSearchParams({ status: "success" });
           if (bookingIdForPayment) {
-            params.set("bookingId", String(bookingIdForPayment));
+            handlePaidConfirmed(bookingIdForPayment);
           }
-          setTimeout(() => router.push(`/bookings?${params.toString()}`), 800);
         },
         onPending: () => {
           // Async payment initiated (GoPay QR shown, VA number shown, etc.)

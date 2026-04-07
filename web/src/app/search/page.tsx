@@ -558,7 +558,7 @@ export default function SearchPage() {
         <section
           className="relative overflow-visible rounded-4xl bg-[linear-gradient(160deg,rgba(14,53,106,0.78)_0%,rgba(26,81,143,0.52)_45%,rgba(16,43,87,0.8)_100%)] px-4 py-5 text-white shadow-xl md:px-8 md:py-7 lg:px-10 lg:py-8"
         >
-          <div className="pointer-events-none absolute inset-0 opacity-20 [background:radial-gradient(circle_at_20%_10%,white,transparent_35%),radial-gradient(circle_at_80%_20%,white,transparent_30%)]" />
+          <div />
 
           <div ref={wrapperRef} className="relative mx-auto max-w-7xl">
             {/* Hero headline */}
