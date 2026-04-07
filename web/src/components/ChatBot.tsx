@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { getUserSession } from "@/lib/auth";
 import {
-  MessageCircle,
   X,
   Send,
   Bot,
+  Headset,
   MessageSquare,
   Minimize2,
   Maximize2,
@@ -115,7 +115,7 @@ const QUICK_REPLIES: QuickReply[] = [
 ];
 
 const ADMIN_WHATSAPP_NUMBER = (process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? "6281234567890").replace(/[^\d]/g, "");
-const ADMIN_ESCALATION_THRESHOLD = 4;
+const ADMIN_ESCALATION_EVERY_MESSAGES = 5;
 const ADMIN_CHAT_SESSION_KEY_PREFIX = "skyintern_admin_chat_session_";
 const ADMIN_POLL_MS = 3000;
 
@@ -148,7 +148,6 @@ function fromTimestamp(value: number): string {
    Per-user chat persistence
 ───────────────────────────────────────────── */
 const CHAT_KEY_PREFIX = "skyintern_chat_";
-const ADMIN_ESCALATION_SESSION_KEY_PREFIX = "skyintern_admin_escalation_seen_";
 
 function makeInitialMessage(): Message {
   return {
@@ -174,16 +173,6 @@ function loadMessagesForUser(userId: number | null): Message[] {
 function saveMessagesForUser(userId: number | null, msgs: Message[]) {
   if (!userId || typeof window === "undefined") return;
   localStorage.setItem(`${CHAT_KEY_PREFIX}${userId}`, JSON.stringify(msgs));
-}
-
-function hasSeenAdminEscalationInSession(userId: number | null): boolean {
-  if (!userId || typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(`${ADMIN_ESCALATION_SESSION_KEY_PREFIX}${userId}`) === "1";
-}
-
-function markAdminEscalationSeenInSession(userId: number | null) {
-  if (!userId || typeof window === "undefined") return;
-  window.sessionStorage.setItem(`${ADMIN_ESCALATION_SESSION_KEY_PREFIX}${userId}`, "1");
 }
 
 function getOrCreateAdminChatSessionId(userId: number | null): string {
@@ -290,9 +279,13 @@ export default function ChatBot() {
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(0);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [adminEscalationSeen, setAdminEscalationSeen] = useState(() => hasSeenAdminEscalationInSession(init.userId));
   const [chatMode, setChatMode] = useState<"ai" | "admin">("ai");
   const [adminChatSessionId, setAdminChatSessionId] = useState(() => getOrCreateAdminChatSessionId(init.userId));
+  const initialUserMessageCount = init.messages.filter((msg) => msg.role === "user").length;
+  const [showAdminEscalation, setShowAdminEscalation] = useState(false);
+  const [lastEscalationPromptAtCount, setLastEscalationPromptAtCount] = useState(() => {
+    return initialUserMessageCount - (initialUserMessageCount % ADMIN_ESCALATION_EVERY_MESSAGES);
+  });
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -301,28 +294,22 @@ export default function ChatBot() {
   const lastAdminMessageIdRef = useRef(0);
 
   const userMessageCount = messages.filter((msg) => msg.role === "user").length;
-  const showAdminEscalation = chatMode === "ai" && !adminEscalationSeen && userMessageCount > ADMIN_ESCALATION_THRESHOLD;
   const latestUserMessage = [...messages].reverse().find((msg) => msg.role === "user")?.text ?? "";
 
   const completeAdminEscalation = () => {
-    setAdminEscalationSeen(true);
-    markAdminEscalationSeenInSession(currentUserIdRef.current);
+    setShowAdminEscalation(false);
   };
 
   const openAdminWhatsApp = () => {
     if (!ADMIN_WHATSAPP_NUMBER) return;
 
-    const recentTranscript = messages
-      .slice(-8)
-      .map((msg) => `${msg.role === "user" ? "User" : "Bot"}: ${msg.text.replace(/\n/g, " ")}`)
-      .join("\n");
+    const primaryIssue = latestUserMessage || "(Mohon jelaskan kendala utama Anda di sini)";
 
     const text = [
-      "Halo Admin SkyIntern, saya butuh bantuan lanjutan dari chatbot.",
+      "Halo Admin SkyIntern, saya butuh bantuan.",
+      `Kendala utama: ${primaryIssue}`,
       `Session ID: ${adminChatSessionId}`,
-      `Jumlah pesan saya di chatbot: ${userMessageCount}`,
-      latestUserMessage ? `Pesan terakhir saya: \"${latestUserMessage}\"` : "",
-      recentTranscript ? `\nRingkasan chat terbaru:\n${recentTranscript}` : "",
+      "Mohon bantu panduannya, terima kasih.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -387,7 +374,11 @@ export default function ChatBot() {
       currentUserIdRef.current = userId;
       const freshMsgs = loadMessagesForUser(userId);
       setMessages(freshMsgs);
-      setAdminEscalationSeen(hasSeenAdminEscalationInSession(userId));
+      const freshUserCount = freshMsgs.filter((msg) => msg.role === "user").length;
+      setShowAdminEscalation(false);
+      setLastEscalationPromptAtCount(
+        freshUserCount - (freshUserCount % ADMIN_ESCALATION_EVERY_MESSAGES)
+      );
       setChatMode("ai");
       setAdminChatSessionId(getOrCreateAdminChatSessionId(userId));
       lastAdminMessageIdRef.current = 0;
@@ -499,6 +490,16 @@ export default function ChatBot() {
 
     // Capture snapshot of messages BEFORE state update for the API payload
     const historySnapshot = messages;
+    const nextUserMessageCount = userMessageCount + 1;
+
+    if (
+      chatMode === "ai" &&
+      nextUserMessageCount % ADMIN_ESCALATION_EVERY_MESSAGES === 0 &&
+      nextUserMessageCount > lastEscalationPromptAtCount
+    ) {
+      setShowAdminEscalation(true);
+      setLastEscalationPromptAtCount(nextUserMessageCount);
+    }
 
     setMessages((p) => [...p, userMsg]);
     setInput("");
@@ -613,7 +614,10 @@ export default function ChatBot() {
           aria-label="Buka chatbot"
           className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 text-white shadow-xl shadow-blue-500/40 flex items-center justify-center hover:scale-110 transition-transform duration-200 active:scale-95"
         >
-          <MessageCircle size={25} />
+          <Headset size={23} className="text-white" />
+          <span className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white bg-cyan-500 p-1">
+            <Bot size={10} className="text-white" />
+          </span>
           {unread > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
               {unread > 9 ? "9+" : unread}
@@ -632,11 +636,14 @@ export default function ChatBot() {
         >
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 bg-linear-to-r from-blue-500 to-indigo-600 rounded-t-2xl text-white shrink-0">
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <Bot size={18} className="text-white" />
+            <div className="relative w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <Headset size={17} className="text-white" />
+              <span className="absolute -bottom-1 -right-1 rounded-full border border-white/70 bg-cyan-500 p-0.5">
+                <Bot size={9} className="text-white" />
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold leading-tight">Sky Assistant</p>
+              <p className="text-sm font-semibold leading-tight">Sky Customer Service + AI</p>
               <p className="text-[11px] text-blue-100 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
                 Online • Siap membantu
