@@ -45,10 +45,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     final menus = [
       {'label': 'Maskapai', 'icon': Icons.flight_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/airlines'},
+      {'label': 'Penerbangan', 'icon': Icons.local_airport_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/schedules'},
       {'label': 'Bandara', 'icon': Icons.location_city_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/airports'},
       {'label': 'Jadwal', 'icon': Icons.schedule_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/schedules'},
-      {'label': 'Kursi', 'icon': Icons.event_seat_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/seats'},
+      {'label': 'Atur Kursi', 'icon': Icons.event_seat_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/seats'},
       {'label': 'Transaksi', 'icon': Icons.receipt_long_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/transactions'},
+      {'label': 'Scan QR', 'icon': Icons.qr_code_scanner_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/scan'},
       {'label': 'Pengguna', 'icon': Icons.group_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/users'},
       {'label': 'Promo', 'icon': Icons.local_offer_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/promos'},
     ];

@@ -1,3 +1,9 @@
+# Jalankan Wireless
+.\start-wireless.ps1
+
+Dengan retry custom:
+.\start-wireless.ps1 -ReconnectRetries 5 -RetryDelaySeconds 
+
 # SkyIntern Mobile App
 
 Panduan ini menjelaskan cara setup, build, install, dan menjalankan APK mobile SkyIntern dari nol sampai bisa dipakai di HP fisik.
@@ -173,6 +179,43 @@ adb devices
 
 ```bash
 flutter run -d <DEVICE_ID>
+```
+
+Alternatif cepat (disarankan):
+
+```powershell
+.\start-wireless.ps1
+```
+
+Atau via CMD:
+
+```bat
+start-wireless.bat
+```
+
+Script ini akan:
+
+- Mengecek tool `flutter` dan `adb`
+- Memilih device wireless otomatis (jika ada)
+- Auto reconnect ADB saat device drop (default 5x retry)
+- Menjalankan `flutter run -d <device>`
+
+Opsi jika ingin target spesifik:
+
+```powershell
+.\start-wireless.ps1 -DeviceId "adb-xxxx._adb-tls-connect._tcp"
+```
+
+Opsi connect endpoint dulu lalu run:
+
+```powershell
+.\start-wireless.ps1 -AdbEndpoint "192.168.1.25:37933"
+```
+
+Opsi atur jumlah retry reconnect:
+
+```powershell
+.\start-wireless.ps1 -ReconnectRetries 5 -RetryDelaySeconds 3
 ```
 
 ## 12. Validasi Koneksi Sebelum Login

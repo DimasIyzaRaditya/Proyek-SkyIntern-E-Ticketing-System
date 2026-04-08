@@ -31,6 +31,7 @@ import 'screens/admin_schedules_screen.dart';
 import 'screens/admin_seats_screen.dart';
 import 'screens/admin_transactions_screen.dart';
 import 'screens/admin_promos_screen.dart';
+import 'screens/admin_scan_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,7 +71,34 @@ class AdminGuard extends StatelessWidget {
                 backgroundColor: Colors.red,
               ),
             );
-            Navigator.pushReplacementNamed(context, '/dashboard');
+            Navigator.pushReplacementNamed(context, '/search');
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return child;
+      },
+    );
+  }
+}
+
+class AuthGuard extends StatelessWidget {
+  final Widget child;
+  const AuthGuard({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        if (!auth.isInitialized) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (!auth.isAuthenticated) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/login');
           });
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -112,15 +140,7 @@ class MyApp extends StatelessWidget {
                 body: Center(child: CircularProgressIndicator()),
               );
             }
-            if (authProvider.isAuthenticated) {
-              // Role-based home screen
-              final user = authProvider.user;
-              if (user?.role == 'admin') {
-                return const AdminDashboardScreen();
-              }
-              return const DashboardScreen();
-            }
-            return const LoginScreen();
+            return const SearchScreen();
           },
         ),
         routes: {
@@ -128,15 +148,15 @@ class MyApp extends StatelessWidget {
           '/register': (_) => const RegisterScreen(),
           '/search': (_) => const SearchScreen(),
           '/search-results': (_) => const SearchResultsScreen(),
-          '/dashboard': (_) => const DashboardScreen(),
+          '/dashboard': (_) => const AuthGuard(child: DashboardScreen()),
           '/admin': (_) => const AdminGuard(child: AdminDashboardScreen()),
           '/admin/airlines': (_) =>
               const AdminGuard(child: AdminAirlinesScreen()),
           '/admin/airports': (_) =>
               const AdminGuard(child: AdminAirportsScreen()),
           '/admin/users': (_) => const AdminGuard(child: AdminUsersScreen()),
-          '/bookings': (_) => const BookingsScreen(),
-          '/edit-profile': (_) => const EditProfileScreen(),
+          '/bookings': (_) => const AuthGuard(child: BookingsScreen()),
+          '/edit-profile': (_) => const AuthGuard(child: EditProfileScreen()),
           '/forgot-password': (_) => const ForgotPasswordScreen(),
           '/chatbot': (_) => const ChatBotScreen(),
         },
@@ -154,15 +174,15 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
     case '/flight-detail':
       page = const FlightDetailScreen();
     case '/booking-seat':
-      page = const BookingSeatScreen();
+      page = const AuthGuard(child: BookingSeatScreen());
     case '/booking-passenger':
-      page = const BookingPassengerScreen();
+      page = const AuthGuard(child: BookingPassengerScreen());
     case '/booking-payment':
-      page = const BookingPaymentScreen();
+      page = const AuthGuard(child: BookingPaymentScreen());
     case '/e-ticket':
-      page = const ETicketScreen();
+      page = const AuthGuard(child: ETicketScreen());
     case '/booking-verify':
-      page = const BookingVerifyScreen();
+      page = const AuthGuard(child: BookingVerifyScreen());
     case '/login-2fa':
       final rawArg = settings.arguments;
       final args = rawArg is Map
@@ -184,6 +204,8 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
       page = const AdminGuard(child: AdminTransactionsScreen());
     case '/admin/promos':
       page = const AdminGuard(child: AdminPromosScreen());
+    case '/admin/scan':
+      page = const AdminGuard(child: AdminScanScreen());
     default:
       if (settings.name?.startsWith('/reset-password') == true) {
         final uri = Uri.parse(settings.name ?? '');

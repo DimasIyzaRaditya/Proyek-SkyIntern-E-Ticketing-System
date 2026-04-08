@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/flight_model.dart';
 import '../providers/flight_provider.dart';
+import '../services/promo_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
@@ -26,6 +27,8 @@ class _SearchScreenState extends State<SearchScreen>
   int childCount = 0;
   bool isRoundTrip = false;
   List<Airport> airports = [];
+  List<PromoItem> promos = const [];
+  bool isLoadingPromos = false;
 
   late AnimationController _animCtrl;
 
@@ -37,7 +40,10 @@ class _SearchScreenState extends State<SearchScreen>
     _animCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700));
     _animCtrl.forward();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAirports());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAirports();
+      _loadPromos();
+    });
   }
 
   @override
@@ -53,6 +59,23 @@ class _SearchScreenState extends State<SearchScreen>
       if (mounted) setState(() => airports = fp.airports);
     } catch (e) {
       if (mounted) showSnackBar(context, 'Gagal memuat bandara', isError: true);
+    }
+  }
+
+  Future<void> _loadPromos() async {
+    try {
+      setState(() => isLoadingPromos = true);
+      final activePromos = await PromoService.getActivePromos();
+      if (!mounted) return;
+      setState(() => promos = activePromos.take(6).toList());
+    } catch (_) {
+      if (mounted) {
+        showSnackBar(context, 'Gagal memuat promo', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingPromos = false);
+      }
     }
   }
 
@@ -451,6 +474,7 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 600;
+    final topInset = MediaQuery.of(context).padding.top;
     final originAirport =
         originCode != null ? airports.where((a) => a.code == originCode).firstOrNull : null;
     final destinationAirport =
@@ -475,7 +499,12 @@ class _SearchScreenState extends State<SearchScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              padding: EdgeInsets.fromLTRB(isWide ? 34 : 16, 14, isWide ? 34 : 16, 26),
+              padding: EdgeInsets.fromLTRB(
+                isWide ? 34 : 16,
+                topInset + (isWide ? 18 : 16),
+                isWide ? 34 : 16,
+                26,
+              ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF0C3B7E), Color(0xFF1D4E9B)],
@@ -789,12 +818,194 @@ class _SearchScreenState extends State<SearchScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
+                  _buildPromoSection(isWide),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPromoSection(bool isWide) {
+    if (isLoadingPromos) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (promos.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE6EAF2)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.local_offer_outlined, color: Color(0xFF64748B)),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Belum ada promo aktif saat ini.',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Promo Aktif',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: isWide ? 190 : 176,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: promos.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final promo = promos[i];
+              final until = promo.endDate != null
+                  ? DateFormatter.formatDate(promo.endDate!)
+                  : null;
+              return SizedBox(
+                width: isWide ? 360 : 310,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    if (promo.isFlightPromo &&
+                        promo.flightId != null &&
+                        promo.flightId!.isNotEmpty) {
+                      Navigator.pushNamed(
+                        context,
+                        '/flight-detail',
+                        arguments: {
+                          'flightId': promo.flightId,
+                          'origin': promo.origin ?? '',
+                          'destination': promo.destination ?? '',
+                          'adults': 1,
+                          'children': 0,
+                        },
+                      );
+                      return;
+                    }
+                    showSnackBar(context, 'Promo ini tidak terikat rute tertentu');
+                  },
+                  child: Ink(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF13438B), Color(0xFF2563EB)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1E0F172A),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'HEMAT ${promo.discount}%',
+                                style: const TextStyle(
+                                  color: Color(0xFF1E3A8A),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              promo.isFlightPromo
+                                  ? Icons.flight_takeoff_rounded
+                                  : Icons.public_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          promo.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if ((promo.description ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            promo.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFDDE8FF),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          promo.sourceLabel ?? 'Promo SkyIntern',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (until != null)
+                          Text(
+                            'Berlaku sampai $until',
+                            style: const TextStyle(
+                              color: Color(0xFFD3E1FF),
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 }
