@@ -1,5 +1,7 @@
-﻿import 'dart:typed_data';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
@@ -143,11 +145,12 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
+      }
     }
   }
 
@@ -384,9 +387,19 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
                                         ],
                                         onSelected: (v) {
                                           if (v == 'edit') {
-                                            _showAddEditDialog(airline: a);
+                                            WidgetsBinding.instance
+                                                .addPostFrameCallback((_) {
+                                                  if (!mounted) return;
+                                                  _showAddEditDialog(
+                                                    airline: a,
+                                                  );
+                                                });
                                           } else {
-                                            _showDeleteDialog(a);
+                                            WidgetsBinding.instance
+                                                .addPostFrameCallback((_) {
+                                                  if (!mounted) return;
+                                                  _showDeleteDialog(a);
+                                                });
                                           }
                                         },
                                       ),
@@ -428,6 +441,71 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
         ? ''
         : ApiClient.normalizePublicUrl(existingLogoRaw);
 
+    Future<void> pickAndCropLogo(StateSetter setSt, BuildContext sCtx) async {
+      if (pickingImage) return;
+
+      setSt(() => pickingImage = true);
+      try {
+        final picked = await _imagePicker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 95,
+          maxWidth: 1800,
+        );
+
+        if (picked == null) return;
+
+        CroppedFile? cropped;
+        try {
+          cropped = await ImageCropper().cropImage(
+            sourcePath: picked.path,
+            compressFormat: ImageCompressFormat.jpg,
+            compressQuality: 90,
+            uiSettings: [
+              AndroidUiSettings(
+                toolbarTitle: 'Crop Logo',
+                toolbarColor: AppColors.primary,
+                toolbarWidgetColor: Colors.white,
+                activeControlsWidgetColor: AppColors.primary,
+                lockAspectRatio: false,
+                initAspectRatio: CropAspectRatioPreset.original,
+              ),
+              IOSUiSettings(title: 'Crop Logo', aspectRatioLockEnabled: false),
+            ],
+          );
+        } on MissingPluginException {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Fitur crop belum aktif. Gambar tetap dipilih tanpa crop. Coba full restart aplikasi.',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+
+        final selectedPath = cropped?.path ?? picked.path;
+        final bytes = await File(selectedPath).readAsBytes();
+        if (!sCtx.mounted) return;
+
+        final segments = selectedPath.split(RegExp(r'[\\/]'));
+        final croppedName = segments.isNotEmpty && segments.last.isNotEmpty
+            ? segments.last
+            : picked.name;
+
+        setSt(() {
+          logoBytes = bytes;
+          logoFileName = croppedName;
+          logoMimeType = _inferMimeType(croppedName);
+        });
+      } finally {
+        if (sCtx.mounted) {
+          setSt(() => pickingImage = false);
+        }
+      }
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -459,112 +537,109 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
               ),
             ],
           ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: pickingImage
-                        ? null
-                        : () async {
-                            setSt(() => pickingImage = true);
-                            try {
-                              final picked = await _imagePicker.pickImage(
-                                source: ImageSource.gallery,
-                                imageQuality: 85,
-                                maxWidth: 1200,
-                              );
-                              if (picked != null) {
-                                final bytes = await picked.readAsBytes();
-                                if (!sCtx.mounted) return;
-                                setSt(() {
-                                  logoBytes = bytes;
-                                  logoFileName = picked.name;
-                                  logoMimeType =
-                                      picked.mimeType ??
-                                      _inferMimeType(picked.name);
-                                });
-                              }
-                            } finally {
-                              if (sCtx.mounted) {
-                                setSt(() => pickingImage = false);
-                              }
-                            }
-                          },
-                    child: Container(
-                      height: 132,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                        color: Colors.white,
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: logoBytes != null
-                          ? Image.memory(
-                              logoBytes!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                            )
-                          : existingLogo.isNotEmpty
-                          ? Image.network(
-                              existingLogo,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              errorBuilder: (_, __, ___) =>
-                                  _buildLogoPlaceholder(isLoading: false),
-                            )
-                          : _buildLogoPlaceholder(isLoading: pickingImage),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.image_outlined,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          logoFileName != null
-                              ? 'Gambar dipilih: $logoFileName'
-                              : isEdit
-                              ? 'Ketuk untuk mengganti logo (opsional)'
-                              : 'Ketuk untuk memilih logo (opsional)',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
+          content: SizedBox(
+            width: 360,
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: pickingImage
+                          ? null
+                          : () => pickAndCropLogo(setSt, sCtx),
+                      child: Container(
+                        height: 132,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                          color: Colors.white,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (logoBytes != null)
+                              ExcludeSemantics(
+                                child: Image.memory(
+                                  logoBytes!,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            else if (existingLogo.isNotEmpty)
+                              ExcludeSemantics(
+                                child: Image.network(
+                                  existingLogo,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _buildLogoPlaceholder(isLoading: false),
+                                ),
+                              )
+                            else
+                              _buildLogoPlaceholder(isLoading: false),
+                            if (pickingImage)
+                              Container(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  InputField(
-                    label: 'Nama Maskapai',
-                    controller: nameCtrl,
-                    validator: (v) => v?.isEmpty == true ? 'Wajib diisi' : null,
-                  ),
-                  const SizedBox(height: 14),
-                  InputField(
-                    label: 'Kode IATA',
-                    controller: codeCtrl,
-                    validator: (v) => v?.isEmpty == true ? 'Wajib diisi' : null,
-                  ),
-                  const SizedBox(height: 14),
-                  InputField(
-                    label: 'Negara',
-                    controller: countryCtrl,
-                    validator: (v) => v?.isEmpty == true ? 'Wajib diisi' : null,
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.image_outlined,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            logoFileName != null
+                                ? 'Gambar dipilih: $logoFileName'
+                                : isEdit
+                                ? 'Ketuk untuk mengganti logo (opsional)'
+                                : 'Ketuk untuk memilih logo (opsional)',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    InputField(
+                      label: 'Nama Maskapai',
+                      controller: nameCtrl,
+                      validator: (v) =>
+                          v?.isEmpty == true ? 'Wajib diisi' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    InputField(
+                      label: 'Kode IATA',
+                      controller: codeCtrl,
+                      validator: (v) =>
+                          v?.isEmpty == true ? 'Wajib diisi' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    InputField(
+                      label: 'Negara',
+                      controller: countryCtrl,
+                      validator: (v) =>
+                          v?.isEmpty == true ? 'Wajib diisi' : null,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
