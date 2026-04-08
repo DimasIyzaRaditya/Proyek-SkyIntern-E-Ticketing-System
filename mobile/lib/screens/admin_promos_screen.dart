@@ -16,6 +16,10 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
   bool _loading = true;
   String? _error;
   String _filter = 'all';
+  String _searchQuery = '';
+  String _sortBy = 'newest';
+  int _page = 1;
+  int _perPage = 10;
 
   @override
   void initState() {
@@ -41,6 +45,7 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
           ..clear()
           ..addAll(data[0]);
         _flights = data[1];
+        if (_page > _totalPages) _page = _totalPages;
         _loading = false;
       });
     } catch (e) {
@@ -52,12 +57,62 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
     }
   }
 
+  DateTime _parseDate(String? raw) =>
+      DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+
   List<Map<String, dynamic>> get _filteredPromos {
     if (_filter == 'all') return _promos;
     if (_filter == 'active') {
       return _promos.where((p) => p['isActive'] == true).toList();
     }
     return _promos.where((p) => p['isActive'] != true).toList();
+  }
+
+  List<Map<String, dynamic>> get _processedPromos {
+    final q = _searchQuery.trim().toLowerCase();
+    var data = _filteredPromos.where((p) {
+      if (q.isEmpty) return true;
+      final id = (p['id'] ?? '').toString().toLowerCase();
+      final title = (p['title'] ?? '').toString().toLowerCase();
+      final description = (p['description'] ?? '').toString().toLowerCase();
+      return id.contains(q) || title.contains(q) || description.contains(q);
+    }).toList();
+
+    data.sort((x, y) {
+      switch (_sortBy) {
+        case 'id':
+          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
+            (y['id'] as num?)?.toInt() ?? 0,
+          );
+        case 'name':
+          return (x['title'] ?? '').toString().toLowerCase().compareTo(
+            (y['title'] ?? '').toString().toLowerCase(),
+          );
+        case 'oldest':
+          return _parseDate(
+            x['startDate']?.toString(),
+          ).compareTo(_parseDate(y['startDate']?.toString()));
+        case 'newest':
+        default:
+          return _parseDate(
+            y['startDate']?.toString(),
+          ).compareTo(_parseDate(x['startDate']?.toString()));
+      }
+    });
+
+    return data;
+  }
+
+  int get _totalPages => _processedPromos.isEmpty
+      ? 1
+      : (_processedPromos.length / _perPage).ceil();
+
+  List<Map<String, dynamic>> get _pagedPromos {
+    final data = _processedPromos;
+    final start = (_page - 1) * _perPage;
+    final end = (start + _perPage).clamp(0, data.length);
+    if (start >= data.length) return [];
+    return data.sublist(start, end);
   }
 
   String _flightLabel(Map<String, dynamic> promo) {
@@ -100,24 +155,32 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
     final isEdit = promo != null;
     final formKey = GlobalKey<FormState>();
 
-    final titleCtrl = TextEditingController(text: (promo?['title'] ?? '').toString());
-    final descriptionCtrl =
-        TextEditingController(text: (promo?['description'] ?? '').toString());
-    final discountCtrl =
-        TextEditingController(text: ((promo?['discount'] ?? 0) as num).toInt().toString());
+    final titleCtrl = TextEditingController(
+      text: (promo?['title'] ?? '').toString(),
+    );
+    final descriptionCtrl = TextEditingController(
+      text: (promo?['description'] ?? '').toString(),
+    );
+    final discountCtrl = TextEditingController(
+      text: ((promo?['discount'] ?? 0) as num).toInt().toString(),
+    );
     final startCtrl = TextEditingController(
-      text: DateTime.tryParse((promo?['startDate'] ?? '').toString())
-              ?.toIso8601String()
-              .split('T')
-              .first ??
+      text:
+          DateTime.tryParse(
+            (promo?['startDate'] ?? '').toString(),
+          )?.toIso8601String().split('T').first ??
           DateTime.now().toIso8601String().split('T').first,
     );
     final endCtrl = TextEditingController(
-      text: DateTime.tryParse((promo?['endDate'] ?? '').toString())
-              ?.toIso8601String()
+      text:
+          DateTime.tryParse(
+            (promo?['endDate'] ?? '').toString(),
+          )?.toIso8601String().split('T').first ??
+          DateTime.now()
+              .add(const Duration(days: 7))
+              .toIso8601String()
               .split('T')
-              .first ??
-          DateTime.now().add(const Duration(days: 7)).toIso8601String().split('T').first,
+              .first,
     );
 
     bool saving = false;
@@ -130,7 +193,9 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
         return StatefulBuilder(
           builder: (context, setSt) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: Text(
                 isEdit ? 'Edit Promo' : 'Tambah Promo',
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -203,20 +268,21 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
                               value: null,
                               child: Text('Semua tiket (Global)'),
                             ),
-                            ..._flights.map(
-                              (f) {
-                                final id = (f['id'] as num).toInt();
-                                final fn = (f['flightNumber'] ?? '-').toString();
-                                final origin = ((f['origin'] as Map?)?['city'] ?? '-').toString();
-                                final destination =
-                                    ((f['destination'] as Map?)?['city'] ?? '-').toString();
+                            ..._flights.map((f) {
+                              final id = (f['id'] as num).toInt();
+                              final fn = (f['flightNumber'] ?? '-').toString();
+                              final origin =
+                                  ((f['origin'] as Map?)?['city'] ?? '-')
+                                      .toString();
+                              final destination =
+                                  ((f['destination'] as Map?)?['city'] ?? '-')
+                                      .toString();
 
-                                return DropdownMenuItem<int?>(
-                                  value: id,
-                                  child: Text('$fn • $origin → $destination'),
-                                );
-                              },
-                            ),
+                              return DropdownMenuItem<int?>(
+                                value: id,
+                                child: Text('$fn • $origin → $destination'),
+                              );
+                            }),
                           ],
                           onChanged: (value) {
                             setSt(() => selectedFlightId = value);
@@ -247,10 +313,14 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
 
                           final start = DateTime.tryParse(startCtrl.text);
                           final end = DateTime.tryParse(endCtrl.text);
-                          if (start == null || end == null || !end.isAfter(start)) {
+                          if (start == null ||
+                              end == null ||
+                              !end.isAfter(start)) {
                             ScaffoldMessenger.of(this.context).showSnackBar(
                               const SnackBar(
-                                content: Text('Tanggal selesai harus setelah tanggal mulai.'),
+                                content: Text(
+                                  'Tanggal selesai harus setelah tanggal mulai.',
+                                ),
                                 backgroundColor: AppColors.error,
                               ),
                             );
@@ -315,7 +385,10 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : Text(isEdit ? 'Simpan' : 'Tambah'),
                 ),
@@ -335,7 +408,10 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
         title: const Text('Hapus Promo'),
         content: Text('Yakin ingin menghapus promo "${promo['title']}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
@@ -385,186 +461,249 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 44),
-                        const SizedBox(height: 8),
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: _loadData,
-                          child: const Text('Coba lagi'),
-                        ),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                      size: 44,
                     ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    const SizedBox(height: 8),
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _loadData,
+                      child: const Text('Coba lagi'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(value: 'all', label: Text('Semua')),
-                                ButtonSegment(value: 'active', label: Text('Aktif')),
-                                ButtonSegment(value: 'inactive', label: Text('Nonaktif')),
-                              ],
-                              selected: {_filter},
-                              onSelectionChanged: (value) {
-                                setState(() => _filter = value.first);
-                              },
+                      Expanded(
+                        child: SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(value: 'all', label: Text('Semua')),
+                            ButtonSegment(
+                              value: 'active',
+                              label: Text('Aktif'),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      if (_filteredPromos.isEmpty)
-                        const EmptyState(
-                          icon: Icons.local_offer_outlined,
-                          title: 'Belum ada promo',
-                          subtitle: 'Tambahkan promo untuk ditampilkan di aplikasi.',
+                            ButtonSegment(
+                              value: 'inactive',
+                              label: Text('Nonaktif'),
+                            ),
+                          ],
+                          selected: {_filter},
+                          onSelectionChanged: (value) {
+                            setState(() {
+                              _filter = value.first;
+                              _page = 1;
+                            });
+                          },
                         ),
-                      ..._filteredPromos.map((promo) {
-                        final active = promo['isActive'] == true;
-                        final discount = ((promo['discount'] ?? 0) as num).toInt();
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  ListQueryControls(
+                    searchQuery: _searchQuery,
+                    sortValue: _sortBy,
+                    rowsPerPage: _perPage,
+                    searchHint:
+                        'Cari promo berdasarkan judul, deskripsi, atau ID...',
+                    onSearchChanged: (v) => setState(() {
+                      _searchQuery = v;
+                      _page = 1;
+                    }),
+                    onSortChanged: (v) => setState(() {
+                      _sortBy = v;
+                      _page = 1;
+                    }),
+                    onRowsPerPageChanged: (v) => setState(() {
+                      _perPage = v;
+                      _page = 1;
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                  if (_processedPromos.isEmpty)
+                    const EmptyState(
+                      icon: Icons.local_offer_outlined,
+                      title: 'Belum ada promo',
+                      subtitle:
+                          'Tambahkan promo untuk ditampilkan di aplikasi.',
+                    ),
+                  ..._pagedPromos.map((promo) {
+                    final active = promo['isActive'] == true;
+                    final discount = ((promo['discount'] ?? 0) as num).toInt();
 
-                        return GlassCard(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
+                    return GlassCard(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          (promo['title'] ?? 'Promo').toString(),
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _flightLabel(promo),
-                                          style: const TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: active ? AppColors.successLight : AppColors.surfaceVariant,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      active ? 'Aktif' : 'Nonaktif',
-                                      style: TextStyle(
-                                        color: active ? AppColors.success : AppColors.textSecondary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 11,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      (promo['title'] ?? 'Promo').toString(),
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              if ((promo['description'] ?? '').toString().trim().isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  (promo['description'] ?? '').toString(),
-                                  style: const TextStyle(color: AppColors.textSecondary),
-                                ),
-                              ],
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryLight,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'Diskon $discount%',
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _flightLabel(promo),
                                       style: const TextStyle(
-                                        color: AppColors.primaryDark,
-                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textSecondary,
                                         fontSize: 12,
                                       ),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    '${_fmtDate((promo['startDate'] ?? '').toString())} - ${_fmtDate((promo['endDate'] ?? '').toString())}',
-                                    style: const TextStyle(
-                                      color: AppColors.textHint,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: () => _showPromoDialog(promo: promo),
-                                    icon: const Icon(Icons.edit_outlined),
-                                    tooltip: 'Edit',
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? AppColors.successLight
+                                      : AppColors.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  active ? 'Aktif' : 'Nonaktif',
+                                  style: TextStyle(
+                                    color: active
+                                        ? AppColors.success
+                                        : AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
                                   ),
-                                  IconButton(
-                                    onPressed: () => _confirmDelete(promo),
-                                    icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                                    tooltip: 'Hapus',
-                                  ),
-                                  const Spacer(),
-                                  Switch.adaptive(
-                                    value: active,
-                                    onChanged: (value) async {
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      try {
-                                        await AdminService.updatePromo(
-                                          id: (promo['id'] as num).toInt(),
-                                          isActive: value,
-                                        );
-                                        await _loadData();
-                                      } catch (e) {
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              e.toString().replaceAll('Exception: ', ''),
-                                            ),
-                                            backgroundColor: AppColors.error,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
-                        );
-                      }),
-                    ],
+                          if ((promo['description'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              (promo['description'] ?? '').toString(),
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Diskon $discount%',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryDark,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${_fmtDate((promo['startDate'] ?? '').toString())} - ${_fmtDate((promo['endDate'] ?? '').toString())}',
+                                style: const TextStyle(
+                                  color: AppColors.textHint,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: () => _showPromoDialog(promo: promo),
+                                icon: const Icon(Icons.edit_outlined),
+                                tooltip: 'Edit',
+                              ),
+                              IconButton(
+                                onPressed: () => _confirmDelete(promo),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: AppColors.error,
+                                ),
+                                tooltip: 'Hapus',
+                              ),
+                              const Spacer(),
+                              Switch.adaptive(
+                                value: active,
+                                onChanged: (value) async {
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
+                                  );
+                                  try {
+                                    await AdminService.updatePromo(
+                                      id: (promo['id'] as num).toInt(),
+                                      isActive: value,
+                                    );
+                                    await _loadData();
+                                  } catch (e) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          e.toString().replaceAll(
+                                            'Exception: ',
+                                            '',
+                                          ),
+                                        ),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  ListPaginationBar(
+                    currentPage: _page,
+                    totalItems: _processedPromos.length,
+                    itemsPerPage: _perPage,
+                    onPageChanged: (next) => setState(() => _page = next),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
   }
 }
