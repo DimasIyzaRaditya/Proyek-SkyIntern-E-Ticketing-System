@@ -1,6 +1,6 @@
 // Route autentikasi. Mendaftarkan endpoint untuk register, login, verifikasi token,
 // profil user, lupa/reset password, dan hapus akun. Dilengkapi dokumentasi Swagger.
-import { Router } from "express"
+import { NextFunction, Request, Response, Router } from "express"
 import multer from "multer"
 import rateLimit from "express-rate-limit"
 import { register, login, verifyToken, getProfile, updateProfile, uploadAvatar, forgotPassword, resetPassword, deleteAccount, verifyTwoFactorLogin, resendTwoFactorCode, updateTwoFactorSetting } from "../controllers/auth.controller"
@@ -8,12 +8,40 @@ import { authenticate } from "../middleware/auth.middleware"
 
 const upload = multer({ storage: multer.memoryStorage() }) // File avatar disimpan di memori sebelum dikirim ke MinIO
 
+const LOGIN_LIMIT_WINDOW_MS = 10 * 60 * 1000
+
+const formatCountdown = (totalSeconds: number): string => {
+  const safeSeconds = Math.max(0, totalSeconds)
+  const minutes = Math.floor(safeSeconds / 60)
+  const seconds = safeSeconds % 60
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+}
+
 const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 menit
+  windowMs: LOGIN_LIMIT_WINDOW_MS, // 10 menit
   max: 5,                    // maks 5 percobaan per IP
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: "Terlalu banyak percobaan login, coba lagi setelah 10 menit" }
+  handler: (
+    req: Request & { rateLimit?: { resetTime?: Date } },
+    res: Response,
+    _next: NextFunction,
+    options: { statusCode: number }
+  ) => {
+    const nowMs = Date.now()
+    const resetMs = req.rateLimit?.resetTime instanceof Date
+      ? req.rateLimit.resetTime.getTime()
+      : nowMs + LOGIN_LIMIT_WINDOW_MS
+    const retryAfterSeconds = Math.max(1, Math.ceil((resetMs - nowMs) / 1000))
+    const countdown = formatCountdown(retryAfterSeconds)
+
+    res.status(options.statusCode).json({
+      message: `Terlalu banyak percobaan login. Coba lagi dalam ${countdown}.`,
+      retryAfterSeconds,
+      retryAt: new Date(resetMs).toISOString(),
+      countdown,
+    })
+  }
 })
 
 const router = Router() // Router Express untuk semua route autentikasi
