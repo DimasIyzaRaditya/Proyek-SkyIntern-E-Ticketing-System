@@ -2,6 +2,9 @@
 // dari anotasi JSDoc yang ada di file route. Dokumentasi tersedia di /api-docs.
 import swaggerJsdoc from "swagger-jsdoc"
 
+const port = Number(process.env.PORT ?? 3000)
+const swaggerServerUrl = process.env.SWAGGER_SERVER_URL ?? `http://localhost:${port}`
+
 // Opsi konfigurasi Swagger: metadata API, server URL, dan pola file route yang dibaca
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -13,7 +16,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: "http://localhost:3000",
+        url: swaggerServerUrl,
         description: "Development server"
       }
     ],
@@ -27,7 +30,7 @@ const options: swaggerJsdoc.Options = {
       }
     }
   },
-  apis: ["./src/routes/*.ts"]
+  apis: ["./src/routes/*.ts", "./dist/routes/*.js"]
 }
 
 export default swaggerJsdoc(options)

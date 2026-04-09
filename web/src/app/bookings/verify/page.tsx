@@ -13,14 +13,31 @@ const QRCode = dynamic(
 );
 
 const STATUS_CONFIG = {
-  PAID:      { label: "Terkonfirmasi",          bg: "bg-emerald-500", text: "text-white", Icon: CheckCircle2 },
-  ISSUED:    { label: "Tiket Diterbitkan",       bg: "bg-blue-600",   text: "text-white", Icon: CheckCircle2 },
-  PENDING:   { label: "Menunggu Pembayaran",     bg: "bg-amber-400",  text: "text-white", Icon: Clock        },
-  CANCELLED: { label: "Dibatalkan",              bg: "bg-rose-500",   text: "text-white", Icon: XCircle      },
-  EXPIRED:   { label: "Kedaluwarsa",             bg: "bg-slate-400",  text: "text-white", Icon: XCircle      },
+  PAID:      { label: "Confirmed",                 bg: "bg-emerald-500", text: "text-white", Icon: CheckCircle2 },
+  ISSUED:    { label: "Ticket Issued",             bg: "bg-blue-600",   text: "text-white", Icon: CheckCircle2 },
+  PENDING:   { label: "Awaiting Payment",          bg: "bg-amber-400",  text: "text-white", Icon: Clock        },
+  CANCELLED: { label: "Cancelled",                 bg: "bg-rose-500",   text: "text-white", Icon: XCircle      },
+  EXPIRED:   { label: "Expired",                   bg: "bg-slate-400",  text: "text-white", Icon: XCircle      },
+  PAST_FLIGHT: { label: "Expired (Past Departure)", bg: "bg-slate-500", text: "text-white", Icon: XCircle      },
 } as const;
 
 type StatusKey = keyof typeof STATUS_CONFIG;
+
+function fmtDateTime(iso: string) {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
 
 function fmtTime(iso: string) {
   if (!iso) return "--:--";
@@ -71,7 +88,16 @@ function VerifyPageContent() {
 
   const booking      = result?.booking;
   const displayedError = error ?? (!code ? "Kode booking tidak ditemukan dalam QR code." : null);
-  const statusKey    = (booking?.status ?? "") as StatusKey;
+  const isPastDeparture = booking?.flight?.departureTime
+    ? new Date(booking.flight.departureTime).getTime() < Date.now()
+    : false;
+  const shouldShowPastFlight = Boolean(
+    booking
+      && isPastDeparture
+      && booking.status !== "CANCELLED"
+      && booking.status !== "EXPIRED"
+  );
+  const statusKey    = (shouldShowPastFlight ? "PAST_FLIGHT" : (booking?.status ?? "")) as StatusKey;
   const statusConfig = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.PENDING;
   const { Icon: StatusIcon } = statusConfig;
 
@@ -139,6 +165,11 @@ function VerifyPageContent() {
         {/* ── Ticket ── */}
         {booking && !loading && (
           <div className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+            {shouldShowPastFlight && (
+              <div className="border-b border-slate-200 bg-slate-50 px-8 py-2 text-xs font-medium text-slate-700">
+                This ticket has passed its departure schedule at {fmtDateTime(booking.flight.departureTime)}.
+              </div>
+            )}
 
             {/* ── Section 1: Header ── */}
             <div className="relative flex items-start justify-between overflow-hidden px-8 pt-7 pb-5">

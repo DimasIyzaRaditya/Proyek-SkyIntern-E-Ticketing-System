@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
 import { isAuthenticated, getUserSession } from "@/lib/auth";
 import { getPassengerProfile } from "@/lib/passenger-profile";
+import { validateDateOfBirth, validateIdentityNumber } from "@/lib/identity-validation";
 
 function PassengerFormPageContent() {
   const router = useRouter();
@@ -17,18 +18,35 @@ function PassengerFormPageContent() {
   const [nationality, setNationality] = useState("Indonesian");
   const [dob, setDob] = useState("");
   const [idNumberTouched, setIdNumberTouched] = useState(false);
+  const [dobTouched, setDobTouched] = useState(false);
 
-  const idNumberError =
-    idNumberTouched && idNumber.trim().length > 0 && idNumber.trim().length < 8
-      ? "Nomor identitas minimal 8 karakter"
-      : null;
+  const handleIdentityTypeChange = (nextType: "KTP" | "PASSPORT") => {
+    setIdType(nextType);
+    setIdNumber((prev) => {
+      if (nextType === "KTP") {
+        return prev.replace(/\D/g, "").slice(0, 16);
+      }
+      return prev.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
+    });
+  };
+
+  const handleIdentityNumberChange = (value: string) => {
+    if (idType === "KTP") {
+      setIdNumber(value.replace(/\D/g, "").slice(0, 16));
+      return;
+    }
+    setIdNumber(value.replace(/[^A-Za-z0-9]/g, "").slice(0, 20));
+  };
+
+  const idNumberError = idNumberTouched ? validateIdentityNumber(idType, idNumber) : null;
+  const dobError = dobTouched ? validateDateOfBirth(dob) : null;
 
   const isFormValid =
     firstName.trim() !== "" &&
     lastName.trim() !== "" &&
-    idNumber.trim().length >= 8 &&
+    validateIdentityNumber(idType, idNumber) === null &&
     nationality.trim() !== "" &&
-    dob !== "";
+    validateDateOfBirth(dob) === null;
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -127,7 +145,7 @@ function PassengerFormPageContent() {
               </label>
               <select
                 value={idType}
-                onChange={(e) => setIdType(e.target.value === "PASSPORT" ? "PASSPORT" : "KTP")}
+                onChange={(e) => handleIdentityTypeChange(e.target.value === "PASSPORT" ? "PASSPORT" : "KTP")}
                 className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
               >
                 <option>KTP</option>
@@ -142,9 +160,11 @@ function PassengerFormPageContent() {
               </label>
               <input
                 value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value)}
+                onChange={(e) => handleIdentityNumberChange(e.target.value)}
                 onBlur={() => setIdNumberTouched(true)}
-                placeholder="Minimal 8 karakter"
+                placeholder={idType === "KTP" ? "16 digit angka" : "8-20 karakter alfanumerik"}
+                inputMode={idType === "KTP" ? "numeric" : "text"}
+                maxLength={idType === "KTP" ? 16 : 20}
                 className={`w-full rounded-2xl border px-4 py-3 focus:outline-none ${
                   idNumberError
                     ? "border-red-400 bg-red-50 focus:border-red-400"
@@ -178,8 +198,17 @@ function PassengerFormPageContent() {
                 type="date"
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
+                onBlur={() => setDobTouched(true)}
+                max={new Date().toISOString().slice(0, 10)}
+                className={`w-full rounded-2xl border px-4 py-3 focus:outline-none ${
+                  dobError
+                    ? "border-red-400 bg-red-50 focus:border-red-400"
+                    : "border-blue-100 bg-blue-50 focus:border-blue-400"
+                }`}
               />
+              {dobError && (
+                <p className="mt-1 text-xs text-red-500">{dobError}</p>
+              )}
             </div>
 
             {!isFormValid && (
