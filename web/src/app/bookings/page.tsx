@@ -43,6 +43,7 @@ type BookingView = {
   originCity: string;
   destCity: string;
   totalPriceAmt: number;
+  isExpired: boolean;
 };
 
 const getTabByStatus = (status: BookingStatus): TabKey => {
@@ -57,6 +58,17 @@ const formatDate = (value: string) =>
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+
+const formatDateTime = (value: string) =>
+  new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+
+const isTicketExpired = (departureIso: string) => new Date(departureIso).getTime() < Date.now();
 
 const mapBookingToView = (item: Awaited<ReturnType<typeof getMyBookingsFromApi>>[number]): BookingView => {
   const passenger = item.passengers[0]
@@ -101,6 +113,7 @@ const mapBookingToView = (item: Awaited<ReturnType<typeof getMyBookingsFromApi>>
     originCity: item.flight.origin.city,
     destCity: item.flight.destination.city,
     totalPriceAmt: item.totalPrice,
+    isExpired: isTicketExpired(item.flight.departureTime),
   };
 };
 
@@ -348,6 +361,7 @@ function MyBookingsPageContent() {
             originCity: item.flight.origin.city,
             destCity: item.flight.destination.city,
             totalPriceAmt: item.totalPrice,
+            isExpired: isTicketExpired(item.flight.departureTime),
           };
         });
 
@@ -429,11 +443,17 @@ function MyBookingsPageContent() {
     );
   }, [activeTab, liveBookings, sortOrder]);
 
-  const getStatusClass = (status: BookingStatus) => {
+  const getStatusClass = (status: BookingStatus, isExpired: boolean) => {
+    if (status === "Issued" && isExpired) return "bg-slate-200 text-slate-700";
     if (status === "Issued") return "bg-emerald-100 text-emerald-700";
     if (status === "Paid") return "bg-blue-100 text-blue-700";
     if (status === "Cancelled") return "bg-rose-100 text-rose-700";
     return "bg-amber-100 text-amber-700";
+  };
+
+  const getStatusLabel = (status: BookingStatus, isExpired: boolean) => {
+    if (status === "Issued" && isExpired) return "Expired";
+    return status;
   };
 
   if (authenticated === null) {
@@ -549,9 +569,14 @@ function MyBookingsPageContent() {
                     </div>
 
                     <div className="text-right">
-                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(booking.status)}`}>
-                        <CheckCircle2 className="h-3.5 w-3.5" /> {booking.status}
+                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(booking.status, booking.isExpired)}`}>
+                        <CheckCircle2 className="h-3.5 w-3.5" /> {getStatusLabel(booking.status, booking.isExpired)}
                       </span>
+                      {booking.status === "Issued" && booking.isExpired && (
+                        <p className="mt-1 text-xs font-semibold text-slate-600">
+                          Ticket expired since {formatDateTime(booking.departureIso)}
+                        </p>
+                      )}
                       {booking.status === "Paid" && (
                         <p className="mt-1 text-xs font-semibold text-blue-700">
                           Sudah dibayar, menunggu e-ticket terbit
@@ -569,11 +594,7 @@ function MyBookingsPageContent() {
                             </button>
                             <button
                               onClick={() => void handlePayBooking(booking.id)}
-                              disabled={
-                                payingId === booking.id ||
-                                syncingId === booking.id ||
-                                cancellingId === booking.id
-                              }
+                              disabled={payingId === booking.id || syncingId === booking.id || cancellingId === booking.id}
                               className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {payingId === booking.id ? "Memproses..." : "Bayar Sekarang"}
@@ -599,7 +620,7 @@ function MyBookingsPageContent() {
                             onClick={() => handleViewETicket(booking)}
                             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                           >
-                            View E-Ticket
+                            {booking.isExpired ? "View E-Ticket (Archive)" : "View E-Ticket"}
                           </button>
                         )}
                         {booking.status === "Cancelled" && (

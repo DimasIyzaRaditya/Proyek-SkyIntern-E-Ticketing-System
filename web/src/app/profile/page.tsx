@@ -11,6 +11,7 @@ import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@
 import { getProfileFromApi, updateProfileFromApi, updateTwoFactorSettingFromApi, uploadAvatarToApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
 import { getPassengerProfile, maskIdentityNumber, setPassengerProfile } from "@/lib/passenger-profile";
+import { validateDateOfBirth, validateIdentityNumber } from "@/lib/identity-validation";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -31,13 +32,45 @@ export default function ProfilePage() {
   const [identityNationality, setIdentityNationality] = useState("Indonesian");
   const [identityDob, setIdentityDob] = useState("");
   const [editingIdentityNumber, setEditingIdentityNumber] = useState(false);
+  const [showIdentityTypeMenu, setShowIdentityTypeMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const identityTypeMenuRef = useRef<HTMLDivElement>(null);
   const showSkeleton = useMinDelay(loading);
   const [message, setMessage] = useState("");
   const authenticated = isAuthenticated();
 
   type UpcomingTrip = { route: string; airline: string; date: string; status: string } | null;
   const [upcomingTrip, setUpcomingTrip] = useState<UpcomingTrip>(null);
+
+  const handleIdentityTypeChange = (nextType: "KTP" | "PASSPORT") => {
+    setIdentityType(nextType);
+    setIdentityNumber((prev) => {
+      if (nextType === "KTP") {
+        return prev.replace(/\D/g, "").slice(0, 16);
+      }
+      return prev.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
+    });
+  };
+
+  const handleIdentityNumberChange = (value: string) => {
+    if (identityType === "KTP") {
+      setIdentityNumber(value.replace(/\D/g, "").slice(0, 16));
+      return;
+    }
+    setIdentityNumber(value.replace(/[^A-Za-z0-9]/g, "").slice(0, 20));
+  };
+
+  useEffect(() => {
+    const onClickOutside = (event: MouseEvent) => {
+      if (!identityTypeMenuRef.current) return;
+      if (!identityTypeMenuRef.current.contains(event.target as Node)) {
+        setShowIdentityTypeMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!authenticated) {
@@ -266,14 +299,43 @@ export default function ProfilePage() {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Jenis Identitas</label>
-                    <select
-                      value={identityType}
-                      onChange={(event) => setIdentityType(event.target.value === "PASSPORT" ? "PASSPORT" : "KTP")}
-                      className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3"
-                    >
-                      <option value="KTP">KTP</option>
-                      <option value="PASSPORT">Passport</option>
-                    </select>
+                    <div ref={identityTypeMenuRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowIdentityTypeMenu((prev) => !prev)}
+                        className="flex w-full items-center justify-between rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-left text-sm outline-none ring-blue-200 transition focus:ring sm:px-4 sm:py-3"
+                      >
+                        <span>{identityType === "PASSPORT" ? "Passport" : "KTP"}</span>
+                        <span className={`text-xs text-slate-500 transition-transform ${showIdentityTypeMenu ? "rotate-180" : ""}`}>
+                          ▼
+                        </span>
+                      </button>
+
+                      {showIdentityTypeMenu && (
+                        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-blue-100 bg-white shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleIdentityTypeChange("KTP");
+                              setShowIdentityTypeMenu(false);
+                            }}
+                            className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${identityType === "KTP" ? "bg-blue-50 text-blue-700" : "text-slate-700"}`}
+                          >
+                            KTP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleIdentityTypeChange("PASSPORT");
+                              setShowIdentityTypeMenu(false);
+                            }}
+                            className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${identityType === "PASSPORT" ? "bg-blue-50 text-blue-700" : "text-slate-700"}`}
+                          >
+                            Passport
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Kewarganegaraan</label>
@@ -281,14 +343,22 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
+                {editingIdentityNumber && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Mode edit identitas aktif. Pastikan NIK/Paspor sesuai dokumen resmi sebelum menyimpan profil.
+                  </div>
+                )}
+
                 <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-700 sm:text-sm">Nomor Identitas (NIK/Paspor)</label>
                     {editingIdentityNumber ? (
                       <input
                         value={identityNumber}
-                        onChange={(event) => setIdentityNumber(event.target.value)}
-                        placeholder="Masukkan nomor identitas"
+                        onChange={(event) => handleIdentityNumberChange(event.target.value)}
+                        placeholder={identityType === "KTP" ? "16 digit angka" : "8-20 karakter alfanumerik"}
+                        inputMode={identityType === "KTP" ? "numeric" : "text"}
+                        maxLength={identityType === "KTP" ? 16 : 20}
                         className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3"
                       />
                     ) : (
@@ -315,6 +385,7 @@ export default function ProfilePage() {
                     type="date"
                     value={identityDob}
                     onChange={(event) => setIdentityDob(event.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
                     className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2.5 text-sm outline-none ring-blue-200 focus:ring sm:px-4 sm:py-3"
                   />
                 </div>
@@ -362,8 +433,16 @@ export default function ProfilePage() {
                   setMessage("");
                   setSaved(false);
 
-                  if (identityNumber.trim().length > 0 && identityNumber.trim().length < 8) {
-                    setMessage("Nomor identitas minimal 8 karakter.");
+                  const identityNumberError = validateIdentityNumber(identityType, identityNumber);
+                  if (identityNumberError) {
+                    setMessage(identityNumberError);
+                    setSaving(false);
+                    return;
+                  }
+
+                  const dobError = validateDateOfBirth(identityDob);
+                  if (dobError) {
+                    setMessage(dobError);
                     setSaving(false);
                     return;
                   }

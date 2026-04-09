@@ -55,13 +55,17 @@ function SeatSelectionPageContent() {
   }, [seatData]);
   // All seat numbers from API (for grid)
   const allSeatNumbers = useMemo(
-    () => seatData.map((s) => s.seat.seatNumber),
+    () => Array.from(new Set(seatData.map((s) => s.seat.seatNumber))),
     [seatData],
   );
   // Map seat number → FlightSeat ID (needed for hold/release API calls)
   const seatIdMap = useMemo(() => {
     const map = new Map<string, number>();
-    seatData.forEach((s) => map.set(s.seat.seatNumber, s.id));
+    seatData.forEach((s) => {
+      if (!map.has(s.seat.seatNumber)) {
+        map.set(s.seat.seatNumber, s.id);
+      }
+    });
     seatIdMapRef.current = map;
     return map;
   }, [seatData]);

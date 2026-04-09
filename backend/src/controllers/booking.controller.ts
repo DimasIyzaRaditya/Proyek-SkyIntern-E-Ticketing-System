@@ -99,6 +99,14 @@ const sendTransactionReminderIfNeeded = async (bookingId: number) => {
   })
 }
 
+const MINIMUM_AGE_YEARS = 17
+
+const isAtLeastAge = (dateOfBirth: Date, age: number) => {
+  const today = new Date()
+  const threshold = new Date(today.getFullYear() - age, today.getMonth(), today.getDate())
+  return dateOfBirth <= threshold
+}
+
 // Step 1: Create Booking with Passenger Data
 export const createBooking = async (req: AuthRequest, res: Response) => {
   try {
@@ -109,6 +117,42 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
 
     if (!Array.isArray(passengers) || passengers.length === 0) {
       return res.status(400).json({ message: "Data penumpang wajib diisi" })
+    }
+
+    for (const passenger of passengers as any[]) {
+      const rawType = String(passenger?.documentType || passenger?.idType || "KTP").toUpperCase()
+      const documentType = rawType === "PASSPORT" ? "PASSPORT" : "KTP"
+      const rawDocumentNumber = String(passenger?.documentNumber || passenger?.idNumber || "").trim()
+
+      if (documentType === "KTP") {
+        if (!/^\d{16}$/.test(rawDocumentNumber)) {
+          return res.status(400).json({ message: "NIK harus 16 digit angka." })
+        }
+      } 
+      else {
+        if (!/^[A-Za-z0-9]{8,20}$/.test(rawDocumentNumber)) {
+          return res.status(400).json({ message: "Nomor paspor harus 8-20 karakter alfanumerik." })
+        }
+      }
+
+      const rawDob = passenger?.dateOfBirth || passenger?.dob
+      const parsedDob = rawDob ? new Date(rawDob) : undefined
+      if (!parsedDob || Number.isNaN(parsedDob.getTime())) {
+        return res.status(400).json({ message: "Tanggal lahir wajib diisi dan valid." })
+      }
+
+      const today = new Date()
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      const dobOnly = new Date(parsedDob.getFullYear(), parsedDob.getMonth(), parsedDob.getDate())
+
+      if (dobOnly > todayOnly) {
+        return res.status(400).json({ message: "Tanggal lahir tidak boleh lebih dari hari ini." })
+      }
+
+      const passengerType = String(passenger?.type || "ADULT").toUpperCase()
+      if (passengerType !== "CHILD" && !isAtLeastAge(dobOnly, MINIMUM_AGE_YEARS)) {
+        return res.status(400).json({ message: `Usia minimum ${MINIMUM_AGE_YEARS} tahun untuk penumpang dewasa.` })
+      }
     }
 
     const flight = await prisma.flight.findUnique({
@@ -194,7 +238,12 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
             const documentType = rawType === "PASSPORT" ? "PASSPORT" : "KTP"
 
             const rawDocumentNumber = String(p.documentNumber || p.idNumber || "0000000000000000").trim()
-            const documentNumber = rawDocumentNumber.slice(0, 16) || "0000000000000000"
+            const normalizedDocumentNumber = documentType === "KTP"
+              ? rawDocumentNumber.replace(/\D/g, "")
+              : rawDocumentNumber.replace(/[^A-Za-z0-9]/g, "")
+            const documentNumber = documentType === "KTP"
+              ? (normalizedDocumentNumber.slice(0, 16) || "0000000000000000")
+              : (normalizedDocumentNumber.slice(0, 20) || "UNKNOWNPASS")
 
             const rawDob = p.dateOfBirth || p.dob
             const parsedDob = rawDob ? new Date(rawDob) : undefined

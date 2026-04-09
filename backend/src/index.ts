@@ -64,17 +64,36 @@ app.get("/api/promos", getActivePromos)
 
 // API Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+app.get("/api-docs/", (_req, res) => {
+  res.redirect("/api-docs")
+})
 
 app.get("/", (req, res) => {
   res.send("SkyIntern E-Ticketing API Running")
 })
 
-const PORT = process.env.PORT || 3000
-const httpServer = createServer(app)
-initSocketServer(httpServer)
+const DEFAULT_PORT = Number(process.env.PORT ?? 3000)
 
-httpServer.listen(Number(PORT), "0.0.0.0", () => {
-  console.log(`Server running on http://localhost:${PORT}`)
-  console.log(`API Documentation: http://localhost:${PORT}/api-docs`)
-  console.log(`WebSocket ready on ws://localhost:${PORT}`)
-})
+const startServer = (port: number) => {
+  const httpServer = createServer(app)
+  initSocketServer(httpServer)
+
+  httpServer.once("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      const fallbackPort = port + 1
+      console.warn(`Port ${port} is already in use. Retrying on port ${fallbackPort}...`)
+      startServer(fallbackPort)
+      return
+    }
+
+    throw error
+  })
+
+  httpServer.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${port}`)
+    console.log(`API Documentation: http://localhost:${port}/api-docs`)
+    console.log(`WebSocket ready on ws://localhost:${port}`)
+  })
+}
+
+startServer(DEFAULT_PORT)
