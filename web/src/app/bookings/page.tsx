@@ -594,7 +594,15 @@ function MyBookingsPageContent() {
                             </button>
                             <button
                               onClick={() => void handlePayBooking(booking.id)}
+<<<<<<< HEAD
                               disabled={payingId === booking.id || syncingId === booking.id || cancellingId === booking.id}
+=======
+                              disabled={
+                                payingId === booking.id ||
+                                syncingId === booking.id ||
+                                cancellingId === booking.id
+                              }
+>>>>>>> 439523b905140679efe0b1e05d9aad06a0feed55
                               className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {payingId === booking.id ? "Memproses..." : "Bayar Sekarang"}

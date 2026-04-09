@@ -25,6 +25,8 @@ class MobileSideMenu {
                 child: Consumer<AuthProvider>(
                   builder: (dialogCtx, auth, __) {
                     final userName = auth.user?.fullName ?? 'Guest';
+                    final isLoggedIn = auth.isAuthenticated;
+                    final isAdmin = auth.user?.role == 'admin';
 
                     Widget navBtn(
                       String label,
@@ -45,6 +47,14 @@ class MobileSideMenu {
                               return;
                             }
                             if (routeName == '/dashboard') {
+                              Navigator.pushNamedAndRemoveUntil(
+                                context,
+                                routeName,
+                                (route) => false,
+                              );
+                              return;
+                            }
+                            if (routeName == '/admin') {
                               Navigator.pushNamedAndRemoveUntil(
                                 context,
                                 routeName,
@@ -121,9 +131,12 @@ class MobileSideMenu {
                           ),
                           const SizedBox(height: 24),
                           navBtn('Flights', '/search'),
-                          navBtn('Bookings', '/bookings'),
-                          navBtn('Dashboard', '/dashboard'),
-                          navBtn('Profile', '/edit-profile'),
+                          if (isLoggedIn) navBtn('Bookings', '/bookings'),
+                          if (isLoggedIn && !isAdmin)
+                            navBtn('Dashboard', '/dashboard'),
+                          if (isLoggedIn && isAdmin)
+                            navBtn('Admin Dashboard', '/admin'),
+                          if (isLoggedIn) navBtn('Profile', '/edit-profile'),
                           const Spacer(),
                           Container(
                             width: double.infinity,
@@ -161,33 +174,55 @@ class MobileSideMenu {
                           const SizedBox(height: 10),
                           SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await auth.logout();
-                                if (!dialogCtx.mounted) return;
-                                Navigator.pop(dialogCtx);
-                                Navigator.pushNamedAndRemoveUntil(
-                                  context,
-                                  '/login',
-                                  (route) => false,
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF0050),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              child: const Text(
-                                'Logout',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
+                            child: isLoggedIn
+                                ? ElevatedButton(
+                                    onPressed: () async {
+                                      await auth.logout();
+                                      if (!dialogCtx.mounted) return;
+                                      Navigator.pop(dialogCtx);
+                                      Navigator.pushNamedAndRemoveUntil(
+                                        context,
+                                        '/search',
+                                        (route) => false,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFF0050),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Logout',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  )
+                                : ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pop(dialogCtx);
+                                      Navigator.pushNamed(context, '/login');
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2D7BFF),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Login untuk Booking',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ],
                       ),

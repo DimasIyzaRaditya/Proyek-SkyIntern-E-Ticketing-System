@@ -36,13 +36,17 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         elevation: 0,
         leading: showBackButton
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 onPressed: onBackPressed ?? () => Navigator.pop(context),
               )
             : null,
         automaticallyImplyLeading: showBackButton,
-        title: titleWidget ??
+        title:
+            titleWidget ??
             Text(
               title,
               style: const TextStyle(
@@ -96,9 +100,13 @@ class _PrimaryButtonState extends State<PrimaryButton>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _scale = Tween<double>(begin: 1.0, end: 0.96)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeIn));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.96,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeIn));
   }
 
   @override
@@ -134,8 +142,9 @@ class _PrimaryButtonState extends State<PrimaryButton>
                 ? []
                 : [
                     BoxShadow(
-                      color: (widget.color ?? AppColors.primary)
-                          .withValues(alpha: 0.30),
+                      color: (widget.color ?? AppColors.primary).withValues(
+                        alpha: 0.30,
+                      ),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -147,8 +156,7 @@ class _PrimaryButtonState extends State<PrimaryButton>
                     height: 22,
                     width: 22,
                     child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       strokeWidth: 2.5,
                     ),
                   )
@@ -272,8 +280,10 @@ class InputField extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: AppColors.error, width: 2),
             ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
           ),
         ),
       ],
@@ -349,10 +359,7 @@ class GradientCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(borderRadius),
           splashColor: Colors.white.withValues(alpha: 0.12),
-          child: Padding(
-            padding: padding ?? EdgeInsets.zero,
-            child: child,
-          ),
+          child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
         ),
       ),
     );
@@ -460,8 +467,10 @@ class _FlightCardState extends State<FlightCard>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _elevation = Tween<double>(begin: 0, end: 1)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _elevation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
 
   @override
@@ -472,7 +481,9 @@ class _FlightCardState extends State<FlightCard>
 
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
   }
 
   @override
@@ -487,14 +498,19 @@ class _FlightCardState extends State<FlightCard>
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Color.lerp(AppColors.border, AppColors.primary,
-                      _elevation.value * 0.4) ??
+              color:
+                  Color.lerp(
+                    AppColors.border,
+                    AppColors.primary,
+                    _elevation.value * 0.4,
+                  ) ??
                   AppColors.border,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black
-                    .withValues(alpha: 0.05 + _elevation.value * 0.04),
+                color: Colors.black.withValues(
+                  alpha: 0.05 + _elevation.value * 0.04,
+                ),
                 blurRadius: 12 + _elevation.value * 8,
                 offset: Offset(0, 3 + _elevation.value * 2),
               ),
@@ -522,28 +538,40 @@ class _FlightCardState extends State<FlightCard>
                         color: AppColors.background,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.flight,
-                          color: AppColors.primary, size: 20),
+                      child: const Icon(
+                        Icons.flight,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(widget.airline,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary)),
-                          Text(widget.flightNumber,
-                              style: const TextStyle(
-                                  fontSize: 12, color: AppColors.textHint)),
+                          Text(
+                            widget.airline,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            widget.flightNumber,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF2563EB), Color(0xFF6366F1)],
@@ -553,9 +581,10 @@ class _FlightCardState extends State<FlightCard>
                       child: Text(
                         'Rp ${_formatPrice(widget.price)}',
                         style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -565,24 +594,31 @@ class _FlightCardState extends State<FlightCard>
                 Row(
                   children: [
                     _RoutePoint(
-                        time: widget.departureTime,
-                        code: widget.origin,
-                        align: CrossAxisAlignment.start),
+                      time: widget.departureTime,
+                      code: widget.origin,
+                      align: CrossAxisAlignment.start,
+                    ),
                     Expanded(
                       child: Column(
                         children: [
-                          Text(widget.duration,
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textHint,
-                                  fontWeight: FontWeight.w500)),
+                          Text(
+                            widget.duration,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
                               _dot(AppColors.primary),
                               Expanded(child: _line()),
-                              const Icon(Icons.flight_takeoff,
-                                  size: 16, color: AppColors.secondary),
+                              const Icon(
+                                Icons.flight_takeoff,
+                                size: 16,
+                                color: AppColors.secondary,
+                              ),
                               Expanded(child: _line()),
                               _dot(AppColors.secondary),
                             ],
@@ -591,9 +627,10 @@ class _FlightCardState extends State<FlightCard>
                       ),
                     ),
                     _RoutePoint(
-                        time: widget.arrivalTime,
-                        code: widget.destination,
-                        align: CrossAxisAlignment.end),
+                      time: widget.arrivalTime,
+                      code: widget.destination,
+                      align: CrossAxisAlignment.end,
+                    ),
                   ],
                 ),
                 if (widget.facilities.isNotEmpty) ...[
@@ -609,22 +646,30 @@ class _FlightCardState extends State<FlightCard>
                           children: widget.facilities.take(3).map((f) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.primaryLight,
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(f,
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w500)),
+                              child: Text(
+                                f,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             );
                           }).toList(),
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textHint, size: 20),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textHint,
+                        size: 20,
+                      ),
                     ],
                   ),
                 ],
@@ -637,13 +682,15 @@ class _FlightCardState extends State<FlightCard>
   }
 
   Widget _dot(Color color) => Container(
-      width: 6,
-      height: 6,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color));
+    width: 6,
+    height: 6,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 
   Widget _line() => Container(
-      height: 1.5,
-      decoration: const BoxDecoration(gradient: AppColors.primaryGradient));
+    height: 1.5,
+    decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+  );
 }
 
 class _RoutePoint extends StatelessWidget {
@@ -651,24 +698,33 @@ class _RoutePoint extends StatelessWidget {
   final String code;
   final CrossAxisAlignment align;
 
-  const _RoutePoint(
-      {required this.time, required this.code, required this.align});
+  const _RoutePoint({
+    required this.time,
+    required this.code,
+    required this.align,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: align,
       children: [
-        Text(time,
-            style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary)),
-        Text(code,
-            style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600)),
+        Text(
+          time,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          code,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -708,16 +764,22 @@ class InfoRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textHint,
-                        fontWeight: FontWeight.w500)),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textHint,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -749,16 +811,23 @@ class SectionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
-                Text(subtitle!,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary)),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ],
           ),
@@ -785,24 +854,45 @@ class StatusBadge extends StatelessWidget {
   factory StatusBadge.fromStatus(String status) {
     switch (status.toUpperCase()) {
       case 'ISSUED':
-        return const StatusBadge(label: 'Issued', bgColor: Color(0xFFECFDF5), textColor: Color(0xFF059669));
+        return const StatusBadge(
+          label: 'Issued',
+          bgColor: Color(0xFFECFDF5),
+          textColor: Color(0xFF059669),
+        );
       case 'PAID':
       case 'SETTLEMENT':
       case 'COMPLETED':
       case 'CONFIRMED':
-        return const StatusBadge(label: 'Terbayar', bgColor: Color(0xFFECFDF5), textColor: Color(0xFF059669));
+        return const StatusBadge(
+          label: 'Terbayar',
+          bgColor: Color(0xFFECFDF5),
+          textColor: Color(0xFF059669),
+        );
       case 'PENDING':
-        return const StatusBadge(label: 'Menunggu', bgColor: Color(0xFFFFFBEB), textColor: Color(0xFFD97706));
+        return const StatusBadge(
+          label: 'Menunggu',
+          bgColor: Color(0xFFFFFBEB),
+          textColor: Color(0xFFD97706),
+        );
       case 'CANCELLED':
-        return const StatusBadge(label: 'Dibatalkan', bgColor: Color(0xFFFEF2F2), textColor: Color(0xFFDC2626));
+        return const StatusBadge(
+          label: 'Dibatalkan',
+          bgColor: Color(0xFFFEF2F2),
+          textColor: Color(0xFFDC2626),
+        );
       case 'EXPIRED':
       case 'FAILED':
-        return const StatusBadge(label: 'Kadaluwarsa', bgColor: Color(0xFFFEF2F2), textColor: Color(0xFFDC2626));
+        return const StatusBadge(
+          label: 'Kadaluwarsa',
+          bgColor: Color(0xFFFEF2F2),
+          textColor: Color(0xFFDC2626),
+        );
       default:
         return StatusBadge(
-            label: status,
-            bgColor: AppColors.surfaceVariant,
-            textColor: AppColors.textSecondary);
+          label: status,
+          bgColor: AppColors.surfaceVariant,
+          textColor: AppColors.textSecondary,
+        );
     }
   }
 
@@ -811,14 +901,17 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: bgColor, borderRadius: BorderRadius.circular(20)),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Text(
         label,
         style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: textColor,
-            letterSpacing: 0.2),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: textColor,
+          letterSpacing: 0.2,
+        ),
       ),
     );
   }
@@ -850,23 +943,31 @@ class EmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  shape: BoxShape.circle),
+                color: AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, size: 48, color: AppColors.textHint),
             ),
             const SizedBox(height: 20),
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary),
-                textAlign: TextAlign.center),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 8),
-              Text(subtitle!,
-                  style: const TextStyle(
-                      fontSize: 14, color: AppColors.textSecondary),
-                  textAlign: TextAlign.center),
+              Text(
+                subtitle!,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ],
             if (action != null) ...[const SizedBox(height: 24), action!],
           ],
@@ -882,11 +983,12 @@ class ShimmerBox extends StatefulWidget {
   final double height;
   final double borderRadius;
 
-  const ShimmerBox(
-      {super.key,
-      this.width,
-      required this.height,
-      this.borderRadius = 8});
+  const ShimmerBox({
+    super.key,
+    this.width,
+    required this.height,
+    this.borderRadius = 8,
+  });
 
   @override
   State<ShimmerBox> createState() => _ShimmerBoxState();
@@ -901,8 +1003,9 @@ class _ShimmerBoxState extends State<ShimmerBox>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
@@ -921,7 +1024,10 @@ class _ShimmerBoxState extends State<ShimmerBox>
         height: widget.height,
         decoration: BoxDecoration(
           color: Color.lerp(
-              const Color(0xFFE5E7EB), const Color(0xFFF3F4F6), _anim.value),
+            const Color(0xFFE5E7EB),
+            const Color(0xFFF3F4F6),
+            _anim.value,
+          ),
           borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
       ),
@@ -941,14 +1047,211 @@ class LabelDivider extends StatelessWidget {
         const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(label,
-              style: const TextStyle(
-                  color: AppColors.textHint,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500)),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textHint,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         const Expanded(child: Divider()),
       ],
+    );
+  }
+}
+
+// ─── List Query Controls ────────────────────────────────────────────────────
+class ListQueryControls extends StatelessWidget {
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
+  final String sortValue;
+  final ValueChanged<String> onSortChanged;
+  final int rowsPerPage;
+  final ValueChanged<int> onRowsPerPageChanged;
+  final String searchHint;
+
+  const ListQueryControls({
+    super.key,
+    required this.searchQuery,
+    required this.onSearchChanged,
+    required this.sortValue,
+    required this.onSortChanged,
+    required this.rowsPerPage,
+    required this.onRowsPerPageChanged,
+    this.searchHint = 'Cari data...',
+  });
+
+  static const List<int> _rowOptions = [10, 20, 50, 100, 1000];
+  static const List<Map<String, String>> _sortOptions = [
+    {'value': 'id', 'label': 'ID'},
+    {'value': 'name', 'label': 'Nama'},
+    {'value': 'oldest', 'label': 'Terlama'},
+    {'value': 'newest', 'label': 'Terbaru'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        children: [
+          TextFormField(
+            initialValue: searchQuery,
+            onChanged: onSearchChanged,
+            decoration: InputDecoration(
+              hintText: searchHint,
+              prefixIcon: const Icon(Icons.search_rounded),
+              isDense: true,
+              filled: true,
+              fillColor: AppColors.background,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: sortValue,
+                  decoration: const InputDecoration(
+                    labelText: 'Sortir',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: _sortOptions
+                      .map(
+                        (o) => DropdownMenuItem<String>(
+                          value: o['value'],
+                          child: Text(o['label']!),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) onSortChanged(v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 140,
+                child: DropdownButtonFormField<int>(
+                  initialValue: rowsPerPage,
+                  decoration: const InputDecoration(
+                    labelText: 'Tampilkan',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: _rowOptions
+                      .map(
+                        (n) =>
+                            DropdownMenuItem<int>(value: n, child: Text('$n')),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) onRowsPerPageChanged(v);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── List Pagination Bar ─────────────────────────────────────────────────────
+class ListPaginationBar extends StatelessWidget {
+  final int currentPage;
+  final int totalItems;
+  final int itemsPerPage;
+  final ValueChanged<int> onPageChanged;
+
+  const ListPaginationBar({
+    super.key,
+    required this.currentPage,
+    required this.totalItems,
+    required this.itemsPerPage,
+    required this.onPageChanged,
+  });
+
+  int get totalPages {
+    if (totalItems <= 0 || itemsPerPage <= 0) return 1;
+    return (totalItems / itemsPerPage).ceil();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (totalItems <= itemsPerPage) return const SizedBox.shrink();
+
+    final canPrev = currentPage > 1;
+    final canNext = currentPage < totalPages;
+    final start = ((currentPage - 1) * itemsPerPage) + 1;
+    final end = (currentPage * itemsPerPage).clamp(1, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$start-$end dari $totalItems',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Halaman sebelumnya',
+            onPressed: canPrev ? () => onPageChanged(currentPage - 1) : null,
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$currentPage / $totalPages',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Halaman berikutnya',
+            onPressed: canNext ? () => onPageChanged(currentPage + 1) : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
+      ),
     );
   }
 }

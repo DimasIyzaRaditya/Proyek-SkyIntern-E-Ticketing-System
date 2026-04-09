@@ -28,6 +28,12 @@ class _BookingsScreenState extends State<BookingsScreen>
   final Set<int> _syncingIds = {};
   final Set<int> _downloadingTicketIds = {};
   Timer? _pollTimer;
+  String _searchQuery = '';
+  String _sortBy = 'newest';
+  int _activePage = 1;
+  int _completedPage = 1;
+  int _cancelledPage = 1;
+  int _perPage = 10;
 
   @override
   void initState() {
@@ -56,20 +62,78 @@ class _BookingsScreenState extends State<BookingsScreen>
   List<Booking> _filter(List<Booking> all, String tab) {
     switch (tab) {
       case 'active':
-        return all.where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase())).toList();
+        return all
+            .where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase()))
+            .toList();
       case 'completed':
-        return all.where((b) => b.status.toUpperCase() == 'PAID' && b.ticket != null).toList();
+        return all
+            .where((b) => b.status.toUpperCase() == 'PAID' && b.ticket != null)
+            .toList();
       case 'cancelled':
-        return all.where((b) => ['CANCELLED', 'EXPIRED', 'FAILED'].contains(b.status.toUpperCase())).toList();
+        return all
+            .where(
+              (b) => [
+                'CANCELLED',
+                'EXPIRED',
+                'FAILED',
+              ].contains(b.status.toUpperCase()),
+            )
+            .toList();
       default:
         return all;
     }
   }
 
+  DateTime _parseDate(String? raw) =>
+      DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _bookingName(Booking b) {
+    if (b.passengers.isNotEmpty) {
+      final p = b.passengers.first;
+      return '${p.firstName} ${p.lastName}'.trim();
+    }
+    return b.flight.airline;
+  }
+
+  List<Booking> _applyQueryAndSort(List<Booking> source) {
+    final q = _searchQuery.trim().toLowerCase();
+    final data = source.where((b) {
+      if (q.isEmpty) return true;
+      final id = b.id.toString();
+      final code = b.bookingCode.toLowerCase();
+      final name = _bookingName(b).toLowerCase();
+      final airline = b.flight.airline.toLowerCase();
+      return id.contains(q) ||
+          code.contains(q) ||
+          name.contains(q) ||
+          airline.contains(q);
+    }).toList();
+
+    data.sort((x, y) {
+      switch (_sortBy) {
+        case 'id':
+          return x.id.compareTo(y.id);
+        case 'name':
+          return _bookingName(
+            x,
+          ).toLowerCase().compareTo(_bookingName(y).toLowerCase());
+        case 'oldest':
+          return _parseDate(x.createdAt).compareTo(_parseDate(y.createdAt));
+        case 'newest':
+        default:
+          return _parseDate(y.createdAt).compareTo(_parseDate(x.createdAt));
+      }
+    });
+
+    return data;
+  }
+
   bool get _supportsEmbeddedPayment {
     if (kIsWeb) return false;
     return switch (defaultTargetPlatform) {
-      TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS => true,
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS => true,
       _ => false,
     };
   }
@@ -79,16 +143,19 @@ class _BookingsScreenState extends State<BookingsScreen>
     try {
       final result = await BookingService.createPayment(bookingId);
       final paymentData = result['payment'] as Map<String, dynamic>?;
-      final url = paymentData?['redirectUrl'] as String?
-          ?? result['redirectUrl'] as String?
-          ?? result['snap_redirect_url'] as String?;
+      final url =
+          paymentData?['redirectUrl'] as String? ??
+          result['redirectUrl'] as String? ??
+          result['snap_redirect_url'] as String?;
       if (url == null) throw Exception('Gagal mendapatkan link pembayaran');
       if (!mounted) return;
 
       if (!_supportsEmbeddedPayment) {
         final opened = await launchUrl(
           Uri.parse(url),
-          mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+          mode: kIsWeb
+              ? LaunchMode.platformDefault
+              : LaunchMode.externalApplication,
         );
         if (!opened) {
           throw Exception('Tidak dapat membuka halaman pembayaran');
@@ -101,11 +168,12 @@ class _BookingsScreenState extends State<BookingsScreen>
         return;
       }
 
-      final paymentResult = await Navigator.of(context).push<Map<String, dynamic>>(
-        MaterialPageRoute(
-          builder: (_) => MidtransPaymentWebViewScreen(paymentUrl: url),
-        ),
-      );
+      final paymentResult = await Navigator.of(context)
+          .push<Map<String, dynamic>>(
+            MaterialPageRoute(
+              builder: (_) => MidtransPaymentWebViewScreen(paymentUrl: url),
+            ),
+          );
 
       if (!mounted) return;
 
@@ -113,7 +181,12 @@ class _BookingsScreenState extends State<BookingsScreen>
         await _syncBooking(bookingId);
       }
     } catch (e) {
-      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+      if (mounted)
+        showSnackBar(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
     } finally {
       if (mounted) setState(() => _payingIds.remove(bookingId));
     }
@@ -123,19 +196,33 @@ class _BookingsScreenState extends State<BookingsScreen>
     setState(() => _syncingIds.add(bookingId));
     try {
       final result = await BookingService.syncPayment(bookingId);
-      final status = (result['booking']?['status'] ?? result['status'] ?? '').toString().toUpperCase();
+      final status = (result['booking']?['status'] ?? result['status'] ?? '')
+          .toString()
+          .toUpperCase();
       if (!mounted) return;
       if (status == 'PAID') {
         showSnackBar(context, 'Pembayaran berhasil dikonfirmasi!');
         await context.read<BookingProvider>().loadBookings();
       } else if (status == 'PENDING') {
-        showSnackBar(context, 'Pembayaran masih diproses. Silakan coba lagi nanti.');
+        showSnackBar(
+          context,
+          'Pembayaran masih diproses. Silakan coba lagi nanti.',
+        );
       } else if (['CANCELLED', 'EXPIRED', 'FAILED'].contains(status)) {
-        showSnackBar(context, 'Pembayaran gagal atau kadaluwarsa.', isError: true);
+        showSnackBar(
+          context,
+          'Pembayaran gagal atau kadaluwarsa.',
+          isError: true,
+        );
         await context.read<BookingProvider>().loadBookings();
       }
     } catch (e) {
-      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+      if (mounted)
+        showSnackBar(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
     } finally {
       if (mounted) setState(() => _syncingIds.remove(bookingId));
     }
@@ -146,17 +233,31 @@ class _BookingsScreenState extends State<BookingsScreen>
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Batalkan Pemesanan', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('Apakah Anda yakin ingin membatalkan pemesanan ini?',
-            style: TextStyle(color: AppColors.textSecondary)),
+        title: const Text(
+          'Batalkan Pemesanan',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin membatalkan pemesanan ini?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Tidak', style: TextStyle(color: AppColors.textSecondary))),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Tidak',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: const Text('Ya, Batalkan'),
           ),
         ],
@@ -167,7 +268,12 @@ class _BookingsScreenState extends State<BookingsScreen>
         await context.read<BookingProvider>().cancelBooking(bookingId);
         if (mounted) showSnackBar(context, 'Pemesanan berhasil dibatalkan');
       } catch (e) {
-        if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+        if (mounted)
+          showSnackBar(
+            context,
+            e.toString().replaceFirst('Exception: ', ''),
+            isError: true,
+          );
       }
     }
   }
@@ -215,7 +321,13 @@ class _BookingsScreenState extends State<BookingsScreen>
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x222563EB),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -223,16 +335,25 @@ class _BookingsScreenState extends State<BookingsScreen>
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: const Text('Pemesanan Saya',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Pemesanan Saya',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 actions: [
                   IconButton(
                     tooltip: 'Menu',
                     icon: const Icon(Icons.menu_rounded, color: Colors.white),
-                    onPressed: () => MobileSideMenu.show(context, activeItem: 'Bookings'),
+                    onPressed: () =>
+                        MobileSideMenu.show(context, activeItem: 'Bookings'),
                   ),
                 ],
               ),
@@ -260,27 +381,85 @@ class _BookingsScreenState extends State<BookingsScreen>
               padding: const EdgeInsets.all(16),
               itemCount: 3,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, __) => const ShimmerBox(height: 130, width: double.infinity, borderRadius: 16),
+              itemBuilder: (_, __) => const ShimmerBox(
+                height: 130,
+                width: double.infinity,
+                borderRadius: 16,
+              ),
             );
           }
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () => provider.loadBookings(),
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildList(context, _filter(provider.bookings, 'active')),
-                _buildList(context, _filter(provider.bookings, 'completed')),
-                _buildList(context, _filter(provider.bookings, 'cancelled')),
-              ],
-            ),
+          return Column(
+            children: [
+              ListQueryControls(
+                searchQuery: _searchQuery,
+                sortValue: _sortBy,
+                rowsPerPage: _perPage,
+                searchHint:
+                    'Cari booking berdasarkan kode, nama, maskapai, atau ID...',
+                onSearchChanged: (v) => setState(() {
+                  _searchQuery = v;
+                  _activePage = 1;
+                  _completedPage = 1;
+                  _cancelledPage = 1;
+                }),
+                onSortChanged: (v) => setState(() {
+                  _sortBy = v;
+                  _activePage = 1;
+                  _completedPage = 1;
+                  _cancelledPage = 1;
+                }),
+                onRowsPerPageChanged: (v) => setState(() {
+                  _perPage = v;
+                  _activePage = 1;
+                  _completedPage = 1;
+                  _cancelledPage = 1;
+                }),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () => provider.loadBookings(),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildList(
+                        context,
+                        _applyQueryAndSort(
+                          _filter(provider.bookings, 'active'),
+                        ),
+                        tab: 'active',
+                      ),
+                      _buildList(
+                        context,
+                        _applyQueryAndSort(
+                          _filter(provider.bookings, 'completed'),
+                        ),
+                        tab: 'completed',
+                      ),
+                      _buildList(
+                        context,
+                        _applyQueryAndSort(
+                          _filter(provider.bookings, 'cancelled'),
+                        ),
+                        tab: 'cancelled',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildList(BuildContext context, List<Booking> bookings) {
+  Widget _buildList(
+    BuildContext context,
+    List<Booking> bookings, {
+    required String tab,
+  }) {
     if (bookings.isEmpty) {
       return LayoutBuilder(
         builder: (ctx, c) => SingleChildScrollView(
@@ -296,18 +475,69 @@ class _BookingsScreenState extends State<BookingsScreen>
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: bookings.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) => TweenAnimationBuilder<double>(
-        duration: Duration(milliseconds: 280 + i * 60),
-        tween: Tween(begin: 0.0, end: 1.0),
-        curve: Curves.easeOut,
-        builder: (_, v, child) =>
-            Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 16 * (1 - v)), child: child)),
-        child: _buildCard(ctx, bookings[i]),
-      ),
+
+    final page = switch (tab) {
+      'active' => _activePage,
+      'completed' => _completedPage,
+      'cancelled' => _cancelledPage,
+      _ => 1,
+    };
+
+    final totalPages = (bookings.length / _perPage).ceil();
+    final safePage = page > totalPages ? totalPages : page;
+    final start = (safePage - 1) * _perPage;
+    final end = (start + _perPage).clamp(0, bookings.length);
+    final paged = bookings.sublist(start, end);
+
+    if (safePage != page) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          if (tab == 'active') _activePage = safePage;
+          if (tab == 'completed') _completedPage = safePage;
+          if (tab == 'cancelled') _cancelledPage = safePage;
+        });
+      });
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: paged.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (ctx, i) => TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 280 + i * 60),
+              tween: Tween(begin: 0.0, end: 1.0),
+              curve: Curves.easeOut,
+              builder: (_, v, child) => Opacity(
+                opacity: v,
+                child: Transform.translate(
+                  offset: Offset(0, 16 * (1 - v)),
+                  child: child,
+                ),
+              ),
+              child: _buildCard(ctx, paged[i]),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: ListPaginationBar(
+            currentPage: safePage,
+            totalItems: bookings.length,
+            itemsPerPage: _perPage,
+            onPageChanged: (next) {
+              setState(() {
+                if (tab == 'active') _activePage = next;
+                if (tab == 'completed') _completedPage = next;
+                if (tab == 'cancelled') _cancelledPage = next;
+              });
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -317,8 +547,12 @@ class _BookingsScreenState extends State<BookingsScreen>
     final isPaid = booking.status.toUpperCase() == 'PAID' && !isIssued;
 
     // Count adult/child from passenger list
-    final adults = booking.passengers.where((p) => p.type.toUpperCase() == 'ADULT').length;
-    final children = booking.passengers.where((p) => p.type.toUpperCase() == 'CHILD').length;
+    final adults = booking.passengers
+        .where((p) => p.type.toUpperCase() == 'ADULT')
+        .length;
+    final children = booking.passengers
+        .where((p) => p.type.toUpperCase() == 'CHILD')
+        .length;
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -332,11 +566,22 @@ class _BookingsScreenState extends State<BookingsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(booking.bookingCode,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+                    Text(
+                      booking.bookingCode,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(booking.flight.airline,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      booking.flight.airline,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -355,11 +600,22 @@ class _BookingsScreenState extends State<BookingsScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(booking.flight.originCode,
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                        Text(booking.flight.originCity,
-                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                            overflow: TextOverflow.ellipsis),
+                        Text(
+                          booking.flight.originCode,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          booking.flight.originCity,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
@@ -367,18 +623,33 @@ class _BookingsScreenState extends State<BookingsScreen>
                 Expanded(
                   child: Row(
                     children: [
-                      Expanded(child: Container(height: 1, color: AppColors.border)),
+                      Expanded(
+                        child: Container(height: 1, color: AppColors.border),
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                         child: Column(
                           children: [
-                            const Icon(Icons.flight_rounded, color: AppColors.primary, size: 20),
-                            Text(DateFormatter.formatTime(booking.flight.departureTime),
-                                style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+                            const Icon(
+                              Icons.flight_rounded,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            Text(
+                              DateFormatter.formatTime(
+                                booking.flight.departureTime,
+                              ),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textHint,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      Expanded(child: Container(height: 1, color: AppColors.border)),
+                      Expanded(
+                        child: Container(height: 1, color: AppColors.border),
+                      ),
                     ],
                   ),
                 ),
@@ -387,11 +658,23 @@ class _BookingsScreenState extends State<BookingsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(booking.flight.destinationCode,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      Text(booking.flight.destinationCity,
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                          textAlign: TextAlign.end, overflow: TextOverflow.ellipsis),
+                      Text(
+                        booking.flight.destinationCode,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        booking.flight.destinationCity,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.end,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -407,16 +690,34 @@ class _BookingsScreenState extends State<BookingsScreen>
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today_rounded, size: 13, color: AppColors.textHint),
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  size: 13,
+                  color: AppColors.textHint,
+                ),
                 const SizedBox(width: 6),
-                Text(DateFormatter.formatShortDate(booking.flight.departureTime),
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  DateFormatter.formatShortDate(booking.flight.departureTime),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 if (booking.passengers.isNotEmpty) ...[
                   const SizedBox(width: 12),
-                  const Icon(Icons.person_rounded, size: 13, color: AppColors.textHint),
+                  const Icon(
+                    Icons.person_rounded,
+                    size: 13,
+                    color: AppColors.textHint,
+                  ),
                   const SizedBox(width: 4),
-                  Text('${booking.passengers.length} Penumpang',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  Text(
+                    '${booking.passengers.length} Penumpang',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -435,25 +736,39 @@ class _BookingsScreenState extends State<BookingsScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
-                    SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                    SizedBox(
+                      width: 8,
+                      height: 8,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
                     SizedBox(width: 8),
-                    Text('Menunggu Penerbitan Tiket...', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                    Text(
+                      'Menunggu Penerbitan Tiket...',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
             if (isIssued) ...[
               OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pushNamed(
-                  '/e-ticket',
-                  arguments: {'booking': booking},
-                ),
+                onPressed: () => Navigator.of(
+                  context,
+                ).pushNamed('/e-ticket', arguments: {'booking': booking}),
                 icon: const Icon(Icons.airplane_ticket_outlined, size: 16),
                 label: const Text('Lihat Tiket'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(38),
                   foregroundColor: AppColors.primary,
                   side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -465,7 +780,10 @@ class _BookingsScreenState extends State<BookingsScreen>
                     ? const SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.download_rounded, size: 16),
                 label: Text(
@@ -477,7 +795,9 @@ class _BookingsScreenState extends State<BookingsScreen>
                   minimumSize: const Size.fromHeight(38),
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -500,7 +820,9 @@ class _BookingsScreenState extends State<BookingsScreen>
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
@@ -525,7 +847,9 @@ class _BookingsScreenState extends State<BookingsScreen>
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
@@ -537,30 +861,52 @@ class _BookingsScreenState extends State<BookingsScreen>
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _payingIds.contains(booking.id) ? null : () => _payBooking(booking.id),
+                      onPressed: _payingIds.contains(booking.id)
+                          ? null
+                          : () => _payBooking(booking.id),
                       icon: _payingIds.contains(booking.id)
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Icon(Icons.payment_rounded, size: 16),
                       label: const Text('Bayar Sekarang'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _syncingIds.contains(booking.id) ? null : () => _syncBooking(booking.id),
+                      onPressed: _syncingIds.contains(booking.id)
+                          ? null
+                          : () => _syncBooking(booking.id),
                       icon: _syncingIds.contains(booking.id)
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            )
                           : const Icon(Icons.sync_rounded, size: 16),
                       label: const Text('Cek Status'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -575,7 +921,9 @@ class _BookingsScreenState extends State<BookingsScreen>
                   minimumSize: const Size.fromHeight(38),
                   foregroundColor: AppColors.error,
                   side: const BorderSide(color: AppColors.error),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -585,4 +933,3 @@ class _BookingsScreenState extends State<BookingsScreen>
     );
   }
 }
-

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'api_client.dart';
 
 /// Service untuk semua endpoint admin (/api/admin/*)
@@ -17,16 +18,37 @@ class AdminService {
     required String code,
     required String name,
     required String country,
+    List<int>? logoBytes,
+    String? logoFileName,
+    String? logoMimeType,
   }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiClient.baseUrl}/api/admin/airlines'),
-    )
-      ..headers['X-Platform'] = 'mobile'
-      ..headers['Authorization'] = 'Bearer ${ApiClient.authToken}'
-      ..fields['code'] = code
-      ..fields['name'] = name
-      ..fields['country'] = country;
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse('${ApiClient.baseUrl}/api/admin/airlines'),
+          )
+          ..headers['X-Platform'] = 'mobile'
+          ..headers['Authorization'] = 'Bearer ${ApiClient.authToken}'
+          ..fields['code'] = code
+          ..fields['name'] = name
+          ..fields['country'] = country;
+
+    if (logoBytes != null && logoBytes.isNotEmpty) {
+      final mime = logoMimeType ?? 'image/jpeg';
+      final parts = mime.split('/');
+      final mediaType = parts.length == 2
+          ? MediaType(parts[0], parts[1])
+          : MediaType('image', 'jpeg');
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'logo',
+          logoBytes,
+          filename: logoFileName ?? 'airline-logo.jpg',
+          contentType: mediaType,
+        ),
+      );
+    }
 
     final streamedRes = await request.send();
     final body = await streamedRes.stream.bytesToString();
@@ -41,16 +63,37 @@ class AdminService {
     required String code,
     required String name,
     required String country,
+    List<int>? logoBytes,
+    String? logoFileName,
+    String? logoMimeType,
   }) async {
-    final request = http.MultipartRequest(
-      'PUT',
-      Uri.parse('${ApiClient.baseUrl}/api/admin/airlines/$id'),
-    )
-      ..headers['X-Platform'] = 'mobile'
-      ..headers['Authorization'] = 'Bearer ${ApiClient.authToken}'
-      ..fields['code'] = code
-      ..fields['name'] = name
-      ..fields['country'] = country;
+    final request =
+        http.MultipartRequest(
+            'PUT',
+            Uri.parse('${ApiClient.baseUrl}/api/admin/airlines/$id'),
+          )
+          ..headers['X-Platform'] = 'mobile'
+          ..headers['Authorization'] = 'Bearer ${ApiClient.authToken}'
+          ..fields['code'] = code
+          ..fields['name'] = name
+          ..fields['country'] = country;
+
+    if (logoBytes != null && logoBytes.isNotEmpty) {
+      final mime = logoMimeType ?? 'image/jpeg';
+      final parts = mime.split('/');
+      final mediaType = parts.length == 2
+          ? MediaType(parts[0], parts[1])
+          : MediaType('image', 'jpeg');
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'logo',
+          logoBytes,
+          filename: logoFileName ?? 'airline-logo.jpg',
+          contentType: mediaType,
+        ),
+      );
+    }
 
     final streamedRes = await request.send();
     final body = await streamedRes.stream.bytesToString();
@@ -212,8 +255,10 @@ class AdminService {
           : <String, dynamic>{};
       return <String, dynamic>{
         ...fs,
-        'seatNumber': (fs['seatNumber'] ?? nested['seatNumber'] ?? '').toString(),
-        'seatClass': (fs['seatClass'] ?? nested['seatClass'] ?? 'ECONOMY').toString(),
+        'seatNumber': (fs['seatNumber'] ?? nested['seatNumber'] ?? '')
+            .toString(),
+        'seatClass': (fs['seatClass'] ?? nested['seatClass'] ?? 'ECONOMY')
+            .toString(),
         'class': (fs['class'] ?? nested['seatClass'] ?? 'ECONOMY').toString(),
       };
     }).toList();
@@ -244,7 +289,7 @@ class AdminService {
             'seatClass': seatClass,
             'isExitRow': isExitRow,
             'additionalPrice': additionalPrice,
-          }
+          },
         ],
       },
       requireAuth: true,
@@ -265,7 +310,9 @@ class AdminService {
 
   // ─── Bookings / Transactions ──────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getBookings({String? status}) async {
+  static Future<List<Map<String, dynamic>>> getBookings({
+    String? status,
+  }) async {
     final query = status != null ? '?status=$status' : '';
     final res = await ApiClient.get(
       '/api/admin/bookings$query',
@@ -302,7 +349,8 @@ class AdminService {
       body: {},
       requireAuth: true,
     );
-    return (res['user'] as Map<String, dynamic>?)?['isBlocked'] as bool? ?? false;
+    return (res['user'] as Map<String, dynamic>?)?['isBlocked'] as bool? ??
+        false;
   }
 
   // ─── Promos ───────────────────────────────────────────────────────────────
