@@ -1093,6 +1093,11 @@ class ListQueryControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fieldDecoration = InputDecoration(
+      border: const OutlineInputBorder(),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    );
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       padding: const EdgeInsets.all(12),
@@ -1110,7 +1115,6 @@ class ListQueryControls extends StatelessWidget {
             decoration: InputDecoration(
               hintText: searchHint,
               prefixIcon: const Icon(Icons.search_rounded),
-              isDense: true,
               filled: true,
               fillColor: AppColors.background,
               border: OutlineInputBorder(
@@ -1124,51 +1128,53 @@ class ListQueryControls extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: sortValue,
-                  decoration: const InputDecoration(
-                    labelText: 'Sortir',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: _sortOptions
-                      .map(
-                        (o) => DropdownMenuItem<String>(
-                          value: o['value'],
-                          child: Text(o['label']!),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) onSortChanged(v);
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 140,
-                child: DropdownButtonFormField<int>(
-                  initialValue: rowsPerPage,
-                  decoration: const InputDecoration(
-                    labelText: 'Tampilkan',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: _rowOptions
-                      .map(
-                        (n) =>
-                            DropdownMenuItem<int>(value: n, child: Text('$n')),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) onRowsPerPageChanged(v);
-                  },
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 420;
+
+              final sortField = DropdownButtonFormField<String>(
+                initialValue: sortValue,
+                decoration: fieldDecoration.copyWith(labelText: 'Sortir'),
+                items: _sortOptions
+                    .map(
+                      (o) => DropdownMenuItem<String>(
+                        value: o['value'],
+                        child: Text(o['label']!),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) onSortChanged(v);
+                },
+              );
+
+              final rowsField = DropdownButtonFormField<int>(
+                initialValue: rowsPerPage,
+                decoration: fieldDecoration.copyWith(labelText: 'Tampilkan'),
+                items: _rowOptions
+                    .map(
+                      (n) => DropdownMenuItem<int>(value: n, child: Text('$n')),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) onRowsPerPageChanged(v);
+                },
+              );
+
+              if (isCompact) {
+                return Column(
+                  children: [sortField, const SizedBox(height: 10), rowsField],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(flex: 3, child: sortField),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 2, child: rowsField),
+                ],
+              );
+            },
           ),
         ],
       ),

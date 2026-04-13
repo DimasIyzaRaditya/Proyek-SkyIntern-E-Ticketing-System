@@ -1,9 +1,3 @@
-# Jalankan Wireless
-.\start-wireless.ps1
-
-Dengan retry custom:
-.\start-wireless.ps1 -ReconnectRetries 5 -RetryDelaySeconds 
-
 # SkyIntern Mobile App
 
 Panduan ini menjelaskan cara setup, build, install, dan menjalankan APK mobile SkyIntern dari nol sampai bisa dipakai di HP fisik.

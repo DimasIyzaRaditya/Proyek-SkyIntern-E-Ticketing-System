@@ -316,9 +316,9 @@ class _BookingsScreenState extends State<BookingsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight + 48),
-        child: Container(
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
             boxShadow: [
@@ -329,49 +329,35 @@ class _BookingsScreenState extends State<BookingsScreen>
               ),
             ],
           ),
-          child: Column(
-            children: [
-              AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                title: const Text(
-                  'Pemesanan Saya',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                actions: [
-                  IconButton(
-                    tooltip: 'Menu',
-                    icon: const Icon(Icons.menu_rounded, color: Colors.white),
-                    onPressed: () =>
-                        MobileSideMenu.show(context, activeItem: 'Bookings'),
-                  ),
-                ],
-              ),
-              TabBar(
-                controller: _tabController,
-                indicatorColor: Colors.white,
-                indicatorWeight: 3,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white60,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                tabs: const [
-                  Tab(text: 'Aktif'),
-                  Tab(text: 'Selesai'),
-                  Tab(text: 'Dibatalkan'),
-                ],
-              ),
-            ],
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Pemesanan Saya',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Menu',
+            icon: const Icon(Icons.menu_rounded, color: Colors.white),
+            onPressed: () =>
+                MobileSideMenu.show(context, activeItem: 'Bookings'),
           ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          tabs: const [
+            Tab(text: 'Aktif'),
+            Tab(text: 'Selesai'),
+            Tab(text: 'Dibatalkan'),
+          ],
         ),
       ),
       body: Consumer<BookingProvider>(
