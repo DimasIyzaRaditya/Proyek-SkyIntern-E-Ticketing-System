@@ -246,7 +246,7 @@ body {
   transform: scale(0.91) !important;
   box-shadow: none !important;
   transition:
-    transform 80ms ease-out !important,
+    transform 80ms ease-out,
     box-shadow 80ms ease-out !important;
 }
 

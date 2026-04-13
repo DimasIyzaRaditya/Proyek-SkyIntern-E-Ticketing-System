@@ -19,16 +19,16 @@ export default function SiteFooter() {
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Follow Us</p>
           <div className="flex items-center gap-2">
-            <Link href="https://instagram.com" target="_blank" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-600 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-fuchsia-100" aria-label="Instagram SkyIntern">
+            <Link href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-600 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-fuchsia-100" aria-label="Instagram SkyIntern">
               <FaInstagram className="h-4 w-4" />
             </Link>
-            <Link href="https://youtube.com" target="_blank" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-red-100" aria-label="YouTube SkyIntern">
+            <Link href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-red-100" aria-label="YouTube SkyIntern">
               <FaYoutube className="h-4 w-4" />
             </Link>
-            <Link href="https://facebook.com" target="_blank" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-blue-100" aria-label="Facebook SkyIntern">
+            <Link href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-blue-100" aria-label="Facebook SkyIntern">
               <FaFacebookF className="h-4 w-4" />
             </Link>
-            <Link href="https://tiktok.com" target="_blank" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-800 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-slate-200" aria-label="TikTok SkyIntern">
+            <Link href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-800 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-slate-200" aria-label="TikTok SkyIntern">
               <FaTiktok className="h-4 w-4" />
             </Link>
           </div>

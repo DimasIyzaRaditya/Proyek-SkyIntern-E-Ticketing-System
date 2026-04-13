@@ -33,6 +33,22 @@ function formatRupiah(v: string) {
   return `Rp ${n.toLocaleString("id-ID")}`;
 }
 
+function fmtDateTime(iso: string) {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 type ETicketData = {
   passenger: string;
   flightNumber: string;
@@ -241,6 +257,7 @@ function ETicketContent() {
     departureIso, arrivalIso, originAirportName, destAirportName,
     originCity, destCity, pDocType, pDocNumber, totalPrice,
   } = data;
+  const isExpiredTicket = departureIso ? new Date(departureIso).getTime() < Date.now() : false;
 
   return (
     <>
@@ -343,8 +360,16 @@ function ETicketContent() {
           </button>
         </div>
 
-        <div className="no-print mx-auto mb-4 max-w-245 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-800">
-          Jangan lupa untuk membawa e-tiket ini dan identitas yang valid saat check-in di bandara. Selamat menikmati penerbangan Anda!
+        <div
+          className={`no-print mx-auto mb-4 max-w-245 rounded-lg px-4 py-2 text-xs ${
+            isExpiredTicket
+              ? "border border-slate-200 bg-slate-50 text-slate-700"
+              : "border border-blue-100 bg-blue-50 text-blue-800"
+          }`}
+        >
+          {isExpiredTicket
+            ? `Status tiket: Expired. Jadwal keberangkatan telah lewat pada ${fmtDateTime(departureIso)}.`
+            : "Jangan lupa untuk membawa e-tiket ini dan identitas yang valid saat check-in di bandara. Selamat menikmati penerbangan Anda!"}
         </div>
 
         {/* ── Ticket Document ── */}
@@ -360,6 +385,15 @@ function ETicketContent() {
             <div>
               <p className="text-2xl font-bold text-gray-900 leading-tight">E-ticket</p>
               <p className="text-sm text-gray-500 mt-0.5">Penerbangan Pergi / <span className="italic">Departure Flight</span></p>
+              <span
+                className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  isExpiredTicket
+                    ? "bg-slate-200 text-slate-700"
+                    : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {isExpiredTicket ? "Expired" : "Active"}
+              </span>
             </div>
             <div className="brand-wave absolute right-0 top-0 flex h-20 w-56 items-start justify-end">
               <div className="flex items-center gap-1.5 text-white mt-4 mr-5">
