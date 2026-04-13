@@ -2,21 +2,18 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import LazySection from "@/components/LazySection";
 import { formatRupiah } from "@/lib/currency";
 import { type FlightCardItem, searchFlightsFromApi } from "@/lib/flight-api";
 
-type FlightInfoTab = "details" | "fare" | "refund" | "reschedule" | "promos";
+type FlightInfoTab = "details" | "promos";
+type SortOption = "price-low" | "price-high" | "duration" | "departure";
 
 const flightTabs: Array<{ key: FlightInfoTab; label: string }> = [
-  { key: "details", label: "Flight Details" },
-  { key: "fare", label: "Fare & Benefits" },
-  { key: "refund", label: "Refund" },
-  { key: "reschedule", label: "Reschedule" },
-  { key: "promos", label: "Promos 🎟️" },
+  { key: "details", label: "Flight Details    " },
+  { key: "promos", label: "Promos" },
 ];
 
 const extractAirportCode = (value: string) => {
@@ -25,14 +22,37 @@ const extractAirportCode = (value: string) => {
   return value.split(" - ")[0].trim();
 };
 
+const parseSortOption = (value: string | null): SortOption => {
+  if (value === "price-high" || value === "duration" || value === "departure") {
+    return value;
+  }
+  return "price-low";
+};
+
+const parsePageNumber = (value: string | null, fallback: number) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return parsed;
+};
+
+const parseItemsPerPage = (value: string | null) => {
+  const parsed = Number(value);
+  if (parsed === 5 || parsed === 10 || parsed === 20 || parsed === 50) return parsed;
+  return 5;
+};
+
 function SearchResultsPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [sortBy, setSortBy] = useState<"price-low" | "price-high" | "duration" | "departure">("price-low");
+  const [sortBy, setSortBy] = useState<SortOption>(() => parseSortOption(searchParams.get("sort")));
   const [activeTabs, setActiveTabs] = useState<Record<string, FlightInfoTab>>({});
   const [selectedPromoByFlight, setSelectedPromoByFlight] = useState<Record<string, number>>({});
   const [sortedFlights, setSortedFlights] = useState<FlightCardItem[]>([]);
   const [isLoadingFlights, setIsLoadingFlights] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(() => parsePageNumber(searchParams.get("page"), 1));
+  const [itemsPerPage, setItemsPerPage] = useState(() => parseItemsPerPage(searchParams.get("limit")));
 
   const origin = searchParams.get("origin") ?? "CGK - Jakarta";
   const destination = searchParams.get("destination") ?? "DPS - Denpasar";
@@ -97,6 +117,65 @@ function SearchResultsPageContent() {
     });
   }, [sortedFlights]);
 
+  useEffect(() => {
+    const querySort = parseSortOption(searchParams.get("sort"));
+    const queryPage = parsePageNumber(searchParams.get("page"), 1);
+    const queryLimit = parseItemsPerPage(searchParams.get("limit"));
+
+    setSortBy((prev) => (prev === querySort ? prev : querySort));
+    setItemsPerPage((prev) => (prev === queryLimit ? prev : queryLimit));
+    setCurrentPage((prev) => (prev === queryPage ? prev : queryPage));
+  }, [searchParams]);
+
+  const totalFlights = sortedFlights.length;
+  const totalPages = Math.max(1, Math.ceil(totalFlights / itemsPerPage));
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("sort", sortBy);
+    nextParams.set("page", String(currentPage));
+    nextParams.set("limit", String(itemsPerPage));
+
+    const nextQuery = nextParams.toString();
+    if (nextQuery === searchParams.toString()) return;
+    router.replace(`${pathname}?${nextQuery}`, { scroll: false });
+  }, [currentPage, itemsPerPage, pathname, router, searchParams, sortBy]);
+
+  const paginatedFlights = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedFlights.slice(start, start + itemsPerPage);
+  }, [sortedFlights, currentPage, itemsPerPage]);
+
+  const paginationItems = useMemo(() => {
+    const items: Array<number | "ellipsis"> = [];
+
+    if (totalPages <= 8) {
+      for (let page = 1; page <= totalPages; page += 1) items.push(page);
+      return items;
+    }
+
+    items.push(1);
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    if (start > 2) items.push("ellipsis");
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < totalPages - 1) items.push("ellipsis");
+
+    items.push(totalPages);
+    return items;
+  }, [currentPage, totalPages]);
+
+  const handleSortChange = (nextSort: SortOption) => {
+    setSortBy(nextSort);
+    setCurrentPage(1);
+  };
+
   const getActiveTab = (flightId: string): FlightInfoTab => activeTabs[flightId] ?? "details";
 
   const renderTabContent = (flightId: string) => {
@@ -111,23 +190,7 @@ function SearchResultsPageContent() {
           {flight.aircraft} • {extractAirportCode(flight.origin)} → {extractAirportCode(flight.destination)} • {flight.departureTime} - {flight.arrivalTime} ({flight.duration})
         </p>
       );
-    }
-
-    if (activeTab === "fare") {
-      return (
-        <p className="text-sm text-slate-600">
-          Termasuk: {flight.facilities.join(", ")} • Cabin baggage 7kg • Free seat selection pada periode promo.
-        </p>
-      );
-    }
-
-    if (activeTab === "refund") {
-      return <p className="text-sm text-slate-600">Refund tersedia sesuai ketentuan maskapai, estimasi proses 3-14 hari kerja.</p>;
-    }
-
-    if (activeTab === "reschedule") {
-      return <p className="text-sm text-slate-600">Jadwal dapat diubah sebelum keberangkatan dengan potensi selisih tarif dan biaya layanan.</p>;
-    }
+      }
 
     const promoCount = flight.promos?.length ?? 0;
     if (promoCount === 0) {
@@ -194,18 +257,88 @@ function SearchResultsPageContent() {
           {origin} → {destination} • {departureDate} - {returnDate} • {adult} Adult / {child} Child
         </p>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="h-fit rounded-3xl border border-blue-100 bg-white p-5 shadow-sm">
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
+          <aside className="h-fit self-start rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-bold text-slate-900">Filter Section</h2>
-            <div className="mt-4 space-y-2 text-sm">
-              <button onClick={() => setSortBy("price-low")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "price-low" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Price Low to High</button>
-              <button onClick={() => setSortBy("price-high")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "price-high" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Price High to Low</button>
-              <button onClick={() => setSortBy("duration")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "duration" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Duration</button>
-              <button onClick={() => setSortBy("departure")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "departure" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Departure Time</button>
+            <div className="mt-5 space-y-2.5 text-sm">
+              <button onClick={() => handleSortChange("price-low")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "price-low" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Price Low to High</button>
+              <button onClick={() => handleSortChange("price-high")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "price-high" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Price High to Low</button>
+              <button onClick={() => handleSortChange("duration")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "duration" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Duration</button>
+              <button onClick={() => handleSortChange("departure")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "departure" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Departure Time</button>
             </div>
           </aside>
 
           <section className="space-y-4">
+            {!isLoadingFlights && !flightError && totalFlights > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 sm:px-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                    >
+                      &lt; Back
+                    </button>
+
+                    {paginationItems.map((item, index) => {
+                      if (item === "ellipsis") {
+                        return (
+                          <span key={`ellipsis-${index}`} className="inline-flex h-8 items-center px-1.5 text-sm text-slate-500">
+                            ...
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={item}
+                          onClick={() => setCurrentPage(item)}
+                          className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-sm font-medium transition ${
+                            currentPage === item
+                              ? "border-black bg-black text-white"
+                              : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                    >
+                      Next &gt;
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-slate-600">
+                    {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalFlights)} of {totalFlights.toLocaleString("en-US")}
+                  </p>
+
+                  <div className="ml-auto flex items-center gap-2 text-sm text-slate-700">
+                    <label htmlFor="items-per-page" className="font-medium">Result per page</label>
+                    <select
+                      id="items-per-page"
+                      value={itemsPerPage}
+                      onChange={(event) => {
+                        setItemsPerPage(Number(event.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="h-8 rounded-md border border-slate-300 bg-white px-2.5 text-sm outline-none transition focus:border-slate-500"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {isLoadingFlights && (
               <div className="space-y-4">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -260,7 +393,7 @@ function SearchResultsPageContent() {
               </div>
             )}
 
-            {sortedFlights.map((flight, idx) => {
+            {paginatedFlights.map((flight, idx) => {
               const queryData: Record<string, string> = { origin, destination, departureDate, returnDate, adult, child };
               const selectedPromoId = selectedPromoByFlight[flight.id];
               const selectedPromo = flight.promos.find((promo) => promo.id === selectedPromoId) ?? null;
@@ -271,8 +404,11 @@ function SearchResultsPageContent() {
               const query = new URLSearchParams(queryData);
 
               return (
-                <LazySection key={flight.id} delay={Math.min(5, (idx % 5) + 1) as 1 | 2 | 3 | 4 | 5}>
-                <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <article
+                  key={`${sortBy}-${flight.id}`}
+                  className="card-enter rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-transform duration-200 hover:-translate-y-0.5"
+                  style={{ animationDelay: `${Math.min(idx, 5) * 55}ms` }}
+                >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -342,9 +478,9 @@ function SearchResultsPageContent() {
                     </div>
                   </div>
                 </article>
-                </LazySection>
               );
             })}
+
           </section>
         </div>
       </main>
