@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
-import LazySection from "@/components/LazySection";
 import { formatRupiah } from "@/lib/currency";
 import { type FlightCardItem, searchFlightsFromApi } from "@/lib/flight-api";
 
@@ -175,14 +174,14 @@ function SearchResultsPageContent() {
           {origin} → {destination} • {departureDate} - {returnDate} • {adult} Adult / {child} Child
         </p>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="h-fit rounded-3xl border border-blue-100 bg-white p-5 shadow-sm">
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
+          <aside className="h-fit self-start rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-bold text-slate-900">Filter Section</h2>
-            <div className="mt-4 space-y-2 text-sm">
-              <button onClick={() => setSortBy("price-low")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "price-low" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Price Low to High</button>
-              <button onClick={() => setSortBy("price-high")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "price-high" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Price High to Low</button>
-              <button onClick={() => setSortBy("duration")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "duration" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Duration</button>
-              <button onClick={() => setSortBy("departure")} className={`w-full rounded-xl border px-3 py-2 text-left font-medium transition ${sortBy === "departure" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-blue-50 text-slate-700 hover:bg-blue-100"}`}>Departure Time</button>
+            <div className="mt-5 space-y-2.5 text-sm">
+              <button onClick={() => setSortBy("price-low")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "price-low" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Price Low to High</button>
+              <button onClick={() => setSortBy("price-high")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "price-high" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Price High to Low</button>
+              <button onClick={() => setSortBy("duration")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "duration" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Duration</button>
+              <button onClick={() => setSortBy("departure")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "departure" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Departure Time</button>
             </div>
           </aside>
 
@@ -252,8 +251,11 @@ function SearchResultsPageContent() {
               const query = new URLSearchParams(queryData);
 
               return (
-                <LazySection key={flight.id} delay={Math.min(5, (idx % 5) + 1) as 1 | 2 | 3 | 4 | 5}>
-                <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <article
+                  key={`${sortBy}-${flight.id}`}
+                  className="card-enter rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-transform duration-200 hover:-translate-y-0.5"
+                  style={{ animationDelay: `${Math.min(idx, 5) * 55}ms` }}
+                >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -323,7 +325,6 @@ function SearchResultsPageContent() {
                     </div>
                   </div>
                 </article>
-                </LazySection>
               );
             })}
           </section>
