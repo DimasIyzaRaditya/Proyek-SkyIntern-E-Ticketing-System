@@ -9,14 +9,11 @@ import LazySection from "@/components/LazySection";
 import { formatRupiah } from "@/lib/currency";
 import { type FlightCardItem, searchFlightsFromApi } from "@/lib/flight-api";
 
-type FlightInfoTab = "details" | "fare" | "refund" | "reschedule" | "promos";
+type FlightInfoTab = "details" | "promos";
 
 const flightTabs: Array<{ key: FlightInfoTab; label: string }> = [
-  { key: "details", label: "Flight Details" },
-  { key: "fare", label: "Fare & Benefits" },
-  { key: "refund", label: "Refund" },
-  { key: "reschedule", label: "Reschedule" },
-  { key: "promos", label: "Promos 🎟️" },
+  { key: "details", label: "Flight Details    " },
+  { key: "promos", label: "Promos" },
 ];
 
 const extractAirportCode = (value: string) => {
@@ -111,23 +108,7 @@ function SearchResultsPageContent() {
           {flight.aircraft} • {extractAirportCode(flight.origin)} → {extractAirportCode(flight.destination)} • {flight.departureTime} - {flight.arrivalTime} ({flight.duration})
         </p>
       );
-    }
-
-    if (activeTab === "fare") {
-      return (
-        <p className="text-sm text-slate-600">
-          Termasuk: {flight.facilities.join(", ")} • Cabin baggage 7kg • Free seat selection pada periode promo.
-        </p>
-      );
-    }
-
-    if (activeTab === "refund") {
-      return <p className="text-sm text-slate-600">Refund tersedia sesuai ketentuan maskapai, estimasi proses 3-14 hari kerja.</p>;
-    }
-
-    if (activeTab === "reschedule") {
-      return <p className="text-sm text-slate-600">Jadwal dapat diubah sebelum keberangkatan dengan potensi selisih tarif dan biaya layanan.</p>;
-    }
+      }
 
     const promoCount = flight.promos?.length ?? 0;
     if (promoCount === 0) {
