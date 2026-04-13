@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/flight_model.dart';
 import '../models/seat_model.dart';
@@ -29,11 +29,16 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   String _flightId = '';
   int? _existingBookingId;
 
-  final List<Map<String, TextEditingController>> _controllers = [];
-  final List<String> _titles = [];
-  final List<String> _idTypes = [];
-  final List<String> _nationalities = [];
-  final List<DateTime?> _dobs = [];
+  final TextEditingController _firstNameCtrl = TextEditingController();
+  final TextEditingController _lastNameCtrl = TextEditingController();
+  final TextEditingController _idNumberCtrl = TextEditingController();
+
+  String _title = 'Mr.';
+  String _idType = 'KTP';
+  String _nationality = 'Indonesia';
+  DateTime? _dob;
+
+  int get _totalPassengers => _adults + _children;
 
   @override
   void didChangeDependencies() {
@@ -41,89 +46,73 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (args == null) return;
 
     _flightId = args['flightId']?.toString() ?? '';
     _adults = (args['adults'] as int?) ?? 1;
     _children = (args['children'] as int?) ?? 0;
     _flight = args['flight'] as FlightCardItem?;
-    _selectedSeats =
-        List<Seat>.from((args['selectedSeats'] as List?) ?? []);
+    _selectedSeats = List<Seat>.from((args['selectedSeats'] as List?) ?? []);
     _seatIds = List<int>.from((args['seatIds'] as List?) ?? []);
     _extraPrice = (args['extraPrice'] as int?) ?? 0;
     _existingBookingId = args['existingBookingId'] as int?;
 
     final user = context.read<AuthProvider>().user;
     final nameParts = user?.fullName.split(' ') ?? [''];
-    final firstName = nameParts.first;
-    final lastName =
-        nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
-    final total = _adults + _children;
-    for (int i = 0; i < total; i++) {
-      _controllers.add({
-        'firstName':
-            TextEditingController(text: i == 0 ? firstName : ''),
-        'lastName': TextEditingController(text: i == 0 ? lastName : ''),
-        'idNumber': TextEditingController(),
-      });
-      _titles.add(i < _adults ? 'Mr.' : 'Mstr.');
-      _idTypes.add('KTP');
-      _nationalities.add('Indonesia');
-      _dobs.add(null);
-    }
+    _firstNameCtrl.text = nameParts.first;
+    _lastNameCtrl.text = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
   }
 
   @override
   void dispose() {
-    for (final ctrls in _controllers) {
-      for (final c in ctrls.values) {
-        c.dispose();
-      }
-    }
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _idNumberCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDob(int index) async {
+  Future<void> _selectDob() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dobs[index] ?? DateTime(2000),
+      initialDate: _dob ?? DateTime(2000),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
     );
-    if (picked != null) setState(() => _dobs[index] = picked);
+    if (picked != null) setState(() => _dob = picked);
+  }
+
+  String _titleForType(String type) {
+    if (type == 'CHILD') {
+      return _title == 'Mrs.' ? 'Miss' : 'Mstr.';
+    }
+    return _title;
   }
 
   void _handleContinue() {
     if (!_formKey.currentState!.validate()) return;
-    for (int i = 0; i < _controllers.length; i++) {
-      if (_dobs[i] == null) {
-        showSnackBar(context,
-            'Lengkapi tanggal lahir penumpang ${i + 1}',
-            isError: true);
-        return;
-      }
+    if (_dob == null) {
+      showSnackBar(context, 'Lengkapi tanggal lahir penumpang', isError: true);
+      return;
     }
 
     final passengers = <Map<String, dynamic>>[];
-    for (int i = 0; i < _controllers.length; i++) {
+    for (int i = 0; i < _totalPassengers; i++) {
+      final type = i < _adults ? 'ADULT' : 'CHILD';
       passengers.add({
-        'title': _titles[i],
-        'firstName': _controllers[i]['firstName']!.text.trim(),
-        'lastName': _controllers[i]['lastName']!.text.trim(),
-        'type': i < _adults ? 'ADULT' : 'CHILD',
-        'nationality': _nationalities[i],
-        'idType': _idTypes[i],
-        'idNumber': _controllers[i]['idNumber']!.text.trim(),
-        'dateOfBirth': DateFormatter.formatDate(_dobs[i]!),
+        'title': _titleForType(type),
+        'firstName': _firstNameCtrl.text.trim(),
+        'lastName': _lastNameCtrl.text.trim(),
+        'type': type,
+        'nationality': _nationality,
+        'idType': _idType,
+        'idNumber': _idNumberCtrl.text.trim(),
+        'dateOfBirth': DateFormatter.formatDate(_dob!),
       });
     }
 
     final basePrice = _flight?.price ?? 0;
-    final totalPassengers = _adults + _children;
-    final totalPrice = (basePrice + _extraPrice) * totalPassengers;
+    final totalPrice = (basePrice + _extraPrice) * _totalPassengers;
 
     Navigator.of(context).pushNamed('/booking-payment', arguments: {
       'flightId': int.tryParse(_flightId) ?? 0,
@@ -156,7 +145,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
           ),
         ),
       ),
-      body: _controllers.isEmpty
+      body: !_isInitialized
           ? const Center(child: CircularProgressIndicator())
           : Form(
               key: _formKey,
@@ -167,10 +156,8 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         if (_flight != null) _buildFlightSummary(),
-                        const SizedBox(height: 16),
-                        ...List.generate(_controllers.length, (i) {
-                          return _buildPassengerForm(i, i < _adults);
-                        }),
+                        const SizedBox(height: 12),
+                        _buildSinglePassengerForm(),
                       ],
                     ),
                   ),
@@ -193,26 +180,21 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   Widget _buildFlightSummary() {
     final f = _flight!;
     return Card(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: AppColors.surfaceVariant,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(f.airline,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(f.airline, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text('${f.origin} â†’ ${f.destination}',
-                style: const TextStyle(fontSize: 13)),
+            Text('${f.origin} -> ${f.destination}', style: const TextStyle(fontSize: 13)),
             Text('${f.departureTime} - ${f.arrivalTime}',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             if (_seatIds.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                  'Kursi: ${_selectedSeats.map((s) => s.seatNumber).join(', ')}',
+              Text('Kursi: ${_selectedSeats.map((s) => s.seatNumber).join(', ')}',
                   style: const TextStyle(fontSize: 12)),
             ],
           ],
@@ -221,11 +203,12 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     );
   }
 
-  Widget _buildPassengerForm(int i, bool isAdult) {
+  Widget _buildSinglePassengerForm() {
     final inputDecoration = InputDecoration(
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border)),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
       filled: true,
       fillColor: AppColors.surfaceVariant,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -233,106 +216,66 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Penumpang ${i + 1} â€“ ${isAdult ? 'Dewasa' : 'Anak'}',
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold),
+              'Data Penumpang',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
-            _labelText('Gelar / Sapaan'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              initialValue: _titles[i],
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border)),
-                filled: true,
-                fillColor: AppColors.surfaceVariant,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              items: isAdult
-                  ? ['Mr.', 'Mrs.', 'Ms.']
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                      .toList()
-                  : ['Mstr.', 'Miss']
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                      .toList(),
-              onChanged: (v) => setState(() => _titles[i] = v ?? _titles[i]),
-            ),
+         
+          
             const SizedBox(height: 12),
             InputField(
               label: 'Nama Depan',
-              controller: _controllers[i]['firstName'],
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Nama depan wajib diisi'
-                  : null,
+              controller: _firstNameCtrl,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama depan wajib diisi' : null,
             ),
             const SizedBox(height: 12),
             InputField(
               label: 'Nama Belakang',
-              controller: _controllers[i]['lastName'],
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Nama belakang wajib diisi'
-                  : null,
+              controller: _lastNameCtrl,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama belakang wajib diisi' : null,
             ),
             const SizedBox(height: 12),
             _labelText('Jenis Identitas'),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: _idTypes[i],
+              initialValue: _idType,
               decoration: inputDecoration,
               items: ['KTP', 'PASSPORT']
-                  .map((t) =>
-                      DropdownMenuItem(value: t, child: Text(t)))
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
-              onChanged: (v) =>
-                  setState(() => _idTypes[i] = v ?? 'KTP'),
+              onChanged: (v) => setState(() => _idType = v ?? 'KTP'),
             ),
             const SizedBox(height: 12),
             InputField(
               label: 'Nomor Identitas',
-              controller: _controllers[i]['idNumber'],
+              controller: _idNumberCtrl,
               keyboardType: TextInputType.number,
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Nomor identitas wajib diisi'
-                  : null,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nomor identitas wajib diisi' : null,
             ),
             const SizedBox(height: 12),
             _labelText('Kewarganegaraan'),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: _nationalities[i],
+              initialValue: _nationality,
               decoration: inputDecoration,
-              items: [
-                'Indonesia',
-                'Malaysia',
-                'Singapore',
-                'Philippines',
-                'Thailand',
-                'Other'
-              ]
-                  .map((n) =>
-                      DropdownMenuItem(value: n, child: Text(n)))
+              items: ['Indonesia', 'Malaysia', 'Singapore', 'Philippines', 'Thailand', 'Other']
+                  .map((n) => DropdownMenuItem(value: n, child: Text(n)))
                   .toList(),
-              onChanged: (v) =>
-                  setState(() => _nationalities[i] = v ?? 'Indonesia'),
+              onChanged: (v) => setState(() => _nationality = v ?? 'Indonesia'),
             ),
             const SizedBox(height: 12),
             _labelText('Tanggal Lahir'),
             const SizedBox(height: 8),
             InkWell(
-              onTap: () => _selectDob(i),
+              onTap: _selectDob,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(12),
@@ -341,18 +284,15 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
                 child: Row(
                   children: [
                     Text(
-                      _dobs[i] != null
-                          ? DateFormatter.formatShortDate(
-                              DateFormatter.formatDate(_dobs[i]!))
+                      _dob != null
+                          ? DateFormatter.formatShortDate(DateFormatter.formatDate(_dob!))
                           : 'Pilih tanggal lahir',
                       style: TextStyle(
-                          color: _dobs[i] != null
-                              ? AppColors.textPrimary
-                              : AppColors.textHint),
+                        color: _dob != null ? AppColors.textPrimary : AppColors.textHint,
+                      ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.calendar_today,
-                        size: 16, color: AppColors.primary),
+                    const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
                   ],
                 ),
               ),
@@ -364,11 +304,13 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   }
 
   Widget _labelText(String text) {
-    return Text(text,
-        style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary));
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textSecondary,
+      ),
+    );
   }
 }
-

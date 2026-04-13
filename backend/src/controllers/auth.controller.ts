@@ -476,7 +476,10 @@ export const forgotPassword = async (req: Request, res: Response) => {
       }
     })
 
-    await sendResetPasswordEmail(email, resetToken, isMobile)
+    await sendResetPasswordEmail(email, resetToken, isMobile, {
+      host: req.get("host") || undefined,
+      protocol: req.protocol
+    })
 
     res.json({
       message: "Tautan reset password telah dikirim ke email Anda"

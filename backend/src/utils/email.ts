@@ -27,7 +27,8 @@ const getETicketQrImageUrl = (bookingCode: string) => {
 export const sendResetPasswordEmail = async (
   email: string,
   resetToken: string,
-  isMobile: boolean = false
+  isMobile: boolean = false,
+  requestContext?: { host?: string; protocol?: string }
 ) => {
   try {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -35,15 +36,24 @@ export const sendResetPasswordEmail = async (
       return
     }
 
-    // Generate platform-specific reset URL
-    let resetUrl: string
+    // Always use web reset page as entrypoint.
+    // On mobile devices, web page will try opening the app via deep link.
+    let frontendBaseUrl = process.env.FRONTEND_URL || "http://localhost:3001"
+
     if (isMobile) {
-      // For mobile apps - use deep link or mobile-specific URL
-      resetUrl = `${process.env.MOBILE_URL || process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
-    } else {
-      // For web - use regular web URL  
-      resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`
+      const frontendUri = new URL(frontendBaseUrl)
+      const isLocalFrontend =
+        frontendUri.hostname === "localhost" || frontendUri.hostname === "127.0.0.1"
+
+      if (isLocalFrontend && requestContext?.host) {
+        // Replace localhost with the host that mobile device used to reach backend.
+        const hostWithoutPort = requestContext.host.split(":")[0]
+        const protocol = requestContext.protocol || frontendUri.protocol.replace(":", "") || "http"
+        frontendBaseUrl = `${protocol}://${hostWithoutPort}:3001`
+      }
     }
+
+    const resetUrl = `${frontendBaseUrl}/auth/reset-password?token=${resetToken}${isMobile ? "&openApp=1" : ""}`
 
     const platformText = isMobile ? 'aplikasi mobile' : 'website'
 

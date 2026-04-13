@@ -19,12 +19,16 @@ class BookingPaymentScreen extends StatefulWidget {
 
 class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   bool _isInitialized = false;
+  bool _isPreparingBooking = false;
   bool _isCreating = false;
   bool _isSyncing = false;
+  bool _isCancelling = false;
   bool _paymentOpened = false;
   bool _isExpired = false;
   int? _bookingId;
   int? _existingBookingId;
+  String _bookingStatus = 'PENDING';
+  DateTime? _expiresAt;
   String? _redirectUrl;
   String? _error;
 
@@ -35,7 +39,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   int _flightId = 0;
 
   // Countdown timer
-  static const int _countdownSeconds = 15 * 60; // 15 minutes
+  static const int _countdownSeconds = 15 * 60; // Fallback 15 minutes
   int _remainingSeconds = _countdownSeconds;
   Timer? _countdownTimer;
 
@@ -58,7 +62,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         _bookingId = _existingBookingId;
       }
     }
-    _startCountdown();
+    _bootstrapPaymentFlow();
   }
 
   @override
@@ -74,20 +78,122 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         timer.cancel();
         return;
       }
+      _remainingSeconds = _calculateRemainingSeconds();
       if (_remainingSeconds <= 0) {
         timer.cancel();
         _handleExpired();
         return;
       }
-      setState(() => _remainingSeconds--);
+      setState(() {});
     });
+  }
+
+  int _calculateRemainingSeconds() {
+    if (_expiresAt == null) return _remainingSeconds;
+    final remaining = _expiresAt!.difference(DateTime.now()).inSeconds;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  Future<void> _bootstrapPaymentFlow() async {
+    setState(() {
+      _isPreparingBooking = true;
+      _error = null;
+    });
+
+    try {
+      if (_existingBookingId != null) {
+        final detail = await BookingService.getBookingDetail(_existingBookingId!);
+        final booking = detail['booking'] as Map<String, dynamic>?;
+        if (booking == null) throw Exception('Booking tidak ditemukan');
+
+        _bookingId = booking['id'] as int? ?? _existingBookingId;
+        _bookingStatus = (booking['status'] ?? 'PENDING').toString().toUpperCase();
+        _totalPrice = (booking['totalPrice'] as num?)?.toInt() ?? _totalPrice;
+        _passengers = (booking['passengers'] as List? ?? const [])
+            .whereType<Map>()
+            .map((p) => Map<String, dynamic>.from(p))
+            .toList();
+        _flight = _buildFlightFromBookingDetail(booking);
+        _flightId = (booking['flightId'] as num?)?.toInt() ?? _flightId;
+        final expiresAtRaw = booking['expiresAt']?.toString();
+        _expiresAt = expiresAtRaw != null ? DateTime.tryParse(expiresAtRaw)?.toLocal() : null;
+      } else {
+        final bookingResult = await BookingService.createBooking(
+          flightId: _flightId,
+          passengers: _passengers,
+          seatIds: _seatIds.isNotEmpty ? _seatIds : null,
+        );
+
+        final booking = bookingResult['booking'] as Map<String, dynamic>?;
+        final bookingId = booking?['id'] as int? ?? bookingResult['id'] as int?;
+        if (bookingId == null) throw Exception('Gagal membuat pemesanan');
+
+        _bookingId = bookingId;
+        _bookingStatus = (booking?['status'] ?? 'PENDING').toString().toUpperCase();
+        _totalPrice = (booking?['totalPrice'] as num?)?.toInt() ?? _totalPrice;
+        final expiresAtRaw = booking?['expiresAt']?.toString();
+        _expiresAt = expiresAtRaw != null ? DateTime.tryParse(expiresAtRaw)?.toLocal() : DateTime.now().add(const Duration(minutes: 15));
+      }
+
+      _remainingSeconds = _calculateRemainingSeconds();
+      if (_remainingSeconds <= 0 || _bookingStatus == 'CANCELLED' || _bookingStatus == 'EXPIRED') {
+        _handleExpired();
+      } else {
+        _startCountdown();
+      }
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      if (mounted) {
+        setState(() => _isPreparingBooking = false);
+      }
+    }
+  }
+
+  FlightCardItem? _buildFlightFromBookingDetail(Map<String, dynamic> booking) {
+    final flight = booking['flight'];
+    if (flight is! Map) return _flight;
+    final f = Map<String, dynamic>.from(flight);
+    final origin = Map<String, dynamic>.from((f['origin'] as Map?) ?? const {});
+    final destination = Map<String, dynamic>.from((f['destination'] as Map?) ?? const {});
+    final airline = Map<String, dynamic>.from((f['airline'] as Map?) ?? const {});
+
+    final departureRaw = f['departureTime']?.toString();
+    final arrivalRaw = f['arrivalTime']?.toString();
+
+    String _durationText() {
+      final dep = departureRaw != null ? DateTime.tryParse(departureRaw) : null;
+      final arr = arrivalRaw != null ? DateTime.tryParse(arrivalRaw) : null;
+      if (dep == null || arr == null) return '-';
+      final minutes = arr.difference(dep).inMinutes;
+      if (minutes <= 0) return '-';
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      return '${h}h ${m}m';
+    }
+
+    return FlightCardItem(
+      id: (f['id'] ?? _flightId).toString(),
+      flightNumber: (f['flightNumber'] ?? '-').toString(),
+      airline: (airline['name'] ?? '-').toString(),
+      logo: '✈️',
+      aircraft: (f['aircraft'] ?? 'Aircraft').toString(),
+      origin: (origin['city'] ?? '-').toString(),
+      destination: (destination['city'] ?? '-').toString(),
+      departureTime: DateFormatter.formatTime(departureRaw),
+      arrivalTime: DateFormatter.formatTime(arrivalRaw),
+      duration: _durationText(),
+      price: (booking['totalPrice'] as num?)?.toInt() ?? 0,
+      facilities: const [],
+    );
   }
 
   Future<void> _handleExpired() async {
     setState(() => _isExpired = true);
-    if (_bookingId != null) {
+    if (_bookingId != null && _bookingStatus == 'PENDING') {
       try {
         await BookingService.cancelBooking(_bookingId!);
+        _bookingStatus = 'CANCELLED';
       } catch (_) {}
     }
   }
@@ -112,22 +218,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _error = null;
     });
     try {
-      int bookingId;
-
-      if (_existingBookingId != null) {
-        // Editing flow: reuse existing booking, skip createBooking
-        bookingId = _existingBookingId!;
-      } else {
-        // New booking flow
-        final bookingResult = await BookingService.createBooking(
-          flightId: _flightId,
-          passengers: _passengers,
-          seatIds: _seatIds.isNotEmpty ? _seatIds : null,
-        );
-        bookingId =
-            bookingResult['booking']?['id'] as int? ??
-            bookingResult['id'] as int?
-            ?? (throw Exception('Gagal membuat pemesanan'));
+      final bookingId = _bookingId;
+      if (bookingId == null) {
+        throw Exception('Booking belum siap. Coba lagi.');
       }
 
       final paymentResult = await BookingService.createPayment(bookingId);
@@ -150,6 +243,24 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
         _isCreating = false;
       });
+    }
+  }
+
+  Future<void> _cancelPendingBooking() async {
+    if (_bookingId == null || _bookingStatus != 'PENDING') return;
+    setState(() => _isCancelling = true);
+    try {
+      await BookingService.cancelBooking(_bookingId!);
+      if (!mounted) return;
+      setState(() {
+        _bookingStatus = 'CANCELLED';
+        _isExpired = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+    } finally {
+      if (mounted) setState(() => _isCancelling = false);
     }
   }
 
@@ -260,6 +371,23 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isPreparingBooking) {
+      return Scaffold(
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Container(
+            decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     if (_isExpired) {
       return Scaffold(
         appBar: PreferredSize(
@@ -406,29 +534,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                       ),
                     ),
                   ],
-                  if (_bookingId != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('ID Pemesanan: #$_bookingId',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          const Text(
-                              'Selesaikan pembayaran di halaman Midtrans dalam aplikasi. Setelah selesai, Anda akan dikembalikan ke halaman booking mobile.',
-                              style: TextStyle(
-                                  fontSize: 13, color: AppColors.textSecondary)),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -438,12 +543,25 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  if (!_paymentOpened && (_bookingId == null || _existingBookingId != null && !_paymentOpened))
+                  if (!_paymentOpened)
                     PrimaryButton(
-                      label: _existingBookingId != null ? 'Bayar Sekarang' : 'Buat Pesanan & Bayar',
+                      label: 'Bayar Sekarang',
                       onPressed: _createBookingAndPay,
                       isLoading: _isCreating,
                     ),
+                  if (!_paymentOpened) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _isCancelling ? null : _cancelPendingBooking,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Text(_isCancelling ? 'Membatalkan...' : 'Cancel'),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (_paymentOpened && _redirectUrl != null) ...[
                     PrimaryButton(
                       label: 'Buka Halaman Pembayaran Lagi',
@@ -583,7 +701,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total',
+                const Text('Total Pembayaran',
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold)),
                 Text(

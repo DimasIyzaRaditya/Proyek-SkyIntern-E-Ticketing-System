@@ -101,7 +101,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
@@ -117,9 +120,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: _success ? _buildSuccess() : _buildForm(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+          child: _success ? _buildSuccess() : _buildForm(),
+        ),
       ),
     );
   }

@@ -18,6 +18,10 @@ class ETicketScreen extends StatefulWidget {
 class _ETicketScreenState extends State<ETicketScreen> {
   bool _isChecking = false;
   bool _isDownloading = false;
+  bool _isLoadingFromCode = false;
+  bool _isRouteArgsHandled = false;
+  String? _loadFromCodeError;
+  Booking? _resolvedBooking;
 
   String _formatDateEn(String raw) {
     try {
@@ -121,10 +125,106 @@ class _ETicketScreenState extends State<ETicketScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isRouteArgsHandled) return;
+    _isRouteArgsHandled = true;
+
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final booking = args?['booking'] as Booking?;
+    final fromArgs = args?['booking'] as Booking?;
+    if (fromArgs != null) {
+      _resolvedBooking = fromArgs;
+      return;
+    }
+
+    final codeArg = (args?['code'] ?? '').toString().trim();
+    if (codeArg.isNotEmpty) {
+      _loadBookingByCode(codeArg);
+    }
+  }
+
+  Future<void> _loadBookingByCode(String code) async {
+    setState(() {
+      _isLoadingFromCode = true;
+      _loadFromCodeError = null;
+    });
+
+    try {
+      final result = await BookingService.verifyBooking(code);
+      final raw = (result['booking'] as Map<String, dynamic>?) ?? result;
+      final booking = Booking.fromJson(raw);
+
+      if (!mounted) return;
+      setState(() {
+        _resolvedBooking = booking;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadFromCodeError =
+            e.toString().replaceFirst('Exception: ', '').trim();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingFromCode = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoadingFromCode) {
+      return Scaffold(
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
+            ),
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('E-Tiket', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadFromCodeError != null) {
+      return Scaffold(
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
+            ),
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('E-Tiket', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              'Gagal membuka e-tiket: $_loadFromCodeError',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final booking = _resolvedBooking;
 
     if (booking == null) {
       return Scaffold(
@@ -253,9 +353,10 @@ class _ETicketScreenState extends State<ETicketScreen> {
         ? '-'
         : booking.selectedSeats!.trim();
 
-    // Generate shareable link that points to the e-ticket verify page.
+    // QR points to web verify page; web will attempt to open mobile app via deep link.
     final webBase = ApiClient.baseUrl.replaceFirst(':3000', ':3001');
-    final qrLink = '$webBase/bookings/verify?code=${Uri.encodeComponent(booking.bookingCode)}';
+    final qrLink =
+      '$webBase/bookings/verify?code=${Uri.encodeComponent(booking.bookingCode)}&openApp=1';
 
     return Container(
       decoration: BoxDecoration(

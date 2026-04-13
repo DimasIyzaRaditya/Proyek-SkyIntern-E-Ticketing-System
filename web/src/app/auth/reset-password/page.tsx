@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import MainNav from "@/components/MainNav";
 import { resetPasswordFromApi } from "@/lib/auth-api";
 
@@ -10,12 +10,39 @@ function ResetPasswordPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
+  const shouldOpenApp = searchParams.get("openApp") === "1";
+  const appLink = useMemo(
+    () => `skyintern://auth/reset-password?token=${encodeURIComponent(token)}`,
+    [token],
+  );
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showOpenAppHint, setShowOpenAppHint] = useState(false);
+
+  useEffect(() => {
+    if (!token || !shouldOpenApp || typeof window === "undefined") return;
+
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isMobileDevice = /android|iphone|ipad|ipod/.test(ua);
+    if (!isMobileDevice) return;
+
+    const openTimer = window.setTimeout(() => {
+      window.location.href = appLink;
+    }, 250);
+
+    const hintTimer = window.setTimeout(() => {
+      setShowOpenAppHint(true);
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(openTimer);
+      window.clearTimeout(hintTimer);
+    };
+  }, [token, shouldOpenApp, appLink]);
 
   const handleResetPassword = async () => {
     if (!token) {
@@ -68,6 +95,18 @@ function ResetPasswordPageContent() {
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-lg">
           <h1 className="text-3xl font-black text-slate-900">Reset Password</h1>
           <p className="mt-1 text-sm text-slate-600">Masukkan password baru Anda.</p>
+
+          {showOpenAppHint && (
+            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              <p>Jika aplikasi belum terbuka otomatis, tekan tombol di bawah:</p>
+              <a
+                href={appLink}
+                className="mt-2 inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700"
+              >
+                Buka di Aplikasi
+              </a>
+            </div>
+          )}
 
           <form className="mt-6 space-y-4">
             <div>

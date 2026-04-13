@@ -84,6 +84,13 @@ class BookingService {
     return await ApiClient.get('/api/bookings/verify?code=$normalizedCode');
   }
 
+  static Future<Map<String, dynamic>> getBookingDetail(int bookingId) async {
+    return await ApiClient.get(
+      '/api/bookings/$bookingId',
+      requireAuth: true,
+    );
+  }
+
   static Future<TicketDownloadResult> downloadTicket(int ticketId) async {
     final response = await ApiClient.getBytes(
       '/api/bookings/tickets/$ticketId/download',

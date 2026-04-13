@@ -1,18 +1,16 @@
 ﻿import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/booking_provider.dart';
 import '../services/booking_service.dart';
 import '../models/booking_model.dart';
+import '../models/flight_model.dart';
 import '../utils/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
 import '../utils/ticket_download.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/mobile_side_menu.dart';
-import 'midtrans_payment_webview_screen.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -24,7 +22,6 @@ class BookingsScreen extends StatefulWidget {
 class _BookingsScreenState extends State<BookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final Set<int> _payingIds = {};
   final Set<int> _syncingIds = {};
   final Set<int> _downloadingTicketIds = {};
   Timer? _pollTimer;
@@ -128,67 +125,45 @@ class _BookingsScreenState extends State<BookingsScreen>
     return data;
   }
 
-  bool get _supportsEmbeddedPayment {
-    if (kIsWeb) return false;
-    return switch (defaultTargetPlatform) {
-      TargetPlatform.android ||
-      TargetPlatform.iOS ||
-      TargetPlatform.macOS => true,
-      _ => false,
-    };
-  }
+  Future<void> _payBooking(Booking booking) async {
+    final flight = FlightCardItem(
+      id: booking.flight.id.toString(),
+      flightNumber: booking.flight.flightNumber,
+      airline: booking.flight.airline,
+      logo: '✈️',
+      aircraft: 'Aircraft',
+      origin: booking.flight.originCity,
+      destination: booking.flight.destinationCity,
+      departureTime: DateFormatter.formatTime(booking.flight.departureTime),
+      arrivalTime: DateFormatter.formatTime(booking.flight.arrivalTime),
+      duration: '-',
+      price: booking.totalPrice,
+      facilities: const [],
+    );
 
-  Future<void> _payBooking(int bookingId) async {
-    setState(() => _payingIds.add(bookingId));
-    try {
-      final result = await BookingService.createPayment(bookingId);
-      final paymentData = result['payment'] as Map<String, dynamic>?;
-      final url =
-          paymentData?['redirectUrl'] as String? ??
-          result['redirectUrl'] as String? ??
-          result['snap_redirect_url'] as String?;
-      if (url == null) throw Exception('Gagal mendapatkan link pembayaran');
-      if (!mounted) return;
+    final passengers = booking.passengers
+        .map((p) => {
+              'title': p.title,
+              'firstName': p.firstName,
+              'lastName': p.lastName,
+              'type': p.type,
+            })
+        .toList();
 
-      if (!_supportsEmbeddedPayment) {
-        final opened = await launchUrl(
-          Uri.parse(url),
-          mode: kIsWeb
-              ? LaunchMode.platformDefault
-              : LaunchMode.externalApplication,
-        );
-        if (!opened) {
-          throw Exception('Tidak dapat membuka halaman pembayaran');
-        }
-        if (!mounted) return;
-        showSnackBar(
-          context,
-          'Halaman pembayaran dibuka di browser karena platform ini tidak mendukung webview in-app.',
-        );
-        return;
-      }
+    await Navigator.of(context).pushNamed(
+      '/booking-payment',
+      arguments: {
+        'flightId': booking.flight.id,
+        'flight': flight,
+        'passengers': passengers,
+        'seatIds': const <int>[],
+        'totalPrice': booking.totalPrice,
+        'existingBookingId': booking.id,
+      },
+    );
 
-      final paymentResult = await Navigator.of(context)
-          .push<Map<String, dynamic>>(
-            MaterialPageRoute(
-              builder: (_) => MidtransPaymentWebViewScreen(paymentUrl: url),
-            ),
-          );
-
-      if (!mounted) return;
-
-      if (paymentResult?['callbackStatus'] != null) {
-        await _syncBooking(bookingId);
-      }
-    } catch (e) {
-      if (mounted)
-        showSnackBar(
-          context,
-          e.toString().replaceFirst('Exception: ', ''),
-          isError: true,
-        );
-    } finally {
-      if (mounted) setState(() => _payingIds.remove(bookingId));
+    if (mounted) {
+      await context.read<BookingProvider>().loadBookings();
     }
   }
 
@@ -791,75 +766,9 @@ class _BookingsScreenState extends State<BookingsScreen>
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pushNamed(
-                        '/booking-seat',
-                        arguments: {
-                          'flightId': booking.flight.id.toString(),
-                          'adults': adults > 0 ? adults : 1,
-                          'children': children,
-                          'existingBookingId': booking.id,
-                        },
-                      ),
-                      icon: const Icon(Icons.event_seat_outlined, size: 16),
-                      label: const Text('Ubah Kursi'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pushNamed(
-                        '/booking-passenger',
-                        arguments: {
-                          'flightId': booking.flight.id.toString(),
-                          'adults': adults > 0 ? adults : 1,
-                          'children': children,
-                          'selectedSeats': [],
-                          'seatIds': [],
-                          'extraPrice': 0,
-                          'existingBookingId': booking.id,
-                        },
-                      ),
-                      icon: const Icon(Icons.person_outline, size: 16),
-                      label: const Text('Ubah Penumpang'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _payingIds.contains(booking.id)
-                          ? null
-                          : () => _payBooking(booking.id),
-                      icon: _payingIds.contains(booking.id)
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.payment_rounded, size: 16),
+                      onPressed: () => _payBooking(booking),
+                      icon: const Icon(Icons.payment_rounded, size: 16),
                       label: const Text('Bayar Sekarang'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:app_links/app_links.dart';
+import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'utils/app_theme.dart';
@@ -115,6 +117,96 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return const _AppShell();
+  }
+}
+
+class _AppShell extends StatefulWidget {
+  const _AppShell();
+
+  @override
+  State<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<_AppShell> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  AppLinks? _appLinks;
+  StreamSubscription<Uri>? _deepLinkSub;
+  bool _didHandleInitialLink = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    if (kIsWeb) return;
+
+    try {
+      _appLinks = AppLinks();
+
+      if (!_didHandleInitialLink) {
+        final initialUri = await _appLinks!.getInitialLink();
+        if (initialUri != null) {
+          _handleDeepLink(initialUri);
+        }
+        _didHandleInitialLink = true;
+      }
+
+      _deepLinkSub = _appLinks!.uriLinkStream.listen(_handleDeepLink);
+    } catch (_) {
+      // Ignore deep link setup errors so app can continue normally.
+    }
+  }
+
+  @override
+  void dispose() {
+    _deepLinkSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleDeepLink(Uri uri) {
+    final code = (uri.queryParameters['code'] ?? '').trim();
+    final token = (uri.queryParameters['token'] ?? '').trim();
+
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    final fullPath = '/$host$path';
+
+    final isETicketLink = fullPath.contains('/bookings/e-ticket');
+    final isVerifyLink = fullPath.contains('/bookings/verify');
+    final isResetPasswordLink =
+        fullPath.contains('/auth/reset-password') ||
+        path.contains('/reset-password');
+
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+
+    if (isResetPasswordLink) {
+      if (token.isEmpty) return;
+      navigator.pushNamed('/reset-password', arguments: {'token': token});
+      return;
+    }
+
+    if (code.isEmpty) return;
+    final normalizedCode = code.toUpperCase();
+
+    if (isETicketLink) {
+      navigator.pushNamed('/e-ticket', arguments: {'code': normalizedCode});
+      return;
+    }
+
+    if (isVerifyLink) {
+      navigator.pushNamed('/booking-verify', arguments: {'code': normalizedCode});
+      return;
+    }
+
+    navigator.pushNamed('/booking-verify', arguments: {'code': normalizedCode});
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -122,6 +214,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BookingProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: _navigatorKey,
         title: 'SkyIntern - E-Ticketing System',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
@@ -183,6 +276,8 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
       page = const AuthGuard(child: ETicketScreen());
     case '/booking-verify':
       page = const AuthGuard(child: BookingVerifyScreen());
+    case '/reset-password':
+      page = const ResetPasswordScreen();
     case '/login-2fa':
       final rawArg = settings.arguments;
       final args = rawArg is Map
@@ -209,7 +304,10 @@ Route<dynamic>? _buildRoute(RouteSettings settings) {
     default:
       if (settings.name?.startsWith('/reset-password') == true) {
         final uri = Uri.parse(settings.name ?? '');
-        final token = uri.queryParameters['token'];
+        final existingArgs = settings.arguments is Map
+            ? Map<String, dynamic>.from(settings.arguments as Map)
+            : <String, dynamic>{};
+        final token = existingArgs['token']?.toString() ?? uri.queryParameters['token'];
         return _slideRoute(
           const ResetPasswordScreen(),
           RouteSettings(name: settings.name, arguments: {'token': token}),

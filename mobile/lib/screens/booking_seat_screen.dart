@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'dart:async';
 import '../services/seat_service.dart';
 import '../models/seat_model.dart';
 import '../models/flight_model.dart';
@@ -19,7 +20,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
   String? _error;
   bool _isHolding = false;
   bool _isInitialized = false;
-  bool _navigatingForward = false;
+  Timer? _seatRefreshTimer;
 
   late String _flightId;
   late int _adults;
@@ -57,10 +58,8 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
 
   @override
   void dispose() {
-    // Hanya lepas seat jika user navigasi kembali (bukan ke halaman berikutnya)
-    if (!_navigatingForward) {
-      _releaseSelectedSeats();
-    }
+    _seatRefreshTimer?.cancel();
+    _releaseSelectedSeats();
     super.dispose();
   }
 
@@ -72,6 +71,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
           _seats = seats;
           _isLoading = false;
         });
+        _startSeatPolling();
       }
     } catch (e) {
       if (mounted) {
@@ -81,6 +81,20 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
         });
       }
     }
+  }
+
+  void _startSeatPolling() {
+    _seatRefreshTimer?.cancel();
+    _seatRefreshTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      if (!mounted || _isLoading) return;
+      try {
+        final latestSeats = await SeatService.getFlightSeats(_flightId);
+        if (!mounted) return;
+        setState(() {
+          _seats = latestSeats;
+        });
+      } catch (_) {}
+    });
   }
 
   Future<void> _toggleSeat(Seat seat) async {
@@ -118,6 +132,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
     if (_selectedSeatIds.isEmpty) return;
     try {
       await SeatService.releaseSeats(_flightId, _selectedSeatIds.toList());
+      _selectedSeatIds.clear();
     } catch (_) {}
   }
 
@@ -127,19 +142,36 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
     );
   }
 
-  void _handleContinue() {
-    _navigatingForward = true; // jangan lepas seat saat dispose karena navigasi maju
-    final selectedSeats =
-        _seats.where((s) => _selectedSeatIds.contains(s.id)).toList();
+  Future<void> _handleContinue() async {
+    final selectedSeatIds = _selectedSeatIds.toList();
+    final selectedSeats = _seats.where((s) => selectedSeatIds.contains(s.id)).toList();
     final extraPrice =
         selectedSeats.fold(0, (sum, s) => sum + s.additionalPrice);
+
+    // Sesuai requirement: saat keluar dari halaman pilih kursi, kursi langsung dilepas kembali.
+    setState(() => _isHolding = true);
+    try {
+      if (selectedSeatIds.isNotEmpty) {
+        await SeatService.releaseSeats(_flightId, selectedSeatIds);
+      }
+    } catch (_) {
+      // Tetap lanjut agar UX tidak terblokir jika release gagal sesaat.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _selectedSeatIds.clear();
+          _isHolding = false;
+        });
+      }
+    }
+
     final rawArgs = ModalRoute.of(context)?.settings.arguments;
     final args = rawArgs is Map ? Map<String, dynamic>.from(rawArgs) : null;
     Navigator.of(context).pushNamed('/booking-passenger', arguments: {
       'flightId': _flightId,
       'flight': _flight,
       'selectedSeats': selectedSeats,
-      'seatIds': _selectedSeatIds.toList(),
+      'seatIds': selectedSeatIds,
       'extraPrice': extraPrice,
       'adults': _adults,
       'children': _children,

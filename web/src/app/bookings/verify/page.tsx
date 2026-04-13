@@ -56,14 +56,17 @@ function fmtDateEn(iso: string) {
 function VerifyPageContent() {
   const searchParams = useSearchParams();
   const code = searchParams.get("code") ?? "";
+  const shouldOpenApp = searchParams.get("openApp") === "1";
 
   const [result, setResult]   = useState<VerifyBookingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+  const [showOpenAppHint, setShowOpenAppHint] = useState(false);
   const qrValue =
     typeof window !== "undefined"
       ? `${window.location.origin}/bookings/verify?code=${encodeURIComponent(code)}`
       : `/bookings/verify?code=${encodeURIComponent(code)}`;
+  const appLink = `skyintern://bookings/e-ticket?code=${encodeURIComponent(code)}`;
 
   useEffect(() => {
     if (!code) {
@@ -85,6 +88,27 @@ function VerifyPageContent() {
 
     return () => clearTimeout(startTimer);
   }, [code]);
+
+  useEffect(() => {
+    if (!code || !shouldOpenApp || typeof window === "undefined") return;
+
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isMobileDevice = /android|iphone|ipad|ipod/.test(ua);
+    if (!isMobileDevice) return;
+
+    const openTimer = window.setTimeout(() => {
+      window.location.href = appLink;
+    }, 250);
+
+    const hintTimer = window.setTimeout(() => {
+      setShowOpenAppHint(true);
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(openTimer);
+      window.clearTimeout(hintTimer);
+    };
+  }, [code, shouldOpenApp, appLink]);
 
   const booking      = result?.booking;
   const displayedError = error ?? (!code ? "Kode booking tidak ditemukan dalam QR code." : null);
@@ -256,6 +280,20 @@ function VerifyPageContent() {
             </div>
 
             <div className="mx-8 border-t border-gray-200" />
+
+            {showOpenAppHint && (
+              <div className="mx-8 mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs text-blue-800">
+                  Jika aplikasi belum terbuka otomatis, tekan tombol di bawah untuk membuka e-ticket di aplikasi.
+                </p>
+                <a
+                  href={appLink}
+                  className="mt-2 inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                >
+                  Buka di Aplikasi
+                </a>
+              </div>
+            )}
 
             {/* ── Section 3: Tips ── */}
             <div className="grid grid-cols-1 gap-4 px-8 py-5 sm:grid-cols-3">

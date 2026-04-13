@@ -110,6 +110,24 @@ class _BookingVerifyScreenState extends State<BookingVerifyScreen> {
     }
   }
 
+  List<dynamic> _normalizeSeats(Map<String, dynamic> booking) {
+    final seatsRaw = booking['seats'];
+    if (seatsRaw is List) return seatsRaw;
+
+    final selectedSeatsRaw = booking['selectedSeats'];
+    if (selectedSeatsRaw is List) return selectedSeatsRaw;
+
+    if (selectedSeatsRaw is String) {
+      return selectedSeatsRaw
+          .split(',')
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+    }
+
+    return const [];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,8 +179,8 @@ class _BookingVerifyScreenState extends State<BookingVerifyScreen> {
     final status = b['status']?.toString() ?? 'UNKNOWN';
     final bookingCode = b['bookingCode']?.toString() ?? _code;
     final flight = b['flight'] as Map<String, dynamic>?;
-    final passengers = b['passengers'] as List?;
-    final seats = b['seats'] as List? ?? b['selectedSeats'] as List? ?? [];
+    final passengers = b['passengers'] is List ? b['passengers'] as List : const [];
+    final seats = _normalizeSeats(b);
 
     final originCode = flight?['origin']?['code'] ?? '';
     final originCity = flight?['origin']?['city'] ?? '';
