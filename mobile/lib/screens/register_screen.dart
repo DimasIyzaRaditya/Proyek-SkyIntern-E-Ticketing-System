@@ -88,6 +88,22 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: const CustomAppBar(
+        titleWidget: Row(
+          children: [
+            Icon(Icons.flight_rounded, color: Colors.white, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'SkyIntern',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: Stack(
         children: [
           Positioned(
@@ -133,13 +149,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 child: const Icon(Icons.flight_rounded,
                                     size: 36, color: Colors.white),
                               ),
-                              const SizedBox(height: 8),
-                              const Text('SkyIntern',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  )),
                             ],
                           ),
                         ),

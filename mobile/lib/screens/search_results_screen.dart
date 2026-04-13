@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/flight_provider.dart';
+import '../services/promo_service.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 
@@ -14,11 +15,129 @@ class SearchResultsScreen extends StatefulWidget {
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
   String _sortBy = 'price-low';
   Map<String, dynamic>? _args;
+  bool _isLoadingPromos = false;
+  List<PromoItem> _promos = const [];
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _args ??= ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (_promos.isEmpty && !_isLoadingPromos) {
+      _loadPromos();
+    }
+  }
+
+  Future<void> _loadPromos() async {
+    setState(() => _isLoadingPromos = true);
+    try {
+      final promos = await PromoService.getActivePromos();
+      if (!mounted) return;
+      setState(() => _promos = promos);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _promos = const []);
+    } finally {
+      if (mounted) setState(() => _isLoadingPromos = false);
+    }
+  }
+
+  Future<int?> _pickPromoForFlight(String flightId) async {
+    final applicable = _promos
+        .where((p) => !p.isFlightPromo || p.flightId == flightId)
+        .toList()
+      ..sort((a, b) => b.discount.compareTo(a.discount));
+
+    if (applicable.isEmpty) return null;
+
+    int? selectedPromoId;
+    final picked = await showModalBottomSheet<int?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Pilih Promo',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Pilih promo sebelum melihat detail penerbangan',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 10),
+                  RadioListTile<int?>(
+                    value: null,
+                    groupValue: selectedPromoId,
+                    onChanged: (value) => setModalState(() => selectedPromoId = value),
+                    title: const Text('Tanpa Promo'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  ...applicable.map(
+                    (promo) => RadioListTile<int?>(
+                      value: promo.id,
+                      groupValue: selectedPromoId,
+                      onChanged: (value) => setModalState(() => selectedPromoId = value),
+                      title: Text('${promo.title} (${promo.discount}%)'),
+                      subtitle: promo.sourceLabel != null
+                          ? Text(
+                              promo.sourceLabel!,
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, selectedPromoId),
+                      child: const Text('Lanjut ke Detail'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    return picked;
+  }
+
+  Future<void> _openFlightDetail(BuildContext ctx, dynamic flightId) async {
+    final flightIdStr = flightId.toString();
+    final selectedPromoId = _isLoadingPromos
+        ? null
+        : await _pickPromoForFlight(flightIdStr);
+
+    if (!mounted) return;
+
+    Navigator.of(ctx).pushNamed(
+      '/flight-detail',
+      arguments: {
+        'flightId': flightId,
+        'origin': _args?['origin'] ?? '',
+        'destination': _args?['destination'] ?? '',
+        'adults': _args?['adults'] ?? 1,
+        'children': _args?['children'] ?? 0,
+        'promoId': selectedPromoId,
+      },
+    );
   }
 
   final _sortOptions = [
@@ -173,16 +292,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                       destination: f.destination,
                                       price: f.price,
                                       facilities: f.facilities,
-                                      onTap: () => Navigator.of(ctx).pushNamed(
-                                        '/flight-detail',
-                                        arguments: {
-                                          'flightId': f.id,
-                                          'origin': _args?['origin'] ?? '',
-                                          'destination': _args?['destination'] ?? '',
-                                          'adults': _args?['adults'] ?? 1,
-                                          'children': _args?['children'] ?? 0,
-                                        },
-                                      ),
+                                      onTap: () => _openFlightDetail(ctx, f.id),
                                     ),
                                   );
                                 },

@@ -474,7 +474,6 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 600;
-    final topInset = MediaQuery.of(context).padding.top;
     final originAirport =
         originCode != null ? airports.where((a) => a.code == originCode).firstOrNull : null;
     final destinationAirport =
@@ -488,6 +487,61 @@ class _SearchScreenState extends State<SearchScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FB),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0C3B7E), Color(0xFF1D4E9B)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x1F1F3A5F),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: Row(
+              children: const [
+                Icon(Icons.airplanemode_active_rounded,
+                    color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'SkyIntern',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              Container(
+                width: 44,
+                height: 44,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white54),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: InkWell(
+                  onTap: _openMobileMenu,
+                  borderRadius: BorderRadius.circular(14),
+                  child: const Icon(Icons.menu_rounded, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.pushNamed(context, '/chatbot'),
         backgroundColor: const Color(0xFF3B5BFF),
@@ -501,7 +555,7 @@ class _SearchScreenState extends State<SearchScreen>
             Container(
               padding: EdgeInsets.fromLTRB(
                 isWide ? 34 : 16,
-                topInset + (isWide ? 18 : 16),
+                isWide ? 18 : 16,
                 isWide ? 34 : 16,
                 26,
               ),
@@ -514,36 +568,7 @@ class _SearchScreenState extends State<SearchScreen>
               ),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.airplanemode_active_rounded, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'SkyIntern',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white54),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: InkWell(
-                          onTap: _openMobileMenu,
-                          borderRadius: BorderRadius.circular(14),
-                          child: const Icon(Icons.menu_rounded, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
                     decoration: BoxDecoration(

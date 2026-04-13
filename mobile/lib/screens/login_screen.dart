@@ -118,6 +118,22 @@ class _LoginScreenState extends State<LoginScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: const CustomAppBar(
+        titleWidget: Row(
+          children: [
+            Icon(Icons.flight_rounded, color: Colors.white, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'SkyIntern',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: Stack(
         children: [
           // Sky gradient background header
@@ -168,16 +184,6 @@ class _LoginScreenState extends State<LoginScreen>
                                     size: 48, color: Colors.white),
                               ),
                               const SizedBox(height: 12),
-                              const Text(
-                                'SkyIntern',
-                                style: TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
                               Text(
                                 'E-Ticketing System',
                                 style: TextStyle(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/flight_model.dart';
 import '../services/booking_service.dart';
+import '../services/promo_service.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../utils/formatters.dart';
@@ -38,6 +39,19 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   int _totalPrice = 0;
   int _flightId = 0;
 
+  // Pricing breakdown
+  int _baseFare = 0;
+  int _seatExtraPrice = 0;
+  int _tax = 0;
+  int _adminFee = 0;
+  int _subTotal = 0;
+  int _discountPercent = 0;
+  int _discountAmount = 0;
+
+  List<PromoItem> _applicablePromos = const [];
+  bool _isLoadingPromos = false;
+  int? _selectedPromoId;
+
   // Countdown timer
   static const int _countdownSeconds = 15 * 60; // Fallback 15 minutes
   int _remainingSeconds = _countdownSeconds;
@@ -58,10 +72,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _seatIds = List<int>.from(args['seatIds'] ?? []);
       _totalPrice = (args['totalPrice'] as int?) ?? 0;
       _existingBookingId = args['existingBookingId'] as int?;
+      _selectedPromoId = args['promoId'] as int?;
       if (_existingBookingId != null) {
         _bookingId = _existingBookingId;
       }
     }
+    _recalculatePricingFallback();
+    _loadApplicablePromos();
     _bootstrapPaymentFlow();
   }
 
@@ -115,31 +132,14 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             .toList();
         _flight = _buildFlightFromBookingDetail(booking);
         _flightId = (booking['flightId'] as num?)?.toInt() ?? _flightId;
+        _applyPricingFromBookingDetail(booking);
         final expiresAtRaw = booking['expiresAt']?.toString();
         _expiresAt = expiresAtRaw != null ? DateTime.tryParse(expiresAtRaw)?.toLocal() : null;
       } else {
-        final bookingResult = await BookingService.createBooking(
-          flightId: _flightId,
-          passengers: _passengers,
-          seatIds: _seatIds.isNotEmpty ? _seatIds : null,
-        );
-
-        final booking = bookingResult['booking'] as Map<String, dynamic>?;
-        final bookingId = booking?['id'] as int? ?? bookingResult['id'] as int?;
-        if (bookingId == null) throw Exception('Gagal membuat pemesanan');
-
-        _bookingId = bookingId;
-        _bookingStatus = (booking?['status'] ?? 'PENDING').toString().toUpperCase();
-        _totalPrice = (booking?['totalPrice'] as num?)?.toInt() ?? _totalPrice;
-        final expiresAtRaw = booking?['expiresAt']?.toString();
-        _expiresAt = expiresAtRaw != null ? DateTime.tryParse(expiresAtRaw)?.toLocal() : DateTime.now().add(const Duration(minutes: 15));
-      }
-
-      _remainingSeconds = _calculateRemainingSeconds();
-      if (_remainingSeconds <= 0 || _bookingStatus == 'CANCELLED' || _bookingStatus == 'EXPIRED') {
-        _handleExpired();
-      } else {
-        _startCountdown();
+        // Untuk booking baru: tunggu user memilih promo lalu klik Bayar Sekarang.
+        _bookingStatus = 'DRAFT';
+        _expiresAt = null;
+        _remainingSeconds = _countdownSeconds;
       }
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -147,6 +147,42 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       if (mounted) {
         setState(() => _isPreparingBooking = false);
       }
+    }
+  }
+
+  Future<void> _loadApplicablePromos() async {
+    setState(() => _isLoadingPromos = true);
+    try {
+      final promos = await PromoService.getActivePromos();
+      final currentFlightId = _flightId > 0
+          ? _flightId.toString()
+          : (_flight?.id ?? '').toString();
+
+      final filtered = promos.where((promo) {
+        if (!promo.isFlightPromo) return true;
+        return promo.flightId == currentFlightId;
+      }).toList()
+        ..sort((a, b) => b.discount.compareTo(a.discount));
+
+      if (!mounted) return;
+      setState(() {
+        _applicablePromos = filtered;
+        final selectedStillValid =
+            _selectedPromoId == null || filtered.any((p) => p.id == _selectedPromoId);
+        if (!selectedStillValid) {
+          _selectedPromoId = null;
+        }
+        _recalculatePricingFallback();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _applicablePromos = const [];
+        _selectedPromoId = null;
+        _recalculatePricingFallback();
+      });
+    } finally {
+      if (mounted) setState(() => _isLoadingPromos = false);
     }
   }
 
@@ -183,9 +219,83 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       departureTime: DateFormatter.formatTime(departureRaw),
       arrivalTime: DateFormatter.formatTime(arrivalRaw),
       duration: _durationText(),
-      price: (booking['totalPrice'] as num?)?.toInt() ?? 0,
+      price: (f['basePrice'] as num?)?.toInt() ?? 0,
       facilities: const [],
     );
+  }
+
+  void _recalculatePricingFallback() {
+    final passengerCount = _passengers.isEmpty ? 1 : _passengers.length;
+    final baseUnit = _flight?.price ?? 0;
+    _baseFare = baseUnit * passengerCount;
+    _subTotal = _baseFare + _seatExtraPrice + _tax + _adminFee;
+
+    // Selama booking belum dibuat, tampilkan estimasi diskon berdasarkan promo yang dipilih user.
+    if (_bookingId == null) {
+      final selectedPromo = _applicablePromos
+          .where((promo) => promo.id == _selectedPromoId)
+          .firstOrNull;
+      _discountPercent = selectedPromo?.discount ?? 0;
+      _discountAmount = ((_subTotal * _discountPercent) / 100).round();
+    }
+
+    if (_subTotal > 0 && _discountAmount > _subTotal) {
+      _discountAmount = _subTotal;
+    }
+    _totalPrice = _subTotal - _discountAmount;
+  }
+
+  void _applyPricingFromBookingDetail(Map<String, dynamic> booking) {
+    final flight = Map<String, dynamic>.from((booking['flight'] as Map?) ?? const {});
+    final passengerCount =
+        ((booking['passengers'] as List?)?.length ?? _passengers.length).clamp(1, 9999);
+    final basePrice = (flight['basePrice'] as num?)?.toInt() ?? (_flight?.price ?? 0);
+    final tax = (flight['tax'] as num?)?.toInt() ?? 0;
+    final adminFee = (flight['adminFee'] as num?)?.toInt() ?? 0;
+
+    final seatExtraPrice = ((booking['flightSeats'] as List?) ?? const [])
+        .whereType<Map>()
+        .fold<int>(
+          0,
+          (sum, item) =>
+              sum + ((item['additionalPrice'] as num?)?.toInt() ?? 0),
+        );
+
+    _baseFare = basePrice * passengerCount;
+    _seatExtraPrice = seatExtraPrice;
+    _tax = tax;
+    _adminFee = adminFee;
+    _subTotal = _baseFare + _seatExtraPrice + _tax + _adminFee;
+    _discountAmount = (_subTotal - _totalPrice).clamp(0, _subTotal);
+    _discountPercent = _subTotal > 0
+        ? ((_discountAmount * 100) / _subTotal).round()
+        : 0;
+    _totalPrice = (booking['totalPrice'] as num?)?.toInt() ?? _totalPrice;
+  }
+
+  void _applyPricingFromCreateBookingResponse(Map<String, dynamic> response) {
+    final booking = Map<String, dynamic>.from((response['booking'] as Map?) ?? const {});
+    final pricing = Map<String, dynamic>.from((response['pricing'] as Map?) ?? const {});
+    final flight = Map<String, dynamic>.from((booking['flight'] as Map?) ?? const {});
+
+    final passengerCount =
+        ((booking['passengers'] as List?)?.length ?? _passengers.length).clamp(1, 9999);
+    final basePrice = (flight['basePrice'] as num?)?.toInt() ?? (_flight?.price ?? 0);
+
+    _flight = _buildFlightFromBookingDetail(booking);
+    _baseFare = basePrice * passengerCount;
+    _tax = (flight['tax'] as num?)?.toInt() ?? 0;
+    _adminFee = (flight['adminFee'] as num?)?.toInt() ?? 0;
+
+    final rawTotal = (pricing['rawTotalPrice'] as num?)?.toInt();
+    _seatExtraPrice = rawTotal != null
+        ? (rawTotal - _baseFare - _tax - _adminFee).clamp(0, 1 << 30)
+        : _seatExtraPrice;
+    _subTotal = rawTotal ?? (_baseFare + _seatExtraPrice + _tax + _adminFee);
+
+    _discountPercent = (pricing['discountPercent'] as num?)?.toInt() ?? 0;
+    _discountAmount = (pricing['promoAmount'] as num?)?.toInt() ?? 0;
+    _totalPrice = (pricing['totalPrice'] as num?)?.toInt() ?? _totalPrice;
   }
 
   Future<void> _handleExpired() async {
@@ -218,9 +328,37 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _error = null;
     });
     try {
-      final bookingId = _bookingId;
+      int? bookingId = _bookingId;
+
       if (bookingId == null) {
-        throw Exception('Booking belum siap. Coba lagi.');
+        final bookingResult = await BookingService.createBooking(
+          flightId: _flightId,
+          passengers: _passengers,
+          seatIds: _seatIds.isNotEmpty ? _seatIds : null,
+          promoId: _selectedPromoId,
+        );
+
+        final booking = bookingResult['booking'] as Map<String, dynamic>?;
+        bookingId = booking?['id'] as int? ?? bookingResult['id'] as int?;
+        if (bookingId == null) throw Exception('Gagal membuat pemesanan');
+
+        _bookingId = bookingId;
+        _bookingStatus = (booking?['status'] ?? 'PENDING').toString().toUpperCase();
+        _totalPrice = (booking?['totalPrice'] as num?)?.toInt() ?? _totalPrice;
+        _applyPricingFromCreateBookingResponse(bookingResult);
+
+        final expiresAtRaw = booking?['expiresAt']?.toString();
+        _expiresAt = expiresAtRaw != null
+            ? DateTime.tryParse(expiresAtRaw)?.toLocal()
+            : DateTime.now().add(const Duration(minutes: 15));
+        _remainingSeconds = _calculateRemainingSeconds();
+        if (_remainingSeconds <= 0 ||
+            _bookingStatus == 'CANCELLED' ||
+            _bookingStatus == 'EXPIRED') {
+          await _handleExpired();
+          throw Exception('Waktu booking habis. Silakan coba lagi.');
+        }
+        _startCountdown();
       }
 
       final paymentResult = await BookingService.createPayment(bookingId);
@@ -445,33 +583,34 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   ),
             title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _remainingSeconds <= 60
-                          ? AppColors.error.withValues(alpha: 0.2)
-                          : Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.timer_rounded, size: 14,
-                            color: _remainingSeconds <= 60 ? AppColors.error : Colors.white),
-                        const SizedBox(width: 4),
-                        Text(_formatCountdown(),
-                            style: TextStyle(
-                                color: _remainingSeconds <= 60 ? AppColors.error : Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13)),
-                      ],
+              if (_bookingId != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _remainingSeconds <= 60
+                            ? AppColors.error.withValues(alpha: 0.2)
+                            : Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.timer_rounded, size: 14,
+                              color: _remainingSeconds <= 60 ? AppColors.error : Colors.white),
+                          const SizedBox(width: 4),
+                          Text(_formatCountdown(),
+                              style: TextStyle(
+                                  color: _remainingSeconds <= 60 ? AppColors.error : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -485,7 +624,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Countdown warning
-                  if (_remainingSeconds <= 60 && !_isExpired)
+                  if (_bookingId != null && _remainingSeconds <= 60 && !_isExpired)
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
@@ -508,6 +647,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                       ),
                     ),
                   if (_flight != null) _buildFlightSummary(),
+                  const SizedBox(height: 16),
+                  _buildPromoSelector(),
                   const SizedBox(height: 16),
                   _buildPassengerSummary(),
                   const SizedBox(height: 16),
@@ -554,10 +695,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: _isCancelling ? null : _cancelPendingBooking,
+                        onPressed: _isCancelling
+                            ? null
+                            : (_bookingId == null
+                                ? () => Navigator.pop(context)
+                                : _cancelPendingBooking),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Text(_isCancelling ? 'Membatalkan...' : 'Cancel'),
+                          child: Text(_isCancelling
+                              ? 'Membatalkan...'
+                              : (_bookingId == null ? 'Kembali' : 'Cancel')),
                         ),
                       ),
                     ),
@@ -579,6 +726,68 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPromoSelector() {
+    final promoLocked = _bookingId != null;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Promo',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            if (_isLoadingPromos)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: LinearProgressIndicator(minHeight: 4),
+              )
+            else if (_applicablePromos.isEmpty)
+              const Text(
+                'Belum ada promo yang berlaku untuk penerbangan ini.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              )
+            else
+              DropdownButtonFormField<int?>(
+                initialValue: _selectedPromoId,
+                decoration: const InputDecoration(
+                  labelText: 'Pilih Promo',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: AppColors.surfaceVariant,
+                ),
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Tanpa Promo'),
+                  ),
+                  ..._applicablePromos.map((p) => DropdownMenuItem<int?>(
+                        value: p.id,
+                        child: Text('${p.title} - ${p.discount}%'),
+                      )),
+                ],
+                onChanged: promoLocked
+                    ? null
+                    : (value) => setState(() {
+                        _selectedPromoId = value;
+                        _recalculatePricingFallback();
+                      }),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              promoLocked
+                  ? 'Promo dikunci karena booking sudah dibuat.'
+                  : 'Pilih promo sebelum menekan Bayar Sekarang.',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -685,6 +894,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   }
 
   Widget _buildPriceSummary() {
+    final discountLabel = _discountPercent > 0
+        ? 'Potongan Promo ($_discountPercent%)'
+        : 'Potongan Promo';
+
     return Card(
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -698,6 +911,36 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 style: TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
+            _buildPriceRow(
+              'Harga Dasar (${_passengers.length} penumpang)',
+              CurrencyFormatter.formatPrice(_baseFare),
+            ),
+            _buildPriceRow(
+              'Biaya Kursi',
+              CurrencyFormatter.formatPrice(_seatExtraPrice),
+            ),
+            _buildPriceRow(
+              'Pajak',
+              CurrencyFormatter.formatPrice(_tax),
+            ),
+            _buildPriceRow(
+              'Biaya Layanan',
+              CurrencyFormatter.formatPrice(_adminFee),
+            ),
+            const Divider(height: 24),
+            _buildPriceRow(
+              'Subtotal',
+              CurrencyFormatter.formatPrice(_subTotal),
+              isBold: true,
+            ),
+            _buildPriceRow(
+              discountLabel,
+              '- ${CurrencyFormatter.formatPrice(_discountAmount)}',
+              valueColor: _discountAmount > 0
+                  ? AppColors.success
+                  : AppColors.textSecondary,
+            ),
+            const Divider(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -715,6 +958,41 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? valueColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              color: valueColor ?? AppColors.textPrimary,
+              fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

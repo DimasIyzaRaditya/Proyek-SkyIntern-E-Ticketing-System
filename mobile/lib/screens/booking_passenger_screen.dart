@@ -28,6 +28,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   FlightCardItem? _flight;
   String _flightId = '';
   int? _existingBookingId;
+  int? _promoId;
 
   final TextEditingController _firstNameCtrl = TextEditingController();
   final TextEditingController _lastNameCtrl = TextEditingController();
@@ -57,6 +58,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     _seatIds = List<int>.from((args['seatIds'] as List?) ?? []);
     _extraPrice = (args['extraPrice'] as int?) ?? 0;
     _existingBookingId = args['existingBookingId'] as int?;
+    _promoId = args['promoId'] as int?;
 
     final user = context.read<AuthProvider>().user;
     final nameParts = user?.fullName.split(' ') ?? [''];
@@ -120,6 +122,7 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
       'passengers': passengers,
       'seatIds': _seatIds,
       'totalPrice': totalPrice,
+      if (_promoId != null) 'promoId': _promoId,
       if (_existingBookingId != null) 'existingBookingId': _existingBookingId,
     });
   }

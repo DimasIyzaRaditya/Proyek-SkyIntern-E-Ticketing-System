@@ -27,6 +27,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
   late int _children;
   FlightCardItem? _flight;
   int? _existingBookingId;
+  int? _promoId;
 
   int get _totalPassengers => _adults + _children;
   String get _flightCode =>
@@ -47,6 +48,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
       _children = (args['children'] as int?) ?? 0;
       _flight = args['flight'] as FlightCardItem?;
       _existingBookingId = args['existingBookingId'] as int?;
+      _promoId = args['promoId'] as int?;
       _loadSeats();
     } else {
       setState(() {
@@ -177,6 +179,7 @@ class _BookingSeatScreenState extends State<BookingSeatScreen> {
       'children': _children,
       'origin': args?['origin'] ?? '',
       'destination': args?['destination'] ?? '',
+      if (_promoId != null) 'promoId': _promoId,
       if (_existingBookingId != null) 'existingBookingId': _existingBookingId,
     });
   }

@@ -32,6 +32,7 @@ class BookingService {
     required int flightId,
     required List<Map<String, dynamic>> passengers,
     List<int>? seatIds,
+    int? promoId,
   }) async {
     return await ApiClient.post(
       '/api/bookings',
@@ -39,6 +40,7 @@ class BookingService {
         'flightId': flightId,
         'passengers': passengers,
         if (seatIds != null) 'seatIds': seatIds,
+        if (promoId != null) 'promoId': promoId,
       },
       requireAuth: true,
     );

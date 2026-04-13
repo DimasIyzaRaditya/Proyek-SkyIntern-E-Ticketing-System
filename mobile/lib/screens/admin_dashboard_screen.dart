@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/mobile_side_menu.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -69,7 +70,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           child: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
+            leading: IconButton(
+              icon: const Icon(Icons.menu_rounded, color: Colors.white),
+              tooltip: 'Menu',
+              onPressed: () => MobileSideMenu.show(
+                context,
+                activeItem: 'Admin Dashboard',
+              ),
+            ),
             title: const Text('Admin Panel',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             actions: [
