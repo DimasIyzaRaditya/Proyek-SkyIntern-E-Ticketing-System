@@ -924,23 +924,6 @@ class _SearchScreenState extends State<SearchScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Domestic Flight Best Deals for You',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                  ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: const [
-                        _DealTab(label: 'Lampung', active: true),
-                        SizedBox(width: 10),
-                        _DealTab(label: 'Jawa Selatan'),
-                        SizedBox(width: 10),
-                        _DealTab(label: 'Malang'),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   _buildPromoSection(isWide),
                 ],

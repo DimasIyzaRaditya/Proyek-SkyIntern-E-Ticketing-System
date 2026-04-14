@@ -132,9 +132,10 @@ const INTL_ROUTES: RouteTemplate[] = [
   { fromCity: "Kuala Lumpur",  toCity: "Medan",         airlineCode: "MH", flightPrefix: "MH-721", durationMin: 50,  basePrice: 750000,  tax: 75000,  adminFee: 15000, departureHours: [11, 15, 19] },
 ]
 
-// ── How many days to generate (from epoch start) ──────────────────────────────
-const START_DATE = new Date("2026-03-10T00:00:00.000Z")
-const DAYS_TO_GENERATE = 45  // generate flights for 45 days
+// ── Generate daily flights for April and May 2026 ─────────────────────────────
+const START_DATE = new Date("2026-04-01T00:00:00.000Z")
+const END_DATE = new Date("2026-05-31T00:00:00.000Z")
+const DAYS_TO_GENERATE = Math.floor((END_DATE.getTime() - START_DATE.getTime()) / 86400000) + 1
 
 async function main() {
   console.log("🛫  Seeding flights...")
