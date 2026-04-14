@@ -135,6 +135,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         'destination': _args?['destination'] ?? '',
         'adults': _args?['adults'] ?? 1,
         'children': _args?['children'] ?? 0,
+        'infants': _args?['infants'] ?? 0,
         'promoId': selectedPromoId,
       },
     );
@@ -285,6 +286,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                     child: FlightCard(
                                       flightNumber: f.flightNumber,
                                       airline: f.airline,
+                                      airlineLogo: f.logo,
                                       departureTime: f.departureTime,
                                       arrivalTime: f.arrivalTime,
                                       duration: f.duration,

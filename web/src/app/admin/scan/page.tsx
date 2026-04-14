@@ -148,7 +148,7 @@ export default function AdminScanPage() {
   return (
     <AdminShell
       title="Scan QR E-Ticket"
-      description="Arahkan kamera ke QR e-ticket. Setelah kode terbaca, halaman verifikasi booking akan terbuka otomatis."
+      description="Arahkan kamera ke QR E-Ticket. Setelah kode terbaca, halaman verifikasi booking akan terbuka otomatis."
     >
       <section className="page-enter rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-blue-800">
@@ -171,7 +171,7 @@ export default function AdminScanPage() {
           {scanState === "running" && (
             <p className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
               <Camera className="h-4 w-4" />
-              Kamera aktif. Arahkan ke QR code e-ticket.
+              Kamera aktif. Arahkan ke QR code E-Ticket.
             </p>
           )}
 

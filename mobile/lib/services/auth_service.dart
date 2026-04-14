@@ -40,10 +40,7 @@ class AuthService {
   }) async {
     final loginResponse = await ApiClient.post(
       '/api/auth/login',
-      body: {
-        'email': email,
-        'password': password,
-      },
+      body: {'email': email, 'password': password},
     );
 
     final needsTwoFactor = loginResponse['requiresTwoFactor'] == true;
@@ -71,10 +68,7 @@ class AuthService {
   }) async {
     final verifyResponse = await ApiClient.post(
       '/api/auth/login/2fa/verify',
-      body: {
-        'twoFactorToken': twoFactorToken,
-        'code': code,
-      },
+      body: {'twoFactorToken': twoFactorToken, 'code': code},
     );
 
     final token = verifyResponse['token'] as String?;
@@ -125,12 +119,16 @@ class AuthService {
   static Future<UserSession> updateProfile({
     String? name,
     String? phone,
+    String? nik,
+    String? dateOfBirth,
   }) async {
     final response = await ApiClient.put(
       '/api/auth/profile',
       body: {
         if (name != null) 'name': name,
         if (phone != null) 'phone': phone,
+        if (nik != null) 'nik': nik,
+        if (dateOfBirth != null) 'dateOfBirth': dateOfBirth,
       },
       requireAuth: true,
     );
@@ -151,17 +149,18 @@ class AuthService {
       throw Exception('Sesi login tidak valid. Silakan login kembali.');
     }
 
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiClient.baseUrl}/api/auth/avatar'),
-    )
-      ..headers['Authorization'] = 'Bearer $token'
-      ..headers['X-Platform'] = 'mobile';
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse('${ApiClient.baseUrl}/api/auth/avatar'),
+          )
+          ..headers['Authorization'] = 'Bearer $token'
+          ..headers['X-Platform'] = 'mobile';
 
     final mimeParts = mimeType.split('/');
     final mediaType = mimeParts.length == 2
         ? MediaType(mimeParts[0], mimeParts[1])
-      : MediaType('image', 'jpeg');
+        : MediaType('image', 'jpeg');
 
     request.files.add(
       http.MultipartFile.fromBytes(
@@ -201,10 +200,7 @@ class AuthService {
   }
 
   static Future<void> forgotPassword({required String email}) async {
-    await ApiClient.post(
-      '/api/auth/forgot-password',
-      body: {'email': email},
-    );
+    await ApiClient.post('/api/auth/forgot-password', body: {'email': email});
   }
 
   static Future<void> resetPassword({
@@ -213,10 +209,7 @@ class AuthService {
   }) async {
     await ApiClient.post(
       '/api/auth/reset-password',
-      body: {
-        'resetToken': resetToken,
-        'newPassword': newPassword,
-      },
+      body: {'resetToken': resetToken, 'newPassword': newPassword},
     );
   }
 }

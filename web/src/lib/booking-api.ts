@@ -20,6 +20,7 @@ type BackendBooking = {
     adminFee?: number;
     airline: {
       name: string;
+      logo?: string | null;
     };
     origin: {
       code?: string;
@@ -67,7 +68,7 @@ export const getMyBookingsFromApi = async () => {
 };
 
 export type PassengerPayload = {
-  type: "ADULT" | "CHILD";
+  type: "ADULT" | "CHILD" | "INFANT";
   title: string;
   firstName: string;
   lastName: string;
@@ -149,7 +150,7 @@ export type VerifyBookingResult = {
       flightNumber: string;
       departureTime: string;
       arrivalTime: string;
-      airline: { name: string };
+      airline: { name: string; logo?: string | null };
       origin: { city: string; country: string };
       destination: { city: string; country: string };
     };

@@ -67,9 +67,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     if (args != null) {
       _flightId = (args['flightId'] as int?) ?? 0;
       _flight = args['flight'] as FlightCardItem?;
-      _passengers =
-          List<Map<String, dynamic>>.from(args['passengers'] ?? []);
+      _passengers = List<Map<String, dynamic>>.from(args['passengers'] ?? []);
       _seatIds = List<int>.from(args['seatIds'] ?? []);
+      _seatExtraPrice = (args['extraPrice'] as int?) ?? 0;
+      _tax = _flight?.tax ?? 0;
+      _adminFee = _flight?.adminFee ?? 0;
       _totalPrice = (args['totalPrice'] as int?) ?? 0;
       _existingBookingId = args['existingBookingId'] as int?;
       _selectedPromoId = args['promoId'] as int?;
@@ -119,12 +121,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
     try {
       if (_existingBookingId != null) {
-        final detail = await BookingService.getBookingDetail(_existingBookingId!);
+        final detail = await BookingService.getBookingDetail(
+          _existingBookingId!,
+        );
         final booking = detail['booking'] as Map<String, dynamic>?;
         if (booking == null) throw Exception('Booking tidak ditemukan');
 
         _bookingId = booking['id'] as int? ?? _existingBookingId;
-        _bookingStatus = (booking['status'] ?? 'PENDING').toString().toUpperCase();
+        _bookingStatus = (booking['status'] ?? 'PENDING')
+            .toString()
+            .toUpperCase();
         _totalPrice = (booking['totalPrice'] as num?)?.toInt() ?? _totalPrice;
         _passengers = (booking['passengers'] as List? ?? const [])
             .whereType<Map>()
@@ -134,7 +140,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         _flightId = (booking['flightId'] as num?)?.toInt() ?? _flightId;
         _applyPricingFromBookingDetail(booking);
         final expiresAtRaw = booking['expiresAt']?.toString();
-        _expiresAt = expiresAtRaw != null ? DateTime.tryParse(expiresAtRaw)?.toLocal() : null;
+        _expiresAt = expiresAtRaw != null
+            ? DateTime.tryParse(expiresAtRaw)?.toLocal()
+            : null;
       } else {
         // Untuk booking baru: tunggu user memilih promo lalu klik Bayar Sekarang.
         _bookingStatus = 'DRAFT';
@@ -161,14 +169,14 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       final filtered = promos.where((promo) {
         if (!promo.isFlightPromo) return true;
         return promo.flightId == currentFlightId;
-      }).toList()
-        ..sort((a, b) => b.discount.compareTo(a.discount));
+      }).toList()..sort((a, b) => b.discount.compareTo(a.discount));
 
       if (!mounted) return;
       setState(() {
         _applicablePromos = filtered;
         final selectedStillValid =
-            _selectedPromoId == null || filtered.any((p) => p.id == _selectedPromoId);
+            _selectedPromoId == null ||
+            filtered.any((p) => p.id == _selectedPromoId);
         if (!selectedStillValid) {
           _selectedPromoId = null;
         }
@@ -191,8 +199,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     if (flight is! Map) return _flight;
     final f = Map<String, dynamic>.from(flight);
     final origin = Map<String, dynamic>.from((f['origin'] as Map?) ?? const {});
-    final destination = Map<String, dynamic>.from((f['destination'] as Map?) ?? const {});
-    final airline = Map<String, dynamic>.from((f['airline'] as Map?) ?? const {});
+    final destination = Map<String, dynamic>.from(
+      (f['destination'] as Map?) ?? const {},
+    );
+    final airline = Map<String, dynamic>.from(
+      (f['airline'] as Map?) ?? const {},
+    );
 
     final departureRaw = f['departureTime']?.toString();
     final arrivalRaw = f['arrivalTime']?.toString();
@@ -220,6 +232,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       arrivalTime: DateFormatter.formatTime(arrivalRaw),
       duration: _durationText(),
       price: (f['basePrice'] as num?)?.toInt() ?? 0,
+      tax: (f['tax'] as num?)?.toInt() ?? 0,
+      adminFee: (f['adminFee'] as num?)?.toInt() ?? 0,
       facilities: const [],
     );
   }
@@ -246,10 +260,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   }
 
   void _applyPricingFromBookingDetail(Map<String, dynamic> booking) {
-    final flight = Map<String, dynamic>.from((booking['flight'] as Map?) ?? const {});
+    final flight = Map<String, dynamic>.from(
+      (booking['flight'] as Map?) ?? const {},
+    );
     final passengerCount =
-        ((booking['passengers'] as List?)?.length ?? _passengers.length).clamp(1, 9999);
-    final basePrice = (flight['basePrice'] as num?)?.toInt() ?? (_flight?.price ?? 0);
+        ((booking['passengers'] as List?)?.length ?? _passengers.length).clamp(
+          1,
+          9999,
+        );
+    final basePrice =
+        (flight['basePrice'] as num?)?.toInt() ?? (_flight?.price ?? 0);
     final tax = (flight['tax'] as num?)?.toInt() ?? 0;
     final adminFee = (flight['adminFee'] as num?)?.toInt() ?? 0;
 
@@ -274,13 +294,23 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   }
 
   void _applyPricingFromCreateBookingResponse(Map<String, dynamic> response) {
-    final booking = Map<String, dynamic>.from((response['booking'] as Map?) ?? const {});
-    final pricing = Map<String, dynamic>.from((response['pricing'] as Map?) ?? const {});
-    final flight = Map<String, dynamic>.from((booking['flight'] as Map?) ?? const {});
+    final booking = Map<String, dynamic>.from(
+      (response['booking'] as Map?) ?? const {},
+    );
+    final pricing = Map<String, dynamic>.from(
+      (response['pricing'] as Map?) ?? const {},
+    );
+    final flight = Map<String, dynamic>.from(
+      (booking['flight'] as Map?) ?? const {},
+    );
 
     final passengerCount =
-        ((booking['passengers'] as List?)?.length ?? _passengers.length).clamp(1, 9999);
-    final basePrice = (flight['basePrice'] as num?)?.toInt() ?? (_flight?.price ?? 0);
+        ((booking['passengers'] as List?)?.length ?? _passengers.length).clamp(
+          1,
+          9999,
+        );
+    final basePrice =
+        (flight['basePrice'] as num?)?.toInt() ?? (_flight?.price ?? 0);
 
     _flight = _buildFlightFromBookingDetail(booking);
     _baseFare = basePrice * passengerCount;
@@ -317,7 +347,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   bool get _supportsEmbeddedPayment {
     if (kIsWeb) return false;
     return switch (defaultTargetPlatform) {
-      TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS => true,
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS => true,
       _ => false,
     };
   }
@@ -343,7 +375,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         if (bookingId == null) throw Exception('Gagal membuat pemesanan');
 
         _bookingId = bookingId;
-        _bookingStatus = (booking?['status'] ?? 'PENDING').toString().toUpperCase();
+        _bookingStatus = (booking?['status'] ?? 'PENDING')
+            .toString()
+            .toUpperCase();
         _totalPrice = (booking?['totalPrice'] as num?)?.toInt() ?? _totalPrice;
         _applyPricingFromCreateBookingResponse(bookingResult);
 
@@ -368,7 +402,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           paymentData?['redirectUrl'] as String? ??
           paymentResult['redirectUrl'] as String? ??
           paymentResult['snap_redirect_url'] as String?;
-      if (redirectUrl == null) throw Exception('Gagal mendapatkan link pembayaran');
+      if (redirectUrl == null)
+        throw Exception('Gagal mendapatkan link pembayaran');
 
       setState(() {
         _bookingId = bookingId;
@@ -412,12 +447,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     if (!_supportsEmbeddedPayment) {
       final opened = await launchUrl(
         uri,
-        mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+        mode: kIsWeb
+            ? LaunchMode.platformDefault
+            : LaunchMode.externalApplication,
       );
       if (!mounted) return;
       if (opened) {
         setState(() => _paymentOpened = true);
-        _showSnack('Halaman pembayaran dibuka di browser karena platform ini tidak mendukung webview in-app.');
+        _showSnack(
+          'Halaman pembayaran dibuka di browser karena platform ini tidak mendukung webview in-app.',
+        );
       } else {
         _showSnack('Tidak dapat membuka halaman pembayaran', isError: true);
       }
@@ -426,7 +465,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
-        builder: (_) => MidtransPaymentWebViewScreen(paymentUrl: uri.toString()),
+        builder: (_) =>
+            MidtransPaymentWebViewScreen(paymentUrl: uri.toString()),
       ),
     );
     if (!mounted) return;
@@ -442,9 +482,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     setState(() => _isSyncing = true);
     try {
       final result = await BookingService.syncPayment(_bookingId!);
-      final status = (result['booking']?['status'] ??
-              result['status'] ??
-              '')
+      final status = (result['booking']?['status'] ?? result['status'] ?? '')
           .toString()
           .toUpperCase();
       if (!mounted) return;
@@ -454,57 +492,75 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         _showSnack('Pembayaran berhasil dikonfirmasi!');
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
-          Navigator.of(context)
-              .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
         }
       } else if (status == 'PENDING') {
         if (navigateToBookingsAfterSync) {
-          _showSnack('Pembayaran masih diproses. Detail booking ada di halaman booking.');
+          _showSnack(
+            'Pembayaran masih diproses. Detail booking ada di halaman booking.',
+          );
           await Future.delayed(const Duration(milliseconds: 600));
           if (mounted) {
-            Navigator.of(context)
-                .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
           }
         } else {
-          showErrorDialog(context, 'Menunggu Pembayaran',
-              'Pembayaran sedang diproses. Silakan cek ulang beberapa saat lagi.');
+          showErrorDialog(
+            context,
+            'Menunggu Pembayaran',
+            'Pembayaran sedang diproses. Silakan cek ulang beberapa saat lagi.',
+          );
         }
       } else if (['CANCELLED', 'EXPIRED', 'FAILED'].contains(status)) {
         if (navigateToBookingsAfterSync) {
-          _showSnack('Pembayaran tidak berhasil. Silakan cek status booking di aplikasi.', isError: true);
+          _showSnack(
+            'Pembayaran tidak berhasil. Silakan cek status booking di aplikasi.',
+            isError: true,
+          );
           await Future.delayed(const Duration(milliseconds: 600));
           if (mounted) {
-            Navigator.of(context)
-                .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
           }
         } else {
-          showErrorDialog(context, 'Pembayaran Gagal',
-              'Pembayaran dibatalkan atau kadaluwarsa. Silakan buat pemesanan baru.');
+          showErrorDialog(
+            context,
+            'Pembayaran Gagal',
+            'Pembayaran dibatalkan atau kadaluwarsa. Silakan buat pemesanan baru.',
+          );
         }
       } else {
         if (navigateToBookingsAfterSync) {
-          Navigator.of(context)
-              .pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/bookings', (r) => r.isFirst);
         } else {
-          showErrorDialog(context, 'Status Tidak Diketahui',
-              'Status: $status. Coba lagi nanti.');
+          showErrorDialog(
+            context,
+            'Status Tidak Diketahui',
+            'Status: $status. Coba lagi nanti.',
+          );
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSyncing = false);
-        _showSnack(
-            e.toString().replaceFirst('Exception: ', ''),
-            isError: true);
+        _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
       }
     }
   }
 
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? AppColors.error : AppColors.success,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? AppColors.error : AppColors.success,
+      ),
+    );
   }
 
   @override
@@ -514,11 +570,19 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Container(
-            decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+            ),
             child: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: const Text(
+                'Pembayaran',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ),
@@ -531,11 +595,19 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Container(
-            decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+            ),
             child: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: const Text(
+                'Pembayaran',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ),
@@ -545,17 +617,29 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.timer_off_rounded, size: 72, color: AppColors.error),
+                const Icon(
+                  Icons.timer_off_rounded,
+                  size: 72,
+                  color: AppColors.error,
+                ),
                 const SizedBox(height: 16),
-                const Text('Sesi Pembayaran Kadaluwarsa',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                const Text(
+                  'Sesi Pembayaran Kadaluwarsa',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 8),
-                const Text('Waktu pembayaran telah habis dan pemesanan Anda otomatis dibatalkan.',
-                    style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
+                const Text(
+                  'Waktu pembayaran telah habis dan pemesanan Anda otomatis dibatalkan.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 24),
                 PrimaryButton(
                   label: 'Kembali ke Beranda',
-                  onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/dashboard', (r) => false),
                 ),
               ],
             ),
@@ -570,7 +654,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x222563EB),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -578,17 +668,29 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             leading: _paymentOpened
                 ? const SizedBox.shrink()
                 : IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
-            title: const Text('Pembayaran', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Pembayaran',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             actions: [
               if (_bookingId != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _remainingSeconds <= 60
                             ? AppColors.error.withValues(alpha: 0.2)
@@ -598,14 +700,24 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.timer_rounded, size: 14,
-                              color: _remainingSeconds <= 60 ? AppColors.error : Colors.white),
+                          Icon(
+                            Icons.timer_rounded,
+                            size: 14,
+                            color: _remainingSeconds <= 60
+                                ? AppColors.error
+                                : Colors.white,
+                          ),
                           const SizedBox(width: 4),
-                          Text(_formatCountdown(),
-                              style: TextStyle(
-                                  color: _remainingSeconds <= 60 ? AppColors.error : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13)),
+                          Text(
+                            _formatCountdown(),
+                            style: TextStyle(
+                              color: _remainingSeconds <= 60
+                                  ? AppColors.error
+                                  : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -624,23 +736,34 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Countdown warning
-                  if (_bookingId != null && _remainingSeconds <= 60 && !_isExpired)
+                  if (_bookingId != null &&
+                      _remainingSeconds <= 60 &&
+                      !_isExpired)
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppColors.error.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.4),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.error,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Kurang dari 1 menit! Segera selesaikan pembayaran.',
-                              style: const TextStyle(color: AppColors.error, fontSize: 13),
+                              style: const TextStyle(
+                                color: AppColors.error,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ],
@@ -660,17 +783,23 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.errorLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline,
-                              color: AppColors.error),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
-                              child: Text(_error!,
-                                  style: const TextStyle(
-                                      color: AppColors.error))),
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -698,13 +827,15 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         onPressed: _isCancelling
                             ? null
                             : (_bookingId == null
-                                ? () => Navigator.pop(context)
-                                : _cancelPendingBooking),
+                                  ? () => Navigator.pop(context)
+                                  : _cancelPendingBooking),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Text(_isCancelling
-                              ? 'Membatalkan...'
-                              : (_bookingId == null ? 'Kembali' : 'Cancel')),
+                          child: Text(
+                            _isCancelling
+                                ? 'Membatalkan...'
+                                : (_bookingId == null ? 'Kembali' : 'Cancel'),
+                          ),
                         ),
                       ),
                     ),
@@ -740,8 +871,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Promo',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Promo',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
             if (_isLoadingPromos)
               const Padding(
@@ -767,10 +900,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     value: null,
                     child: Text('Tanpa Promo'),
                   ),
-                  ..._applicablePromos.map((p) => DropdownMenuItem<int?>(
-                        value: p.id,
-                        child: Text('${p.title} - ${p.discount}%'),
-                      )),
+                  ..._applicablePromos.map(
+                    (p) => DropdownMenuItem<int?>(
+                      value: p.id,
+                      child: Text('${p.title} - ${p.discount}%'),
+                    ),
+                  ),
                 ],
                 onChanged: promoLocked
                     ? null
@@ -784,7 +919,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               promoLocked
                   ? 'Promo dikunci karena booking sudah dibuat.'
                   : 'Pilih promo sebelum menekan Bayar Sekarang.',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -795,16 +933,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   Widget _buildFlightSummary() {
     final f = _flight!;
     return Card(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Detail Penerbangan',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Detail Penerbangan',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -812,34 +950,47 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(f.airline,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold)),
-                      Text(f.flightNumber,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary)),
+                      Text(
+                        f.airline,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        f.flightNumber,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Text(f.departureTime,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(
+                  f.departureTime,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Column(
                     children: [
-                      const Icon(Icons.flight,
-                          size: 16, color: AppColors.primary),
-                      Text(f.duration,
-                          style: const TextStyle(fontSize: 11)),
+                      const Icon(
+                        Icons.flight,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      Text(f.duration, style: const TextStyle(fontSize: 11)),
                     ],
                   ),
                 ),
-                Text(f.arrivalTime,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(
+                  f.arrivalTime,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
               ],
             ),
           ],
@@ -850,43 +1001,51 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
   Widget _buildPassengerSummary() {
     return Card(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Penumpang',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Penumpang',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
-            ..._passengers.map((p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_outline,
-                          size: 18, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text('${p['firstName']} ${p['lastName']}'),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          p['type'] == 'ADULT' ? 'Dewasa' : 'Anak',
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.primary),
+            ..._passengers.map(
+              (p) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.person_outline,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${p['firstName']} ${p['lastName']}'),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        p['type'] == 'ADULT' ? 'Dewasa' : 'Anak',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
                         ),
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -899,17 +1058,17 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         : 'Potongan Promo';
 
     return Card(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: AppColors.surfaceVariant,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Ringkasan Harga',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Ringkasan Harga',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             _buildPriceRow(
               'Harga Dasar (${_passengers.length} penumpang)',
@@ -919,10 +1078,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               'Biaya Kursi',
               CurrencyFormatter.formatPrice(_seatExtraPrice),
             ),
-            _buildPriceRow(
-              'Pajak',
-              CurrencyFormatter.formatPrice(_tax),
-            ),
+            _buildPriceRow('Pajak', CurrencyFormatter.formatPrice(_tax)),
             _buildPriceRow(
               'Biaya Layanan',
               CurrencyFormatter.formatPrice(_adminFee),
@@ -944,15 +1100,17 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total Pembayaran',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Total Pembayaran',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 Text(
                   CurrencyFormatter.formatPrice(_totalPrice),
                   style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryDark),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryDark,
+                  ),
                 ),
               ],
             ),

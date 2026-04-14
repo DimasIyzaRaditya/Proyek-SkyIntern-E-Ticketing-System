@@ -28,10 +28,7 @@ class MobileSideMenu {
                     final isLoggedIn = auth.isAuthenticated;
                     final isAdmin = auth.user?.role == 'admin';
 
-                    Widget navBtn(
-                      String label,
-                      String routeName,
-                    ) {
+                    Widget navBtn(String label, String routeName) {
                       final isActive = label == activeItem;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -72,7 +69,9 @@ class MobileSideMenu {
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: isActive ? Colors.white24 : Colors.transparent,
+                              color: isActive
+                                  ? Colors.white24
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
@@ -177,6 +176,31 @@ class MobileSideMenu {
                             child: isLoggedIn
                                 ? ElevatedButton(
                                     onPressed: () async {
+                                      final shouldLogout =
+                                          await showDialog<bool>(
+                                            context: dialogCtx,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('Keluar'),
+                                              content: const Text(
+                                                'Anda yakin ingin keluar?',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, false),
+                                                  child: const Text('Batal'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, true),
+                                                  child: const Text('Keluar'),
+                                                ),
+                                              ],
+                                            ),
+                                          ) ??
+                                          false;
+
+                                      if (!shouldLogout) return;
                                       await auth.logout();
                                       if (!dialogCtx.mounted) return;
                                       Navigator.pop(dialogCtx);
@@ -189,7 +213,9 @@ class MobileSideMenu {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFFFF0050),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 13,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
                                       ),
@@ -210,7 +236,9 @@ class MobileSideMenu {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF2D7BFF),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 13,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
                                       ),
@@ -235,12 +263,10 @@ class MobileSideMenu {
         );
       },
       transitionBuilder: (_, animation, __, child) {
-        final offset = Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-        );
+        final offset =
+            Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            );
         return SlideTransition(position: offset, child: child);
       },
     );

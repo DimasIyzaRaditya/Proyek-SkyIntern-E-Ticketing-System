@@ -19,6 +19,8 @@ type AuthProfileResponse = {
     name: string;
     email: string;
     phone: string | null;
+    nik: string | null;
+    dateOfBirth: string | null;
     avatarUrl: string | null;
     twoFactorEnabled: boolean;
     role: "ADMIN" | "USER";
@@ -42,6 +44,8 @@ const toUserSession = (user: AuthProfileResponse["user"]): UserSession => ({
   fullName: user.name,
   email: user.email,
   phoneNumber: user.phone ?? "",
+  nik: user.nik ?? "",
+  dateOfBirth: user.dateOfBirth ? user.dateOfBirth.slice(0, 10) : "",
   avatarUrl: user.avatarUrl ?? "",
   twoFactorEnabled: user.twoFactorEnabled,
   role: user.role === "ADMIN" ? "admin" : "user",
@@ -117,7 +121,13 @@ export const getProfileFromApi = async (): Promise<UserSession> => {
   return toUserSession(payload.user);
 };
 
-export const updateProfileFromApi = async (payload: { name?: string; phone?: string; avatarUrl?: string | null }): Promise<UserSession> => {
+export const updateProfileFromApi = async (payload: {
+  name?: string;
+  phone?: string;
+  nik?: string | null;
+  dateOfBirth?: string | null;
+  avatarUrl?: string | null;
+}): Promise<UserSession> => {
   const response = await apiRequest<AuthProfileResponse & { message: string }>("/api/auth/profile", {
     method: "PUT",
     auth: true,

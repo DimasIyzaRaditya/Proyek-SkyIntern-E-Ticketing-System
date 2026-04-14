@@ -18,6 +18,8 @@ class FlightCardItem {
   final String arrivalTime;
   final String duration;
   final int price;
+  final int tax;
+  final int adminFee;
   final List<String> facilities;
 
   FlightCardItem({
@@ -32,15 +34,17 @@ class FlightCardItem {
     required this.arrivalTime,
     required this.duration,
     required this.price,
+    this.tax = 0,
+    this.adminFee = 0,
     required this.facilities,
   });
 
   factory FlightCardItem.fromJson(Map<String, dynamic> json) {
     final flight = json['flight'] ?? json;
-    
+
     final origin = flight['origin'] ?? {};
     final destination = flight['destination'] ?? {};
-    
+
     String formatTime(String? value) {
       if (value == null) return '--:--';
       try {
@@ -63,7 +67,11 @@ class FlightCardItem {
     List<String> parseFacilities(dynamic value) {
       if (value == null) return ['Cabin Bag 7kg'];
       if (value is String) {
-        return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        return value
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       if (value is List) {
         return value.map((e) => e.toString()).toList();
@@ -77,12 +85,16 @@ class FlightCardItem {
       airline: (flight['airline']?['name'] ?? 'Unknown Airline').toString(),
       logo: (flight['airline']?['logo'] ?? '✈️').toString(),
       aircraft: (flight['aircraft'] ?? 'Aircraft').toString(),
-      origin: '${origin['city'] ?? ''} (${_deriveCode(origin['city'] as String?)})',
-      destination: '${destination['city'] ?? ''} (${_deriveCode(destination['city'] as String?)})',
+      origin:
+          '${origin['city'] ?? ''} (${_deriveCode(origin['city'] as String?)})',
+      destination:
+          '${destination['city'] ?? ''} (${_deriveCode(destination['city'] as String?)})',
       departureTime: formatTime(flight['departureTime'] as String?),
       arrivalTime: formatTime(flight['arrivalTime'] as String?),
       duration: formatDuration(flight['duration']),
       price: (flight['basePrice'] as num?)?.toInt() ?? 0,
+      tax: (flight['tax'] as num?)?.toInt() ?? 0,
+      adminFee: (flight['adminFee'] as num?)?.toInt() ?? 0,
       facilities: parseFacilities(flight['facilities']),
     );
   }
@@ -112,7 +124,9 @@ class Airport {
       city: json['city'] ?? '',
       country: json['country'] ?? '',
       airportName: json['airportName'] ?? json['name'] ?? '',
-      label: json['label'] ?? '${json['city'] ?? ''} – ${json['airportName'] ?? json['name'] ?? ''}',
+      label:
+          json['label'] ??
+          '${json['city'] ?? ''} – ${json['airportName'] ?? json['name'] ?? ''}',
     );
   }
 }

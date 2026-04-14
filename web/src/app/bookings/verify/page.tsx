@@ -155,7 +155,7 @@ function VerifyPageContent() {
           <div className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
             <div className="relative flex items-start justify-between overflow-hidden px-8 pt-7 pb-5">
               <div>
-                <p className="text-2xl font-bold leading-tight text-gray-900">E-ticket</p>
+                <p className="text-2xl font-bold leading-tight text-gray-900">E-Ticket</p>
                 <p className="mt-0.5 text-sm text-gray-500">
                   Verifikasi Gagal / <span className="italic">Verification Failed</span>
                 </p>
@@ -198,7 +198,7 @@ function VerifyPageContent() {
             {/* ── Section 1: Header ── */}
             <div className="relative flex items-start justify-between overflow-hidden px-8 pt-7 pb-5">
               <div>
-                <p className="text-2xl font-bold leading-tight text-gray-900">E-ticket</p>
+                <p className="text-2xl font-bold leading-tight text-gray-900">E-Ticket</p>
                 <p className="mt-0.5 text-sm text-gray-500">
                   Penerbangan Pergi / <span className="italic">Departure Flight</span>
                 </p>
@@ -284,7 +284,7 @@ function VerifyPageContent() {
             {showOpenAppHint && (
               <div className="mx-8 mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <p className="text-xs text-blue-800">
-                  Jika aplikasi belum terbuka otomatis, tekan tombol di bawah untuk membuka e-ticket di aplikasi.
+                  Jika aplikasi belum terbuka otomatis, tekan tombol di bawah untuk membuka E-Ticket di aplikasi.
                 </p>
                 <a
                   href={appLink}

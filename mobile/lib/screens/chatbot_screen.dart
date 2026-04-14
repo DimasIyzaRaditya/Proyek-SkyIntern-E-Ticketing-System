@@ -21,7 +21,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
   final TextEditingController _inputCtrl = TextEditingController();
   final List<ChatMessage> _messages = [
     ChatMessage(
-      text: 'Halo, saya asisten SkyIntern. Saya bisa bantu cari penerbangan, booking, pembayaran, dan e-ticket.',
+      text: 'Halo, saya asisten SkyIntern. Saya bisa bantu cari penerbangan, booking, pembayaran, dan E-Ticket.',
       isUser: false,
     ),
   ];
@@ -38,15 +38,15 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
       return 'Untuk booking: cari flight -> pilih kursi -> isi data penumpang -> bayar. Anda bisa mulai dari menu Cari Penerbangan.';
     }
     if (q.contains('bayar') || q.contains('payment') || q.contains('midtrans')) {
-      return 'Pembayaran memakai Midtrans. Setelah bayar, status booking akan sinkron otomatis dan e-ticket bisa dibuka di menu Booking Saya.';
+      return 'Pembayaran memakai Midtrans. Setelah bayar, status booking akan sinkron otomatis dan E-Ticket bisa dibuka di menu Booking Saya.';
     }
     if (q.contains('tiket') || q.contains('e-ticket') || q.contains('eticket')) {
-      return 'E-ticket tersedia setelah pembayaran sukses. Buka Booking Saya lalu pilih detail untuk lihat QR.';
+      return 'E-Ticket tersedia setelah pembayaran sukses. Buka Booking Saya lalu pilih detail untuk lihat QR.';
     }
     if (q.contains('2fa') || q.contains('verifikasi')) {
       return 'Jika 2FA aktif, saat login Anda akan diminta kode 6 digit yang dikirim ke email.';
     }
-    return 'Terima kasih. Coba jelaskan lebih spesifik, misalnya: "cara booking", "cara bayar", atau "cara lihat e-ticket".';
+    return 'Terima kasih. Coba jelaskan lebih spesifik, misalnya: "cara booking", "cara bayar", atau "cara lihat E-Ticket".';
   }
 
   void _send() {

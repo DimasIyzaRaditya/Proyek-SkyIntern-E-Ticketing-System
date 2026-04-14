@@ -9,9 +9,9 @@ import LazySection from "@/components/LazySection";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi } from "@/lib/auth-api";
 import { getAdminBookings, type AdminBooking } from "@/lib/admin-api";
-import type { ChartDataPoint } from "./AdminSalesChart";
+import type { ChartDataPoint } from "@/components/admin/AdminSalesChart";
 
-const AdminSalesChart = dynamic(() => import("./AdminSalesChart"), {
+const AdminSalesChart = dynamic(() => import("@/components/admin/AdminSalesChart"), {
   ssr: false,
   loading: () => (
     <div className="skeleton h-56 w-full rounded-2xl" aria-label="Memuat grafik..." />

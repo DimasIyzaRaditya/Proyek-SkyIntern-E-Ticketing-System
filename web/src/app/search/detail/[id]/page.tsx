@@ -18,9 +18,10 @@ function FlightDetailPageContent() {
   const origin = searchParams.get("origin") ?? "CGK - Jakarta";
   const destination = searchParams.get("destination") ?? "DPS - Denpasar";
   const departureDate = searchParams.get("departureDate") ?? "2026-03-15";
-  const returnDate = searchParams.get("returnDate") ?? departureDate;
+  const returnDate = searchParams.get("returnDate") ?? "";
   const adult = searchParams.get("adult") ?? "1";
   const child = searchParams.get("child") ?? "0";
+  const infant = searchParams.get("infant") ?? "0";
   const promoId = searchParams.get("promoId") ?? "";
 
   useEffect(() => {
@@ -73,7 +74,7 @@ function FlightDetailPageContent() {
     );
   }
 
-  const query = new URLSearchParams({
+  const queryData: Record<string, string> = {
     flightId: flight.id,
     airlineName: flight.airline,
     flightNumber: flight.flightNumber,
@@ -81,11 +82,17 @@ function FlightDetailPageContent() {
     origin,
     destination,
     departureDate,
-    returnDate,
     adult,
     child,
-    ...(promoId ? { promoId } : {}),
-  });
+    infant,
+  };
+  if (returnDate) {
+    queryData.returnDate = returnDate;
+  }
+  if (promoId) {
+    queryData.promoId = promoId;
+  }
+  const query = new URLSearchParams(queryData);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">

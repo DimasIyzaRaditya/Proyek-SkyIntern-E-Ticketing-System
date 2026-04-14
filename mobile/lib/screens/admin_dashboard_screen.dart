@@ -20,7 +20,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 800));
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _animCtrl.forward();
   }
 
@@ -31,13 +33,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Animation<double> _fade(double s, double e) => CurvedAnimation(
-      parent: _animCtrl, curve: Interval(s, e, curve: Curves.easeOut));
+    parent: _animCtrl,
+    curve: Interval(s, e, curve: Curves.easeOut),
+  );
 
   Animation<Offset> _slide(double s, double e) =>
       Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
-          CurvedAnimation(
-              parent: _animCtrl,
-              curve: Interval(s, e, curve: Curves.easeOutCubic)));
+        CurvedAnimation(
+          parent: _animCtrl,
+          curve: Interval(s, e, curve: Curves.easeOutCubic),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -45,15 +51,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final isWide = MediaQuery.of(context).size.width > 600;
 
     final menus = [
-      {'label': 'Maskapai', 'icon': Icons.flight_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/airlines'},
-      {'label': 'Penerbangan', 'icon': Icons.local_airport_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/schedules'},
-      {'label': 'Bandara', 'icon': Icons.location_city_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/airports'},
-      {'label': 'Jadwal', 'icon': Icons.schedule_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/schedules'},
-      {'label': 'Atur Kursi', 'icon': Icons.event_seat_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/seats'},
-      {'label': 'Transaksi', 'icon': Icons.receipt_long_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/transactions'},
-      {'label': 'Scan QR', 'icon': Icons.qr_code_scanner_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/scan'},
-      {'label': 'Pengguna', 'icon': Icons.group_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/users'},
-      {'label': 'Promo', 'icon': Icons.local_offer_rounded, 'gradient': AppColors.cardGradient, 'route': '/admin/promos'},
+      {
+        'label': 'Maskapai',
+        'icon': Icons.flight_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/airlines',
+      },
+      {
+        'label': 'Penerbangan',
+        'icon': Icons.local_airport_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/schedules',
+      },
+      {
+        'label': 'Bandara',
+        'icon': Icons.location_city_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/airports',
+      },
+      {
+        'label': 'Jadwal',
+        'icon': Icons.schedule_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/schedules',
+      },
+      {
+        'label': 'Atur Kursi',
+        'icon': Icons.event_seat_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/seats',
+      },
+      {
+        'label': 'Transaksi',
+        'icon': Icons.receipt_long_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/transactions',
+      },
+      {
+        'label': 'Scan QR',
+        'icon': Icons.qr_code_scanner_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/scan',
+      },
+      {
+        'label': 'Pengguna',
+        'icon': Icons.group_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/users',
+      },
+      {
+        'label': 'Promo',
+        'icon': Icons.local_offer_rounded,
+        'gradient': AppColors.cardGradient,
+        'route': '/admin/promos',
+      },
     ];
 
     return Scaffold(
@@ -64,32 +115,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           decoration: const BoxDecoration(
             color: AppColors.navSurface,
             boxShadow: [
-              BoxShadow(color: Color(0x1F1F3A5F), blurRadius: 12, offset: Offset(0, 4))
+              BoxShadow(
+                color: Color(0x1F1F3A5F),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
             ],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Colors.white),
-              tooltip: 'Menu',
-              onPressed: () => MobileSideMenu.show(
-                context,
-                activeItem: 'Admin Dashboard',
+            automaticallyImplyLeading: false,
+            title: const Text(
+              'Admin Panel',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            title: const Text('Admin Panel',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             actions: [
               IconButton(
-                icon: const Icon(Icons.switch_account_rounded, color: Colors.white),
-                tooltip: 'Beralih Akun',
-                onPressed: () => _switchAccount(),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded, color: Colors.white),
-                tooltip: 'Keluar',
-                onPressed: () => _showLogoutDialog(context),
+                icon: const Icon(Icons.menu_rounded, color: Colors.white),
+                tooltip: 'Menu',
+                onPressed: () =>
+                    MobileSideMenu.show(context, activeItem: 'Admin Dashboard'),
               ),
               const SizedBox(width: 8),
             ],
@@ -98,7 +147,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
-            horizontal: isWide ? 40 : 16, vertical: 20),
+          horizontal: isWide ? 40 : 16,
+          vertical: 20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -117,29 +168,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.admin_panel_settings_rounded,
-                            color: Colors.white, size: 32),
+                        child: const Icon(
+                          Icons.admin_panel_settings_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Selamat Datang, Admin!',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold)),
+                            const Text(
+                              'Selamat Datang, Admin!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text(user?.fullName ?? 'Administrator',
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.85),
-                                    fontSize: 13)),
+                            Text(
+                              user?.fullName ?? 'Administrator',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 13,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('SkyIntern Admin Dashboard',
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontSize: 12)),
+                            Text(
+                              'SkyIntern Admin Dashboard',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -159,8 +222,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SectionHeader(
-                        title: 'Manajemen Data',
-                        subtitle: 'Kelola seluruh data sistem'),
+                      title: 'Manajemen Data',
+                      subtitle: 'Kelola seluruh data sistem',
+                    ),
                     const SizedBox(height: 14),
                     GridView.builder(
                       shrinkWrap: true,
@@ -184,8 +248,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                             gradient: m['gradient'] as Gradient,
                             padding: const EdgeInsets.all(18),
                             borderRadius: 18,
-                            onTap: () => Navigator.pushNamed(
-                                ctx, m['route'] as String),
+                            onTap: () =>
+                                Navigator.pushNamed(ctx, m['route'] as String),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -195,16 +259,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     color: Colors.white.withValues(alpha: 0.2),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(m['icon'] as IconData,
-                                      color: Colors.white, size: 28),
+                                  child: Icon(
+                                    m['icon'] as IconData,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
-                                Text(m['label'] as String,
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold),
-                                    textAlign: TextAlign.center),
+                                Text(
+                                  m['label'] as String,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ],
                             ),
                           ),
@@ -232,28 +302,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.search_rounded,
-                            color: Colors.white, size: 22),
+                        child: const Icon(
+                          Icons.search_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Cari Penerbangan',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary)),
+                            const Text(
+                              'Cari Penerbangan',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                             const SizedBox(height: 2),
-                            const Text('Lihat jadwal sebagai pengguna',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary)),
+                            const Text(
+                              'Lihat jadwal sebagai pengguna',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textHint),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textHint,
+                      ),
                     ],
                   ),
                 ),
@@ -269,37 +350,5 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     await context.read<AuthProvider>().logout();
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Keluar',
-            style: TextStyle(
-                fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-        content: const Text('Anda yakin ingin keluar dari akun admin?',
-            style: TextStyle(color: AppColors.textSecondary)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal',
-                  style: TextStyle(color: AppColors.textSecondary))),
-          ElevatedButton(
-            onPressed: () {
-              context.read<AuthProvider>().logout();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12))),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
   }
 }

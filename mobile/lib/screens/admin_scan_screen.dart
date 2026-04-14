@@ -20,7 +20,7 @@ class _AdminScanScreenState extends State<AdminScanScreen> {
   final TextEditingController _manualCodeCtrl = TextEditingController();
 
   bool _isNavigating = false;
-  String _statusText = 'Arahkan kamera ke QR e-ticket';
+  String _statusText = 'Arahkan kamera ke QR E-Ticket';
   String _lastRawResult = '';
 
   @override
@@ -79,7 +79,7 @@ class _AdminScanScreenState extends State<AdminScanScreen> {
 
     if (!mounted) return;
     _isNavigating = false;
-    setState(() => _statusText = 'Arahkan kamera ke QR e-ticket');
+    setState(() => _statusText = 'Arahkan kamera ke QR E-Ticket');
     await _scannerController.start();
   }
 
@@ -129,7 +129,7 @@ class _AdminScanScreenState extends State<AdminScanScreen> {
                 children: [
                   const SectionHeader(
                     title: 'Scanner Kamera Admin',
-                    subtitle: 'Arahkan kamera ke QR e-ticket untuk verifikasi otomatis',
+                    subtitle: 'Arahkan kamera ke QR E-Ticket untuk verifikasi otomatis',
                   ),
                   const SizedBox(height: 12),
                   ClipRRect(

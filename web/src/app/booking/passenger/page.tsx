@@ -60,6 +60,13 @@ function PassengerFormPageContent() {
       setFirstName(parts[0] ?? "");
       setLastName(parts.slice(1).join(" "));
     }
+    if ((session?.nik ?? "").trim()) {
+      setIdType("KTP");
+      setIdNumber((session?.nik ?? "").replace(/\D/g, "").slice(0, 16));
+    }
+    if ((session?.dateOfBirth ?? "").trim()) {
+      setDob((session?.dateOfBirth ?? "").slice(0, 10));
+    }
 
     const savedPassengerProfile = getPassengerProfile(session?.id);
     if (savedPassengerProfile) {
@@ -82,9 +89,9 @@ function PassengerFormPageContent() {
       origin: searchParams.get("origin") ?? "",
       destination: searchParams.get("destination") ?? "",
       departureDate: searchParams.get("departureDate") ?? "",
-      returnDate: searchParams.get("returnDate") ?? searchParams.get("departureDate") ?? "",
       adult: searchParams.get("adult") ?? "1",
       child: searchParams.get("child") ?? "0",
+      infant: searchParams.get("infant") ?? "0",
       seats: searchParams.get("seats") ?? "",
       seatFlightIds: searchParams.get("seatFlightIds") ?? "",
       extraPrice: searchParams.get("extraPrice") ?? "0",
@@ -95,6 +102,8 @@ function PassengerFormPageContent() {
       pNationality: nationality,
       pDob: dob,
     };
+    const returnDate = searchParams.get("returnDate") ?? "";
+    if (returnDate) params.returnDate = returnDate;
     const promoId = searchParams.get("promoId") ?? "";
     if (promoId) params.promoId = promoId;
     if (existingBookingId) params.existingBookingId = existingBookingId;

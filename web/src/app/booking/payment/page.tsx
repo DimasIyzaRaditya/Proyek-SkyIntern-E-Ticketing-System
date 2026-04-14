@@ -28,6 +28,7 @@ declare global {
 }
 
 const COUNTDOWN_DURATION = 15 * 60;
+const PROMOS_PER_PAGE = 3;
 
 const getRemainingSeconds = (expiresAt?: string | null) => {
   if (!expiresAt) return COUNTDOWN_DURATION;
@@ -58,6 +59,9 @@ function PaymentSummaryPageContent() {
   } | null>(null);
   const [persistedSeatDetails, setPersistedSeatDetails] = useState<Array<{ seatNumber: string; additionalPrice: number }>>([]);
   const [changingMethod, setChangingMethod] = useState(false);
+  const [selectedPromoId, setSelectedPromoId] = useState<number | null>(null);
+  const [isPromoSelectionInitialized, setIsPromoSelectionInitialized] = useState(false);
+  const [currentPromoPage, setCurrentPromoPage] = useState(1);
   const [flight, setFlight] = useState<FlightCardItem | null>(null);
   const [isLoadingFlight, setIsLoadingFlight] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
@@ -67,8 +71,10 @@ function PaymentSummaryPageContent() {
   const existingBookingId = searchParams.get("existingBookingId") ?? "";
   const adult = Number(searchParams.get("adult") ?? "1");
   const child = Number(searchParams.get("child") ?? "0");
+  const infant = Number(searchParams.get("infant") ?? "0");
   const extraPrice = Number(searchParams.get("extraPrice") ?? "0");
   const promoIdFromQuery = Number(searchParams.get("promoId") ?? "");
+  const initialPromoId = Number.isNaN(promoIdFromQuery) ? null : promoIdFromQuery;
   const draftCountdownKey = `payment_draft_start_${flightId || "unknown"}`;
   const selectedSeatNumbersFromQuery = useMemo(
     () => (searchParams.get("seats") ?? "")
@@ -82,7 +88,8 @@ function PaymentSummaryPageContent() {
     const passengers = [];
     const adultCount = adult;
     const childCount = child;
-    const totalPassengers = Math.max(1, adultCount + childCount);
+    const infantCount = Math.max(0, Math.min(adultCount, infant));
+    const totalPassengers = Math.max(1, adultCount + childCount + infantCount);
 
     const firstName = searchParams.get("pFirstName") ?? "Passenger";
     const lastName = searchParams.get("pLastName") ?? "";
@@ -116,8 +123,21 @@ function PaymentSummaryPageContent() {
       });
     }
 
+    for (let i = 0; i < infantCount; i++) {
+      passengers.push({
+        type: "INFANT" as const,
+        title: "Inf",
+        firstName: `Infant${i + 1}`,
+        lastName,
+        documentType,
+        documentNumber,
+        nationality,
+        dateOfBirth: dob,
+      });
+    }
+
     return passengers.slice(0, Math.max(1, totalPassengers));
-  }, [adult, child, searchParams]);
+  }, [adult, child, infant, searchParams]);
 
   const getSeatIdsFromQuery = useCallback(() => {
     const seatFlightIdsParam = searchParams.get("seatFlightIds") ?? "";
@@ -182,19 +202,59 @@ function PaymentSummaryPageContent() {
   const activeFlight = flight ?? fallbackFlight;
   const availablePromos = [...(activeFlight.promos ?? [])].sort((a, b) => b.discount - a.discount);
 
+  useEffect(() => {
+    setIsPromoSelectionInitialized(false);
+  }, [flightId, initialPromoId]);
+
+  useEffect(() => {
+    if (isPromoSelectionInitialized) return;
+    if (isLoadingFlight) return;
+
+    if (initialPromoId !== null && availablePromos.some((promo) => promo.id === initialPromoId)) {
+      setSelectedPromoId(initialPromoId);
+    } else {
+      setSelectedPromoId(null);
+    }
+
+    setIsPromoSelectionInitialized(true);
+  }, [availablePromos, initialPromoId, isLoadingFlight, isPromoSelectionInitialized]);
+
+  useEffect(() => {
+    if (selectedPromoId == null) return;
+    if (!availablePromos.some((promo) => promo.id === selectedPromoId)) {
+      setSelectedPromoId(null);
+    }
+  }, [availablePromos, selectedPromoId]);
+
   const ticketPrice = activeFlight.basePrice * adult + Math.round(activeFlight.basePrice * 0.75 * child);
   const tax = activeFlight.tax;
   const adminFee = activeFlight.adminFee;
   const subtotalBeforePromo = ticketPrice + tax + adminFee + extraPrice;
-  const selectedPromoFromQuery = Number.isNaN(promoIdFromQuery)
+  const selectedPromo = selectedPromoId == null
     ? null
-    : availablePromos.find((promo) => promo.id === promoIdFromQuery) ?? null;
-  const selectedPromo = selectedPromoFromQuery ?? availablePromos[0] ?? null;
+    : availablePromos.find((promo) => promo.id === selectedPromoId) ?? null;
   const promoDiscountPercent = selectedPromo?.discount ?? 0;
   const promoAmount = Math.round(subtotalBeforePromo * (promoDiscountPercent / 100));
   const totalPrice = Math.max(0, subtotalBeforePromo - promoAmount);
-  const usePersistedPrice = Boolean(existingBookingId) && persistedBookingTotalPrice != null;
+  const totalPromoPages = Math.max(1, Math.ceil(availablePromos.length / PROMOS_PER_PAGE));
+  const promoPageStart = (currentPromoPage - 1) * PROMOS_PER_PAGE;
+  const visiblePromos = availablePromos.slice(promoPageStart, promoPageStart + PROMOS_PER_PAGE);
+  const hasPromoPagination = availablePromos.length > PROMOS_PER_PAGE;
+  const pageNumbers = Array.from({ length: totalPromoPages }, (_, index) => index + 1);
+  const hasPromoChanged = selectedPromoId !== initialPromoId;
+  const canRecreateWithPromo = !existingBookingId || Boolean(searchParams.get("seatFlightIds"));
+  const isPromoLockedBySeatData = Boolean(existingBookingId) && !canRecreateWithPromo;
+  const isPromoLockedByPaymentFlow = bookingLoading || paymentPending || paid || Boolean(pendingSnapToken);
+  const isPromoSelectionLocked = isPromoLockedBySeatData || isPromoLockedByPaymentFlow;
+  const shouldPreviewNewPromo = Boolean(existingBookingId) && hasPromoChanged && canRecreateWithPromo;
+  const usePersistedPrice = Boolean(existingBookingId) && persistedBookingTotalPrice != null && !shouldPreviewNewPromo;
   const displayedTotalPrice = usePersistedPrice ? persistedBookingTotalPrice : totalPrice;
+
+  useEffect(() => {
+    if (currentPromoPage > totalPromoPages) {
+      setCurrentPromoPage(totalPromoPages);
+    }
+  }, [currentPromoPage, totalPromoPages]);
 
   // Fix hydration: read auth state only on client
   useEffect(() => {
@@ -287,7 +347,7 @@ function PaymentSummaryPageContent() {
               flightId: Number(flightId),
               passengers: buildPassengersFromQuery(),
               seatIds: seatIds.length > 0 ? seatIds : undefined,
-              promoId: selectedPromo?.id,
+              promoId: selectedPromoId ?? undefined,
             });
 
             if (!isMounted) return;
@@ -518,6 +578,38 @@ function PaymentSummaryPageContent() {
     try {
       let bookingId: number;
 
+      const shouldRecreateBookingForPromo = Boolean(bookingIdForPayment) && hasPromoChanged && canRecreateWithPromo;
+
+      if (shouldRecreateBookingForPromo && bookingIdForPayment) {
+        await cancelBookingFromApi(bookingIdForPayment).catch(() => {
+          // keep flow resilient if auto-cancel fails temporarily
+        });
+
+        const seatIds = getSeatIdsFromQuery();
+        const recreated = await createBookingFromApi({
+          flightId: Number(flightId),
+          passengers: buildPassengersFromQuery(),
+          seatIds: seatIds.length > 0 ? seatIds : undefined,
+          promoId: selectedPromoId ?? undefined,
+        });
+
+        bookingId = recreated.booking.id;
+        setBookingIdForPayment(bookingId);
+        setPersistedBookingTotalPrice(null);
+        setPersistedBreakdown(null);
+        setPersistedSeatDetails([]);
+        setCountdown(getRemainingSeconds(recreated.booking.expiresAt ?? null));
+
+        const nextParams = new URLSearchParams(searchParams.toString());
+        nextParams.set("existingBookingId", String(bookingId));
+        if (selectedPromoId != null) {
+          nextParams.set("promoId", String(selectedPromoId));
+        } else {
+          nextParams.delete("promoId");
+        }
+        router.replace(`/booking/payment?${nextParams.toString()}`);
+      } else
+
       if (bookingIdForPayment) {
         bookingId = bookingIdForPayment;
       } else if (existingBookingId) {
@@ -532,7 +624,7 @@ function PaymentSummaryPageContent() {
           flightId: Number(flightId),
           passengers: buildPassengersFromQuery(),
           seatIds: seatIds.length > 0 ? seatIds : undefined,
-          promoId: selectedPromo?.id,
+          promoId: selectedPromoId ?? undefined,
         });
         bookingId = bookingResult.booking.id;
         setBookingIdForPayment(bookingId);
@@ -542,6 +634,9 @@ function PaymentSummaryPageContent() {
 
         const nextParams = new URLSearchParams(searchParams.toString());
         nextParams.set("existingBookingId", String(bookingId));
+          if (selectedPromoId != null) {
+            nextParams.set("promoId", String(selectedPromoId));
+          }
         router.replace(`/booking/payment?${nextParams.toString()}`);
       }
 
@@ -623,6 +718,80 @@ function PaymentSummaryPageContent() {
           </div>
 
           <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+            {availablePromos.length > 0 && countdown > 0 && (
+              <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                <p className="text-xs font-semibold text-slate-600">Pilih Promo</p>
+                <div className="mt-2 space-y-1.5">
+                  <label className={`flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs ${isPromoSelectionLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-slate-50"}`}>
+                    <span className="font-medium text-slate-700">Tanpa Promo (Harga Normal)</span>
+                    <input
+                      type="radio"
+                      name="payment-promo"
+                      checked={selectedPromoId == null}
+                      onChange={() => setSelectedPromoId(null)}
+                      disabled={isPromoSelectionLocked}
+                      className="h-4 w-4"
+                    />
+                  </label>
+                  {visiblePromos.map((promo) => (
+                    <label key={promo.id} className={`flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs ${isPromoSelectionLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-slate-50"}`}>
+                      <span className="font-medium text-slate-700">{promo.title} ({promo.discount}%)</span>
+                      <input
+                        type="radio"
+                        name="payment-promo"
+                        checked={selectedPromoId === promo.id}
+                        onChange={() => setSelectedPromoId(promo.id)}
+                        disabled={isPromoSelectionLocked}
+                        className="h-4 w-4"
+                      />
+                    </label>
+                  ))}
+                  {hasPromoPagination && (
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPromoPage((prev) => Math.max(1, prev - 1))}
+                        disabled={isPromoSelectionLocked || currentPromoPage === 1}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {pageNumbers.map((pageNumber) => (
+                          <button
+                            key={pageNumber}
+                            type="button"
+                            onClick={() => setCurrentPromoPage(pageNumber)}
+                            disabled={isPromoSelectionLocked}
+                            className={`h-7 min-w-7 rounded-md border px-2 text-[11px] font-semibold ${
+                              currentPromoPage === pageNumber
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            {pageNumber}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPromoPage((prev) => Math.min(totalPromoPages, prev + 1))}
+                        disabled={isPromoSelectionLocked || currentPromoPage === totalPromoPages}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {Boolean(existingBookingId) && hasPromoChanged && canRecreateWithPromo && (
+                  <p className="mt-2 text-[11px] text-emerald-700">
+                    Promo akan diterapkan ulang saat klik Pay Now.
+                  </p>
+                )}
+              </div>
+            )}
+
             {flightError && <p className="text-xs text-amber-700">{flightError}</p>}
 
             {usePersistedPrice ? (

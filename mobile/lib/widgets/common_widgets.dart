@@ -428,6 +428,7 @@ class StatCard extends StatelessWidget {
 class FlightCard extends StatefulWidget {
   final String flightNumber;
   final String airline;
+  final String? airlineLogo;
   final String departureTime;
   final String arrivalTime;
   final String duration;
@@ -441,6 +442,7 @@ class FlightCard extends StatefulWidget {
     super.key,
     required this.flightNumber,
     required this.airline,
+    this.airlineLogo,
     required this.departureTime,
     required this.arrivalTime,
     required this.duration,
@@ -538,11 +540,7 @@ class _FlightCardState extends State<FlightCard>
                         color: AppColors.background,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
-                        Icons.flight,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
+                      child: _buildAirlineLogo(),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -691,6 +689,32 @@ class _FlightCardState extends State<FlightCard>
     height: 1.5,
     decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
   );
+
+  Widget _buildAirlineLogo() {
+    final logo = widget.airlineLogo?.trim() ?? '';
+    if (logo.isEmpty || !logo.startsWith('http')) {
+      return const Icon(
+        Icons.flight,
+        color: AppColors.primary,
+        size: 20,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Image.network(
+        logo,
+        width: 20,
+        height: 20,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(
+          Icons.flight,
+          color: AppColors.primary,
+          size: 20,
+        ),
+      ),
+    );
+  }
 }
 
 class _RoutePoint extends StatelessWidget {

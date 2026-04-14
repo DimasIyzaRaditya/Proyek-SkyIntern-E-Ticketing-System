@@ -59,6 +59,7 @@ type ETicketData = {
   pdfUrl: string;
   bookingCode: string;
   airline: string;
+  airlineLogo?: string;
   departureIso: string;
   arrivalIso: string;
   originAirportName: string;
@@ -82,6 +83,7 @@ function ETicketContent() {
   const [data, setData] = useState<ETicketData | null>(null);
   const [qrValue, setQrValue] = useState("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isAirlineLogoBroken, setIsAirlineLogoBroken] = useState(false);
 
   const handleDownloadPdf = useCallback(async (useSaveAs: boolean = true) => {
     if (!ticketRef.current || !bookingCode || isGeneratingPdf) return;
@@ -114,7 +116,7 @@ function ETicketContent() {
       const offsetY = (pageHeight - renderHeight) / 2;
 
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
-      const defaultFileName = `SkyIntern E-ticketing-${bookingCode}.pdf`;
+      const defaultFileName = `SkyIntern E-Ticketing-${bookingCode}.pdf`;
       const pdfBlob = pdf.output("blob");
 
       type WindowWithSavePicker = Window & {
@@ -168,17 +170,19 @@ function ETicketContent() {
 
     const loadData = async () => {
       const raw = sessionStorage.getItem(`eticket_${bookingCode}`);
+      let parsedFromSession: ETicketData | null = null;
       if (raw) {
         try {
+          parsedFromSession = JSON.parse(raw) as ETicketData;
           if (isMounted) {
-            setData(JSON.parse(raw) as ETicketData);
+            setData(parsedFromSession);
           }
         } catch {
           // ignore parse errors
         }
       }
 
-      if (!raw && bookingCode) {
+      if (bookingCode && (!raw || !parsedFromSession?.airlineLogo)) {
         try {
           const response = await verifyBookingFromApi(bookingCode);
           const booking = response.booking;
@@ -196,6 +200,7 @@ function ETicketContent() {
             pdfUrl: "",
             bookingCode: booking.bookingCode,
             airline: booking.flight.airline.name,
+            airlineLogo: booking.flight.airline.logo ?? "",
             departureIso: booking.flight.departureTime,
             arrivalIso: booking.flight.arrivalTime,
             originAirportName: booking.flight.origin.city,
@@ -209,7 +214,8 @@ function ETicketContent() {
           };
 
           if (isMounted) {
-            setData(fallbackData);
+            setData((prev) => ({ ...(prev ?? fallbackData), ...fallbackData }));
+            sessionStorage.setItem(`eticket_${bookingCode}`, JSON.stringify({ ...(parsedFromSession ?? {}), ...fallbackData }));
           }
         } catch {
           // keep null data to show fallback message
@@ -227,6 +233,10 @@ function ETicketContent() {
       isMounted = false;
     };
   }, [bookingCode]);
+
+  useEffect(() => {
+    setIsAirlineLogoBroken(false);
+  }, [data?.airlineLogo]);
 
   useEffect(() => {
     if (!shouldAutoDownload || !data || hasTriggeredPrintRef.current) return;
@@ -254,6 +264,7 @@ function ETicketContent() {
 
   const {
     passenger, flightNumber, seat, date, airline,
+    airlineLogo,
     departureIso, arrivalIso, originAirportName, destAirportName,
     originCity, destCity, pDocType, pDocNumber, totalPrice,
   } = data;
@@ -369,7 +380,7 @@ function ETicketContent() {
         >
           {isExpiredTicket
             ? `Status tiket: Expired. Jadwal keberangkatan telah lewat pada ${fmtDateTime(departureIso)}.`
-            : "Jangan lupa untuk membawa e-tiket ini dan identitas yang valid saat check-in di bandara. Selamat menikmati penerbangan Anda!"}
+            : "Jangan lupa untuk membawa E-Ticket ini dan identitas yang valid saat check-in di bandara. Selamat menikmati penerbangan Anda!"}
         </div>
 
         {/* ── Ticket Document ── */}
@@ -383,7 +394,7 @@ function ETicketContent() {
           {/* ── Section 1: Header ── */}
           <div className="relative flex items-start justify-between overflow-hidden px-7 pb-4 pt-5">
             <div>
-              <p className="text-2xl font-bold text-gray-900 leading-tight">E-ticket</p>
+              <p className="text-2xl font-bold text-gray-900 leading-tight">E-Ticket</p>
               <p className="text-sm text-gray-500 mt-0.5">Penerbangan Pergi / <span className="italic">Departure Flight</span></p>
               <span
                 className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -410,13 +421,24 @@ function ETicketContent() {
 
             {/* Airline */}
             <div className="mb-4 flex flex-row items-center gap-3 sm:mb-0 sm:flex-col sm:items-start sm:justify-start sm:w-32">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-black text-blue-700 border border-blue-100">
-                {airline ? airline.charAt(0).toUpperCase() : <Plane className="h-5 w-5" />}
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-black text-blue-700 border border-blue-100">
+                {airlineLogo && !isAirlineLogoBroken ? (
+                  <img
+                    src={airlineLogo}
+                    alt={airline || "Airline"}
+                    className="h-full w-full rounded-full object-cover"
+                    crossOrigin="anonymous"
+                    onError={() => setIsAirlineLogoBroken(true)}
+                  />
+                ) : airline ? (
+                  airline.charAt(0).toUpperCase()
+                ) : (
+                  <Plane className="h-5 w-5" />
+                )}
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-900">{airline || "Airline"}</p>
                 <p className="text-xs text-gray-500">{flightNumber}</p>
-                <p className="text-xs text-gray-500">Economy</p>
               </div>
             </div>
 

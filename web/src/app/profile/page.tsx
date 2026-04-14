@@ -88,6 +88,17 @@ export default function ProfilePage() {
         setTwoFactorEnabled(Boolean(profile.twoFactorEnabled));
         setUserSession(profile);
 
+        const nameParts = profile.fullName.split(" ");
+        setIdentityFirstName(nameParts[0] ?? "");
+        setIdentityLastName(nameParts.slice(1).join(" "));
+        if ((profile.nik ?? "").trim()) {
+          setIdentityType("KTP");
+          setIdentityNumber(profile.nik ?? "");
+        }
+        if ((profile.dateOfBirth ?? "").trim()) {
+          setIdentityDob((profile.dateOfBirth ?? "").slice(0, 10));
+        }
+
         const savedPassengerProfile = getPassengerProfile(profile.id);
         if (savedPassengerProfile) {
           setIdentityFirstName(savedPassengerProfile.firstName);
@@ -96,10 +107,6 @@ export default function ProfilePage() {
           setIdentityNumber(savedPassengerProfile.idNumber);
           setIdentityNationality(savedPassengerProfile.nationality);
           setIdentityDob(savedPassengerProfile.dateOfBirth);
-        } else {
-          const nameParts = profile.fullName.split(" ");
-          setIdentityFirstName(nameParts[0] ?? "");
-          setIdentityLastName(nameParts.slice(1).join(" "));
         }
       } catch {
         clearSession();
@@ -451,6 +458,8 @@ export default function ProfilePage() {
                     const profile = await updateProfileFromApi({
                       name: fullName.trim(),
                       phone: phoneNumber.trim(),
+                      nik: identityType === "KTP" ? identityNumber.trim() : null,
+                      dateOfBirth: identityDob.trim() || null,
                     });
 
                     setPassengerProfile(profile.id, {

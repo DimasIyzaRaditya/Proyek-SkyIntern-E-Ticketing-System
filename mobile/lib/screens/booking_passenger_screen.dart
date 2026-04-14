@@ -47,7 +47,8 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (args == null) return;
 
     _flightId = args['flightId']?.toString() ?? '';
@@ -63,7 +64,15 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     final user = context.read<AuthProvider>().user;
     final nameParts = user?.fullName.split(' ') ?? [''];
     _firstNameCtrl.text = nameParts.first;
-    _lastNameCtrl.text = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    _lastNameCtrl.text = nameParts.length > 1
+        ? nameParts.sublist(1).join(' ')
+        : '';
+    _idType = 'KTP';
+    _idNumberCtrl.text = user?.nik ?? '';
+    final profileDob = user?.dateOfBirth;
+    if (profileDob != null && profileDob.isNotEmpty) {
+      _dob = DateTime.tryParse(profileDob);
+    }
   }
 
   @override
@@ -116,15 +125,19 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
     final basePrice = _flight?.price ?? 0;
     final totalPrice = (basePrice + _extraPrice) * _totalPassengers;
 
-    Navigator.of(context).pushNamed('/booking-payment', arguments: {
-      'flightId': int.tryParse(_flightId) ?? 0,
-      'flight': _flight,
-      'passengers': passengers,
-      'seatIds': _seatIds,
-      'totalPrice': totalPrice,
-      if (_promoId != null) 'promoId': _promoId,
-      if (_existingBookingId != null) 'existingBookingId': _existingBookingId,
-    });
+    Navigator.of(context).pushNamed(
+      '/booking-payment',
+      arguments: {
+        'flightId': int.tryParse(_flightId) ?? 0,
+        'flight': _flight,
+        'passengers': passengers,
+        'seatIds': _seatIds,
+        'extraPrice': _extraPrice,
+        'totalPrice': totalPrice,
+        if (_promoId != null) 'promoId': _promoId,
+        if (_existingBookingId != null) 'existingBookingId': _existingBookingId,
+      },
+    );
   }
 
   @override
@@ -135,7 +148,13 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x222563EB),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -144,7 +163,13 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
               icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text('Data Penumpang', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Data Penumpang',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ),
@@ -190,15 +215,28 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(f.airline, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              f.airline,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
-            Text('${f.origin} -> ${f.destination}', style: const TextStyle(fontSize: 13)),
-            Text('${f.departureTime} - ${f.arrivalTime}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(
+              '${f.origin} -> ${f.destination}',
+              style: const TextStyle(fontSize: 13),
+            ),
+            Text(
+              '${f.departureTime} - ${f.arrivalTime}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
             if (_seatIds.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text('Kursi: ${_selectedSeats.map((s) => s.seatNumber).join(', ')}',
-                  style: const TextStyle(fontSize: 12)),
+              Text(
+                'Kursi: ${_selectedSeats.map((s) => s.seatNumber).join(', ')}',
+                style: const TextStyle(fontSize: 12),
+              ),
             ],
           ],
         ),
@@ -229,19 +267,22 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
               'Data Penumpang',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-         
-          
+
             const SizedBox(height: 12),
             InputField(
               label: 'Nama Depan',
               controller: _firstNameCtrl,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama depan wajib diisi' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Nama depan wajib diisi'
+                  : null,
             ),
             const SizedBox(height: 12),
             InputField(
               label: 'Nama Belakang',
               controller: _lastNameCtrl,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama belakang wajib diisi' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Nama belakang wajib diisi'
+                  : null,
             ),
             const SizedBox(height: 12),
             _labelText('Jenis Identitas'),
@@ -249,9 +290,10 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
             DropdownButtonFormField<String>(
               initialValue: _idType,
               decoration: inputDecoration,
-              items: ['KTP', 'PASSPORT']
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                  .toList(),
+              items: [
+                'KTP',
+                'PASSPORT',
+              ].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
               onChanged: (v) => setState(() => _idType = v ?? 'KTP'),
             ),
             const SizedBox(height: 12),
@@ -259,18 +301,9 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
               label: 'Nomor Identitas',
               controller: _idNumberCtrl,
               keyboardType: TextInputType.number,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nomor identitas wajib diisi' : null,
-            ),
-            const SizedBox(height: 12),
-            _labelText('Kewarganegaraan'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              initialValue: _nationality,
-              decoration: inputDecoration,
-              items: ['Indonesia', 'Malaysia', 'Singapore', 'Philippines', 'Thailand', 'Other']
-                  .map((n) => DropdownMenuItem(value: n, child: Text(n)))
-                  .toList(),
-              onChanged: (v) => setState(() => _nationality = v ?? 'Indonesia'),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Nomor identitas wajib diisi'
+                  : null,
             ),
             const SizedBox(height: 12),
             _labelText('Tanggal Lahir'),
@@ -278,7 +311,10 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
             InkWell(
               onTap: _selectDob,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(12),
@@ -288,14 +324,22 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
                   children: [
                     Text(
                       _dob != null
-                          ? DateFormatter.formatShortDate(DateFormatter.formatDate(_dob!))
+                          ? DateFormatter.formatShortDate(
+                              DateFormatter.formatDate(_dob!),
+                            )
                           : 'Pilih tanggal lahir',
                       style: TextStyle(
-                        color: _dob != null ? AppColors.textPrimary : AppColors.textHint,
+                        color: _dob != null
+                            ? AppColors.textPrimary
+                            : AppColors.textHint,
                       ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                   ],
                 ),
               ),

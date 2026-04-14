@@ -23,6 +23,7 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
   String _flightId = '';
   int _adults = 1;
   int _children = 0;
+  int _infants = 0;
   int? _promoId;
 
   @override
@@ -36,6 +37,7 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
       _flightId = args['flightId']?.toString() ?? '';
       _adults = (args['adults'] as int?) ?? 1;
       _children = (args['children'] as int?) ?? 0;
+      _infants = (args['infants'] as int?) ?? 0;
       _promoId = args['promoId'] as int?;
       if (_flightId.isNotEmpty) _loadDetail();
     } else {
@@ -98,6 +100,7 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
       'flight': _flight,
       'adults': _adults,
       'children': _children,
+      'infants': _infants,
       if (_promoId != null) 'promoId': _promoId,
       'origin': args?['origin'] ?? _flight?.origin ?? '',
       'destination': args?['destination'] ?? _flight?.destination ?? '',

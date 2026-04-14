@@ -495,7 +495,7 @@ export const verifyBookingByCode = async (req: AuthRequest, res: Response) => {
             flightNumber: true,
             departureTime: true,
             arrivalTime: true,
-            airline: { select: { name: true } },
+            airline: { select: { name: true, logo: true } },
             origin: { select: { city: true, country: true } },
             destination: { select: { city: true, country: true } }
           }

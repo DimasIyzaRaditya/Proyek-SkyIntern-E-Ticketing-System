@@ -302,6 +302,8 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         name: true,
         email: true,
         phone: true,
+        nik: true,
+        dateOfBirth: true,
         avatarUrl: true,
         twoFactorEnabled: true,
         role: true,
@@ -327,11 +329,22 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, phone, avatarUrl } = req.body // Field profil yang ingin diperbarui
+    const { name, phone, nik, dateOfBirth, avatarUrl } = req.body // Field profil yang ingin diperbarui
 
     const data: any = {} // Objek berisi hanya field yang dikirimkan (partial update)
     if (typeof name === "string") data.name = name
     if (typeof phone === "string") data.phone = phone
+    if (nik === null || typeof nik === "string") {
+      data.nik = nik === null ? null : nik.replace(/\D/g, "").slice(0, 16)
+    }
+    if (dateOfBirth === null) {
+      data.dateOfBirth = null
+    } else if (typeof dateOfBirth === "string") {
+      const parsedDate = new Date(dateOfBirth)
+      if (!Number.isNaN(parsedDate.getTime())) {
+        data.dateOfBirth = parsedDate
+      }
+    }
     if (avatarUrl === null || typeof avatarUrl === "string") data.avatarUrl = avatarUrl
 
     const user = await prisma.user.update({ // Perbarui profil user di database
@@ -342,6 +355,8 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         name: true,
         email: true,
         phone: true,
+        nik: true,
+        dateOfBirth: true,
         avatarUrl: true,
         twoFactorEnabled: true,
         role: true
@@ -381,6 +396,8 @@ export const updateTwoFactorSetting = async (req: AuthRequest, res: Response) =>
         name: true,
         email: true,
         phone: true,
+        nik: true,
+        dateOfBirth: true,
         avatarUrl: true,
         role: true,
         twoFactorEnabled: true
@@ -432,7 +449,17 @@ export const uploadAvatar = async (req: AuthRequest, res: Response) => {
     const user = await prisma.user.update({
       where: { id: req.user?.id },
       data: { avatarUrl },
-      select: { id: true, name: true, email: true, phone: true, avatarUrl: true, role: true }
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        nik: true,
+        dateOfBirth: true,
+        avatarUrl: true,
+        role: true,
+        twoFactorEnabled: true
+      }
     })
 
     res.json({

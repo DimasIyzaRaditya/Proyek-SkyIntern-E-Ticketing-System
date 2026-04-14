@@ -13,6 +13,19 @@ const getSnap = () => new midtransClient.Snap({
   clientKey: process.env.MIDTRANS_CLIENT_KEY || ""
 })
 
+// Gunakan CoreApi untuk endpoint status transaksi.
+const getCoreApi = () => new midtransClient.CoreApi({
+  isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+  serverKey: process.env.MIDTRANS_SERVER_KEY || "",
+  clientKey: process.env.MIDTRANS_CLIENT_KEY || ""
+})
+
+type CoreApiWithTransactionStatus = midtransClient.CoreApi & {
+  transaction: {
+    status(orderId: string): Promise<any>
+  }
+}
+
 export interface MidtransTransactionParams {
   orderId: string
   amount: number
@@ -90,8 +103,8 @@ export const createTransaction = async (
  */
 export const checkTransactionStatus = async (orderId: string) => {
   try {
-    const snap = getSnap() // Instance Snap Midtrans
-    const statusResponse = await snap.transaction.status(orderId) // Ambil status transaksi dari Midtrans berdasarkan orderId
+    const coreApi = getCoreApi() as CoreApiWithTransactionStatus // CoreApi tipe package tidak expose method transaction di TS
+    const statusResponse = await coreApi.transaction.status(orderId) // Ambil status transaksi dari Midtrans berdasarkan orderId
     return statusResponse
   } catch (error: any) {
     // Jangan log 404 sebagai error — itu kasus normal (user belum mulai bayar / token belum digunakan)

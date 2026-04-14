@@ -3,6 +3,8 @@ export type UserSession = {
   fullName: string;
   email: string;
   phoneNumber?: string;
+  nik?: string;
+  dateOfBirth?: string;
   avatarUrl?: string;
   twoFactorEnabled?: boolean;
   role: "user" | "admin";

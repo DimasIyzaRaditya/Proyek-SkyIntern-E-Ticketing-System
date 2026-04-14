@@ -47,7 +47,12 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await AuthService.register(name: name, email: email, password: password, phone: phone);
+      await AuthService.register(
+        name: name,
+        email: email,
+        password: password,
+        phone: phone,
+      );
       // Auto-login after registration
       await login(email: email, password: password);
     } catch (e) {
@@ -67,7 +72,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final loginResult = await AuthService.login(email: email, password: password);
+      final loginResult = await AuthService.login(
+        email: email,
+        password: password,
+      );
 
       if (loginResult.requiresTwoFactor) {
         _isLoading = false;
@@ -121,9 +129,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> resendTwoFactorCode({
-    required String twoFactorToken,
-  }) async {
+  Future<void> resendTwoFactorCode({required String twoFactorToken}) async {
     await AuthService.resendTwoFactorCode(twoFactorToken: twoFactorToken);
   }
 
@@ -145,6 +151,8 @@ class AuthProvider extends ChangeNotifier {
   Future<void> updateProfile({
     String? name,
     String? phone,
+    String? nik,
+    String? dateOfBirth,
   }) async {
     if (!isAuthenticated) throw Exception('Not authenticated');
 
@@ -152,6 +160,8 @@ class AuthProvider extends ChangeNotifier {
       final user = await AuthService.updateProfile(
         name: name,
         phone: phone,
+        nik: nik,
+        dateOfBirth: dateOfBirth,
       );
       _user = user;
       if (_token != null) await LocalStorage.saveUser(_user!, _token!);
@@ -216,4 +226,3 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

@@ -17,7 +17,10 @@ function SeatSelectionPageContent() {
   const flightId = searchParams.get("flightId") ?? "";
   const adult = Math.max(1, parseInt(searchParams.get("adult") ?? "1", 10) || 1);
   const child = Math.max(0, parseInt(searchParams.get("child") ?? "0", 10) || 0);
+  const infant = Math.max(0, parseInt(searchParams.get("infant") ?? "0", 10) || 0);
   const totalPassengers = adult + child;
+  const normalizedInfant = Math.min(infant, adult);
+  const hasInfantRatioIssue = infant > adult;
   const [authenticated, setAuthenticated] = useState(true);
 
   useEffect(() => {
@@ -255,13 +258,15 @@ function SeatSelectionPageContent() {
       origin: searchParams.get("origin") ?? "",
       destination: searchParams.get("destination") ?? "",
       departureDate: searchParams.get("departureDate") ?? "",
-      returnDate: searchParams.get("returnDate") ?? searchParams.get("departureDate") ?? "",
       adult: searchParams.get("adult") ?? "1",
       child: searchParams.get("child") ?? "0",
+      infant: String(normalizedInfant),
       seats: selectedSeats.join(","),
       seatFlightIds: flightSeatIds.join(","),
       extraPrice: String(extraPrice),
     };
+    const returnDate = searchParams.get("returnDate") ?? "";
+    if (returnDate) params.returnDate = returnDate;
     const promoId = searchParams.get("promoId") ?? "";
     if (promoId) params.promoId = promoId;
     if (existingBookingId) params.existingBookingId = existingBookingId;
@@ -299,7 +304,17 @@ function SeatSelectionPageContent() {
         <section className="rounded-2xl sm:rounded-3xl border border-blue-100 bg-white p-4 sm:p-6 lg:p-8 shadow-lg">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900">Pilih Kursi</h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600">{activeFlight.airline} • {activeFlight.flightNumber} • Pilih kursi yang tersedia.</p>
-          <p className="mt-1 text-xs text-slate-500">{adult} Dewasa{child > 0 ? ` + ${child} Anak` : ""} — Pilih tepat <span className="font-semibold text-blue-700">{totalPassengers} kursi</span></p>
+          <p className="mt-1 text-xs text-slate-500">{adult} Dewasa{child > 0 ? ` + ${child} Anak` : ""}{normalizedInfant > 0 ? ` + ${normalizedInfant} Bayi (tanpa kursi)` : ""} — Pilih tepat <span className="font-semibold text-blue-700">{totalPassengers} kursi</span></p>
+          {hasInfantRatioIssue && (
+            <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+              Batasan penting: 1 dewasa hanya boleh membawa 1 bayi. Sistem menormalkan bayi menjadi {normalizedInfant} agar valid.
+            </p>
+          )}
+          {!hasInfantRatioIssue && normalizedInfant > 0 && (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              Bayi tidak mendapat kursi sendiri. Jumlah kursi tetap dihitung dari Dewasa + Anak.
+            </p>
+          )}
           {flightError && <p className="mt-2 text-xs text-amber-700">{flightError}</p>}
 
           <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 md:grid-cols-[1fr_260px] lg:grid-cols-[1fr_320px]">

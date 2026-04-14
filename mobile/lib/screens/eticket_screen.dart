@@ -405,7 +405,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'E-ticket',
+                                  'E-Ticket',
                                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF111827)),
                                 ),
                                 SizedBox(height: 2),
@@ -598,7 +598,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       const SizedBox(height: 12),
                       Row(
                         children: const [
-                          Expanded(child: _TipItem(icon: Icons.badge_outlined, text: 'Tunjukkan e-tiket dan identitas valid saat check-in.')),
+                          Expanded(child: _TipItem(icon: Icons.badge_outlined, text: 'Tunjukkan E-Ticket dan identitas valid saat check-in.')),
                           SizedBox(width: 8),
                           Expanded(child: _TipItem(icon: Icons.schedule_outlined, text: 'Check-in minimal 90 menit sebelum keberangkatan.')),
                           SizedBox(width: 8),

@@ -7,7 +7,7 @@ class ApiClient {
   // Ubah host ini jika pindah jaringan Wi-Fi (khusus device fisik).
   // Cukup edit nilai ini di source code lalu jalankan ulang `flutter run`.
   // Contoh: 192.168.1.10
-  static const String _hardcodedApiHost = '192.168.18.38';
+  static const String _hardcodedApiHost = '192.168.18.39';
 
   static const String _apiPort = '3000';
   static const String _apiScheme = 'http';

@@ -22,11 +22,14 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameCtrl;
   late TextEditingController _phoneCtrl;
+  late TextEditingController _nikCtrl;
   bool _isLoading = false;
   bool _isUploadingAvatar = false;
   bool _isUpdatingTwoFactor = false;
+  bool _obscureNik = true;
   late AnimationController _animCtrl;
   Uint8List? _localAvatarBytes;
+  DateTime? _dob;
 
   @override
   void initState() {
@@ -34,7 +37,15 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     final user = context.read<AuthProvider>().user;
     _nameCtrl = TextEditingController(text: user?.fullName ?? '');
     _phoneCtrl = TextEditingController(text: user?.phoneNumber ?? '');
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _nikCtrl = TextEditingController(text: user?.nik ?? '');
+    _nikCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _dob = _parseUserDate(user?.dateOfBirth);
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _animCtrl.forward();
   }
 
@@ -42,8 +53,48 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _nikCtrl.dispose();
     _animCtrl.dispose();
     super.dispose();
+  }
+
+  DateTime? _parseUserDate(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value);
+  }
+
+  String _maskedNik(String value) {
+    final raw = value.replaceAll(RegExp(r'\D'), '');
+    if (raw.length <= 8) return raw;
+    final start = raw.substring(0, 4);
+    final end = raw.substring(raw.length - 4);
+    return '$start${'*' * (raw.length - 8)}$end';
+  }
+
+  void _handleNikChanged(String value) {
+    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+    final limited = digitsOnly.length > 16
+        ? digitsOnly.substring(0, 16)
+        : digitsOnly;
+
+    if (_nikCtrl.text != limited) {
+      _nikCtrl.value = TextEditingValue(
+        text: limited,
+        selection: TextSelection.collapsed(offset: limited.length),
+      );
+    }
+  }
+
+  Future<void> _selectDob() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dob ?? DateTime(2000),
+      firstDate: DateTime(1920),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dob = picked);
+    }
   }
 
   Future<void> _pickAvatar() async {
@@ -71,7 +122,12 @@ class _EditProfileScreenState extends State<EditProfileScreen>
         showSnackBar(context, 'Foto profil berhasil diperbarui');
       }
     } catch (e) {
-      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+      if (mounted)
+        showSnackBar(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
@@ -82,15 +138,24 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     setState(() => _isLoading = true);
     try {
       await context.read<AuthProvider>().updateProfile(
-            name: _nameCtrl.text.trim(),
-            phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-          );
+        name: _nameCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+        nik: _nikCtrl.text.trim().isEmpty
+            ? null
+            : _nikCtrl.text.replaceAll(RegExp(r'\D'), ''),
+        dateOfBirth: _dob == null ? null : DateFormatter.formatDate(_dob!),
+      );
       if (mounted) {
         showSnackBar(context, 'Profil berhasil diperbarui');
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) showSnackBar(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
+      if (mounted)
+        showSnackBar(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -115,7 +180,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              gradient: imageProvider == null ? AppColors.primaryGradient : null,
+              gradient: imageProvider == null
+                  ? AppColors.primaryGradient
+                  : null,
               shape: BoxShape.circle,
               boxShadow: AppShadows.colored,
               image: imageProvider != null
@@ -126,7 +193,11 @@ class _EditProfileScreenState extends State<EditProfileScreen>
             child: imageProvider == null
                 ? Text(
                     StringHelper.getInitials(fullName),
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   )
                 : null,
           ),
@@ -142,10 +213,18 @@ class _EditProfileScreenState extends State<EditProfileScreen>
               ),
               child: _isUploadingAvatar
                   ? const SizedBox(
-                      width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
                     )
-                  : const Icon(Icons.camera_alt_rounded, size: 16, color: AppColors.primary),
+                  : const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
             ),
           ),
         ],
@@ -162,7 +241,13 @@ class _EditProfileScreenState extends State<EditProfileScreen>
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
-            boxShadow: [BoxShadow(color: Color(0x222563EB), blurRadius: 12, offset: Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x222563EB),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
@@ -171,7 +256,13 @@ class _EditProfileScreenState extends State<EditProfileScreen>
               icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text('Edit Profil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Edit Profil',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ),
@@ -192,7 +283,10 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                 ),
                 const SizedBox(height: 8),
                 const Center(
-                  child: Text('Ketuk untuk mengubah foto', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                  child: Text(
+                    'Ketuk untuk mengubah foto',
+                    style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -209,7 +303,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                           label: 'Nama Lengkap',
                           controller: _nameCtrl,
                           prefixIcon: const Icon(Icons.person_outline_rounded),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Nama wajib diisi'
+                              : null,
                         ),
                         const SizedBox(height: 14),
                         InputField(
@@ -220,17 +316,116 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                         ),
                         const SizedBox(height: 14),
                         InputField(
+                          label: 'NIK / Nomor KTP',
+                          controller: _nikCtrl,
+                          keyboardType: TextInputType.number,
+                          obscureText: _obscureNik,
+                          onChanged: _handleNikChanged,
+                          prefixIcon: const Icon(Icons.badge_outlined),
+                          suffixIcon: IconButton(
+                            onPressed: () =>
+                                setState(() => _obscureNik = !_obscureNik),
+                            icon: Icon(
+                              _obscureNik
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null;
+                            final digits = v.replaceAll(RegExp(r'\D'), '');
+                            if (digits.length != 16) {
+                              return 'NIK harus 16 digit';
+                            }
+                            return null;
+                          },
+                        ),
+                        if (_nikCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tersensor: ${_maskedNik(_nikCtrl.text)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Tanggal Lahir',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: _selectDob,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.cake_outlined,
+                                  size: 18,
+                                  color: _dob == null
+                                      ? AppColors.textHint
+                                      : AppColors.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _dob == null
+                                      ? 'Pilih tanggal lahir'
+                                      : DateFormatter.formatShortDate(
+                                          DateFormatter.formatDate(_dob!),
+                                        ),
+                                  style: TextStyle(
+                                    color: _dob == null
+                                        ? AppColors.textHint
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        InputField(
                           label: 'Email',
-                          controller: TextEditingController(text: user?.email ?? ''),
+                          controller: TextEditingController(
+                            text: user?.email ?? '',
+                          ),
                           prefixIcon: const Icon(Icons.email_outlined),
                           enabled: false,
                         ),
                         const SizedBox(height: 6),
-                        const Text('Email tidak dapat diubah',
-                            style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                        const Text(
+                          'Email tidak dapat diubah',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textHint,
+                          ),
+                        ),
                         const SizedBox(height: 18),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceVariant,
                             borderRadius: BorderRadius.circular(12),
@@ -252,7 +447,10 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                                     SizedBox(height: 2),
                                     Text(
                                       'Minta kode verifikasi email saat login',
-                                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -261,29 +459,46 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                                   ? const SizedBox(
                                       width: 22,
                                       height: 22,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : Switch(
                                       value: user?.twoFactorEnabled ?? false,
                                       activeThumbColor: AppColors.primary,
                                       onChanged: (enabled) async {
-                                        setState(() => _isUpdatingTwoFactor = true);
+                                        setState(
+                                          () => _isUpdatingTwoFactor = true,
+                                        );
                                         try {
-                                          await context.read<AuthProvider>().updateTwoFactorSetting(enabled: enabled);
+                                          await context
+                                              .read<AuthProvider>()
+                                              .updateTwoFactorSetting(
+                                                enabled: enabled,
+                                              );
                                           if (!mounted) return;
                                           showSnackBar(
                                             context,
-                                            enabled ? '2FA berhasil diaktifkan' : '2FA berhasil dinonaktifkan',
+                                            enabled
+                                                ? '2FA berhasil diaktifkan'
+                                                : '2FA berhasil dinonaktifkan',
                                           );
                                         } catch (e) {
                                           if (!mounted) return;
                                           showSnackBar(
                                             context,
-                                            e.toString().replaceFirst('Exception: ', ''),
+                                            e.toString().replaceFirst(
+                                              'Exception: ',
+                                              '',
+                                            ),
                                             isError: true,
                                           );
                                         } finally {
-                                          if (mounted) setState(() => _isUpdatingTwoFactor = false);
+                                          if (mounted)
+                                            setState(
+                                              () =>
+                                                  _isUpdatingTwoFactor = false,
+                                            );
                                         }
                                       },
                                     ),

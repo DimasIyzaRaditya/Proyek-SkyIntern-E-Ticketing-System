@@ -25,5 +25,9 @@ declare module "midtrans-client" {
       serverKey: string
       clientKey: string
     })
+
+    transaction: {
+      status(orderId: string): Promise<any>
+    }
   }
 }

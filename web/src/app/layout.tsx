@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SkyIntern E-Ticketing",
-  description: "Frontend e-ticketing system untuk user dan admin dashboard",
+  description: "Frontend E-Ticketing system untuk user dan admin dashboard",
 };
 
 export default function RootLayout({

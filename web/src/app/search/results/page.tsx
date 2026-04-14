@@ -10,6 +10,7 @@ import { type FlightCardItem, searchFlightsFromApi } from "@/lib/flight-api";
 
 type FlightInfoTab = "details" | "promos";
 type SortOption = "price-low" | "price-high" | "duration" | "departure";
+const PROMOS_PER_PAGE = 3;
 
 const flightTabs: Array<{ key: FlightInfoTab; label: string }> = [
   { key: "details", label: "Flight Details    " },
@@ -47,7 +48,8 @@ function SearchResultsPageContent() {
   const searchParams = useSearchParams();
   const [sortBy, setSortBy] = useState<SortOption>(() => parseSortOption(searchParams.get("sort")));
   const [activeTabs, setActiveTabs] = useState<Record<string, FlightInfoTab>>({});
-  const [selectedPromoByFlight, setSelectedPromoByFlight] = useState<Record<string, number>>({});
+  const [selectedPromoByFlight, setSelectedPromoByFlight] = useState<Record<string, number | null>>({});
+  const [promoPageByFlight, setPromoPageByFlight] = useState<Record<string, number>>({});
   const [sortedFlights, setSortedFlights] = useState<FlightCardItem[]>([]);
   const [isLoadingFlights, setIsLoadingFlights] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
@@ -57,9 +59,10 @@ function SearchResultsPageContent() {
   const origin = searchParams.get("origin") ?? "CGK - Jakarta";
   const destination = searchParams.get("destination") ?? "DPS - Denpasar";
   const departureDate = searchParams.get("departureDate") ?? "2026-03-15";
-  const returnDate = searchParams.get("returnDate") ?? departureDate;
+  const returnDate = searchParams.get("returnDate") ?? "";
   const adult = searchParams.get("adult") ?? "1";
   const child = searchParams.get("child") ?? "0";
+  const infant = searchParams.get("infant") ?? "0";
 
   useEffect(() => {
     let isMounted = true;
@@ -106,12 +109,30 @@ function SearchResultsPageContent() {
         }
 
         const current = next[flight.id];
-        if (current && flight.promos.some((promo) => promo.id === current)) {
+        if (current == null) {
           continue;
         }
 
-        const bestPromo = [...flight.promos].sort((a, b) => b.discount - a.discount)[0];
-        next[flight.id] = bestPromo.id;
+        if (flight.promos.some((promo) => promo.id === current)) {
+          continue;
+        }
+
+        next[flight.id] = null;
+      }
+      return next;
+    });
+
+    setPromoPageByFlight((prev) => {
+      const next = { ...prev };
+      for (const flight of sortedFlights) {
+        const promoCount = flight.promos?.length ?? 0;
+        if (promoCount === 0) {
+          delete next[flight.id];
+          continue;
+        }
+        const totalPages = Math.max(1, Math.ceil(promoCount / PROMOS_PER_PAGE));
+        const currentPage = next[flight.id] ?? 1;
+        next[flight.id] = Math.min(Math.max(1, currentPage), totalPages);
       }
       return next;
     });
@@ -197,20 +218,48 @@ function SearchResultsPageContent() {
       return <p className="text-sm text-slate-600">Saat ini belum ada promo aktif untuk flight ini.</p>;
     }
 
-    const promoNames = flight.promos
-      .sort((a, b) => b.discount - a.discount)
+    const sortedPromos = [...flight.promos].sort((a, b) => b.discount - a.discount);
+    const totalPromoPages = Math.max(1, Math.ceil(sortedPromos.length / PROMOS_PER_PAGE));
+    const currentPromoPage = Math.min(Math.max(1, promoPageByFlight[flight.id] ?? 1), totalPromoPages);
+    const pageStart = (currentPromoPage - 1) * PROMOS_PER_PAGE;
+    const visiblePromos = sortedPromos.slice(pageStart, pageStart + PROMOS_PER_PAGE);
+    const showPromoPagination = sortedPromos.length > PROMOS_PER_PAGE;
+    const promoPageNumbers = Array.from({ length: totalPromoPages }, (_, index) => index + 1);
+
+    const promoNames = sortedPromos
       .map((promo) => `${promo.title} (${promo.discount}%)`)
       .join(" • ");
 
     return (
       <div className="space-y-2">
-        <p className="text-sm text-slate-600">Promo aktif dari backend: {promoNames}</p>
         <div className="rounded-xl border border-emerald-200 bg-linear-to-b from-emerald-50 to-white p-2.5">
           <p className="text-xs font-semibold tracking-wide text-emerald-800">PILIH 1 PROMO UNTUK CHECKOUT</p>
           <div className="mt-2 space-y-2">
-            {flight.promos
-              .sort((a, b) => b.discount - a.discount)
-              .map((promo) => (
+            <label
+              className={`group block cursor-pointer rounded-lg border px-3 py-2 text-sm transition ${
+                selectedPromoByFlight[flight.id] == null
+                  ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                  : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2.5 text-slate-700">
+                  <input
+                    type="radio"
+                    name={`selected-promo-${flight.id}`}
+                    checked={selectedPromoByFlight[flight.id] == null}
+                    onChange={() => setSelectedPromoByFlight((prev) => ({ ...prev, [flight.id]: null }))}
+                    className="h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="font-medium">Tanpa Promo (Harga Normal)</span>
+                </span>
+              </div>
+              {selectedPromoByFlight[flight.id] == null && (
+                <p className="mt-1 pl-6.5 text-xs font-semibold text-emerald-700">Promo tidak digunakan</p>
+              )}
+            </label>
+
+            {visiblePromos.map((promo) => (
                 <label
                   key={promo.id}
                   className={`group block cursor-pointer rounded-lg border px-3 py-2 text-sm transition ${
@@ -242,6 +291,49 @@ function SearchResultsPageContent() {
                   )}
                 </label>
               ))}
+
+            {showPromoPagination && (
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPromoPageByFlight((prev) => ({
+                    ...prev,
+                    [flight.id]: Math.max(1, (prev[flight.id] ?? 1) - 1),
+                  }))}
+                  disabled={currentPromoPage === 1}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <div className="flex items-center gap-1">
+                  {promoPageNumbers.map((pageNumber) => (
+                    <button
+                      key={pageNumber}
+                      type="button"
+                      onClick={() => setPromoPageByFlight((prev) => ({ ...prev, [flight.id]: pageNumber }))}
+                      className={`h-7 min-w-7 rounded-md border px-2 text-[11px] font-semibold ${
+                        currentPromoPage === pageNumber
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {pageNumber}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPromoPageByFlight((prev) => ({
+                    ...prev,
+                    [flight.id]: Math.min(totalPromoPages, (prev[flight.id] ?? 1) + 1),
+                  }))}
+                  disabled={currentPromoPage === totalPromoPages}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -254,7 +346,8 @@ function SearchResultsPageContent() {
       <main className="mx-auto max-w-7xl px-6 py-10 page-enter">
         <h1 className="text-3xl font-black text-slate-900">Hasil Pencarian Penerbangan</h1>
         <p className="mt-1 text-sm text-slate-600">
-          {origin} → {destination} • {departureDate} - {returnDate} • {adult} Adult / {child} Child
+          {origin} → {destination} • {departureDate}
+          {returnDate ? ` - ${returnDate}` : " (Sekali jalan)"} • {adult} Adult / {child} Child / {infant} Infant
         </p>
 
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
@@ -394,11 +487,13 @@ function SearchResultsPageContent() {
             )}
 
             {paginatedFlights.map((flight, idx) => {
-              const queryData: Record<string, string> = { origin, destination, departureDate, returnDate, adult, child };
+              const queryData: Record<string, string> = { origin, destination, departureDate, adult, child, infant };
+              if (returnDate) {
+                queryData.returnDate = returnDate;
+              }
               const selectedPromoId = selectedPromoByFlight[flight.id];
               const selectedPromo = flight.promos.find((promo) => promo.id === selectedPromoId) ?? null;
-              const badgeDiscount = selectedPromo?.discount ?? (flight.promos.length > 0 ? Math.max(...flight.promos.map((promo) => promo.discount)) : 0);
-              if (selectedPromoId) {
+              if (selectedPromoId != null) {
                 queryData.promoId = String(selectedPromoId);
               }
               const query = new URLSearchParams(queryData);
@@ -462,9 +557,14 @@ function SearchResultsPageContent() {
                     </div>
 
                     <div className="w-full lg:w-auto lg:min-w-42.5 lg:text-right">
-                      {flight.promos.length > 0 && (
+                      {flight.promos.length > 0 && selectedPromo && (
                         <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                          Promo aktif {badgeDiscount}%
+                          Promo dipilih {selectedPromo.discount}%
+                        </div>
+                      )}
+                      {flight.promos.length > 0 && !selectedPromo && (
+                        <div className="mb-2 inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                          Tanpa promo
                         </div>
                       )}
                       <p className="text-3xl font-black text-orange-600">{formatRupiah(flight.price)}<span className="text-sm font-semibold text-slate-500">/pax</span></p>

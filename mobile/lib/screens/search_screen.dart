@@ -25,6 +25,7 @@ class _SearchScreenState extends State<SearchScreen>
   late DateTime returnDate;
   int adults = 1;
   int childCount = 0;
+  int infantCount = 0;
   bool isRoundTrip = false;
   List<Airport> airports = [];
   List<PromoItem> promos = const [];
@@ -80,11 +81,16 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Future<void> _selectDate(bool isReturn) async {
+    final pickerTitle = isReturn ? 'Pilih Tanggal Pulang' : 'Pilih Tanggal Pergi';
     final picked = await showDatePicker(
       context: context,
       initialDate: isReturn ? returnDate : departureDate,
-      firstDate: DateTime.now(),
+      firstDate: isReturn ? departureDate : DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: pickerTitle,
+      fieldLabelText: pickerTitle,
+      confirmText: 'Pilih',
+      cancelText: 'Batal',
       builder: (ctx, child) => Theme(
         data: ThemeData(
           colorScheme: const ColorScheme.light(primary: AppColors.primary),
@@ -134,6 +140,9 @@ class _SearchScreenState extends State<SearchScreen>
           'destination': destinationCode,
           'adults': adults,
           'children': childCount,
+          'infants': infantCount,
+          'departureDate': DateFormatter.formatDate(departureDate),
+          if (isRoundTrip) 'returnDate': DateFormatter.formatDate(returnDate),
         });
       }
     } catch (e) {
@@ -144,6 +153,7 @@ class _SearchScreenState extends State<SearchScreen>
   Future<void> _showGuestPicker() async {
     int tempAdults = adults;
     int tempChildren = childCount;
+    int tempInfants = infantCount;
 
     final applied = await showModalBottomSheet<bool>(
       context: context,
@@ -160,26 +170,62 @@ class _SearchScreenState extends State<SearchScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Guests',
+                    'Jumlah Penumpang',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 16),
                   _guestCounterRow(
-                    label: 'Adult',
+                    label: 'Dewasa',
                     count: tempAdults,
                     onDec: tempAdults > 1
-                        ? () => setModalState(() => tempAdults--)
+                        ? () => setModalState(() {
+                              tempAdults--;
+                              if (tempInfants > tempAdults) {
+                                tempInfants = tempAdults;
+                              }
+                            })
                         : null,
                     onInc: () => setModalState(() => tempAdults++),
                   ),
                   const SizedBox(height: 12),
                   _guestCounterRow(
-                    label: 'Child',
+                    label: 'Anak',
                     count: tempChildren,
                     onDec: tempChildren > 0
                         ? () => setModalState(() => tempChildren--)
                         : null,
                     onInc: () => setModalState(() => tempChildren++),
+                  ),
+                  const SizedBox(height: 12),
+                  _guestCounterRow(
+                    label: 'Bayi',
+                    count: tempInfants,
+                    onDec: tempInfants > 0
+                        ? () => setModalState(() => tempInfants--)
+                        : null,
+                    onInc: tempInfants < tempAdults
+                        ? () => setModalState(() => tempInfants++)
+                        : () {
+                            showSnackBar(
+                              context,
+                              '1 dewasa hanya boleh membawa 1 bayi',
+                              isError: true,
+                            );
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Text(
+                      'Dewasa/Anak mendapat kursi, Bayi tidak mendapat kursi sendiri.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   SizedBox(
@@ -209,6 +255,7 @@ class _SearchScreenState extends State<SearchScreen>
       setState(() {
         adults = tempAdults;
         childCount = tempChildren;
+        infantCount = tempInfants;
       });
     }
   }
@@ -734,11 +781,47 @@ class _SearchScreenState extends State<SearchScreen>
                                   ),
                                 ),
                               ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: Checkbox(
+                                        value: isRoundTrip,
+                                        activeColor: const Color(0xFF2563EB),
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            isRoundTrip = value ?? false;
+                                            if (isRoundTrip &&
+                                                !returnDate.isAfter(departureDate)) {
+                                              returnDate = departureDate
+                                                  .add(const Duration(days: 1));
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Tanggal pulang',
+                                      style: TextStyle(
+                                        color: Color(0xFF334155),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
                               InkWell(
                                 onTap: () async {
                                   await _selectDate(false);
-                                  if (!mounted) return;
+                                  if (!mounted || !isRoundTrip) return;
                                   await _selectDate(true);
                                 },
                                 child: Padding(
@@ -747,9 +830,25 @@ class _SearchScreenState extends State<SearchScreen>
                                     children: [
                                       const Icon(Icons.calendar_today_rounded, color: Color(0xFF2563EB), size: 20),
                                       const SizedBox(width: 10),
-                                      Text(
-                                        '${DateFormatter.formatShortDate(DateFormatter.formatDate(departureDate))} - ${DateFormatter.formatShortDate(DateFormatter.formatDate(returnDate))}',
-                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              isRoundTrip
+                                                  ? '${DateFormatter.formatShortDate(DateFormatter.formatDate(departureDate))} - ${DateFormatter.formatShortDate(DateFormatter.formatDate(returnDate))}'
+                                                  : DateFormatter.formatShortDate(DateFormatter.formatDate(departureDate)),
+                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              isRoundTrip
+                                                  ? 'Kalender pertama untuk tanggal pergi, lalu pilih tanggal pulang.'
+                                                  : 'Mode sekali jalan: pilih tanggal pergi saja.',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -780,7 +879,7 @@ class _SearchScreenState extends State<SearchScreen>
                                       const Icon(Icons.people_outline_rounded, color: Color(0xFF2563EB), size: 22),
                                       const SizedBox(width: 10),
                                       Text(
-                                        '$adults Adult(s), $childCount Child',
+                                        '$adults Dewasa, $childCount Anak, $infantCount Bayi',
                                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
                                       ),
                                     ],

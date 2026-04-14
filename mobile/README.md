@@ -9,7 +9,7 @@ Aplikasi mobile SkyIntern terhubung ke backend Node/Express dan mendukung fitur 
 - Login/register user
 - Verifikasi login 2FA (jika diaktifkan)
 - Pencarian dan booking penerbangan
-- Pembayaran dan e-ticket
+- Pembayaran dan E-Ticket
 - Fitur admin (role admin)
 - Real-time update via WebSocket
 
@@ -258,7 +258,14 @@ flutter devices
 flutter doctor
 ```
 
-## 15. Keamanan Untuk Dev vs Production
+## 15. Konvensi Penamaan
+
+- File Dart di `lib/`: gunakan `snake_case` (contoh: `booking_payment_screen.dart`).
+- Class/widget: gunakan `PascalCase` (contoh: `BookingPaymentScreen`).
+- Constant/variabel global: gunakan `lowerCamelCase` sesuai guideline Dart.
+- Istilah UI untuk tiket elektronik gunakan `E-Ticket` secara konsisten.
+
+## 16. Keamanan Untuk Dev vs Production
 
 Saat ini mobile mengizinkan HTTP (cleartext) untuk kebutuhan development lokal. Untuk production:
 
@@ -266,7 +273,7 @@ Saat ini mobile mengizinkan HTTP (cleartext) untuk kebutuhan development lokal. 
 - Gunakan domain resmi
 - Jangan hardcode secret di aplikasi
 
-## 16. Command Ringkas (Copy-Paste)
+## 17. Command Ringkas (Copy-Paste)
 
 Backend:
 

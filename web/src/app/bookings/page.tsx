@@ -16,6 +16,7 @@ type BookingView = {
   id: string;
   bookingCode: string;
   airline: string;
+  airlineLogo?: string;
   route: string;
   date: string;
   status: BookingStatus;
@@ -88,6 +89,7 @@ const mapBookingToView = (item: Awaited<ReturnType<typeof getMyBookingsFromApi>>
     id: String(item.id),
     bookingCode: item.bookingCode,
     airline: item.flight.airline.name,
+    airlineLogo: item.flight.airline.logo ?? "",
     route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
     date: formatDate(item.flight.departureTime),
     status,
@@ -129,6 +131,7 @@ function MyBookingsPageContent() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelDialogBooking, setCancelDialogBooking] = useState<BookingView | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   const refreshBookings = useCallback(async () => {
@@ -147,6 +150,7 @@ function MyBookingsPageContent() {
       pdfUrl: booking.pdfUrl,
       bookingCode: booking.bookingCode,
       airline: booking.airline,
+      airlineLogo: booking.airlineLogo ?? "",
       departureIso: booking.departureIso,
       arrivalIso: booking.arrivalIso,
       originAirportName: booking.originAirportName,
@@ -254,13 +258,17 @@ function MyBookingsPageContent() {
     router.push(`/booking/payment?${params.toString()}`)
   };
 
-  const handleCancelBooking = async (bookingId: string) => {
+  const openCancelDialog = (bookingId: string) => {
     const booking = liveBookings.find((item) => item.id === bookingId);
     if (!booking) return;
     if (booking.status !== "Pending") return;
 
-    const confirmed = window.confirm("Yakin ingin membatalkan booking ini? Tindakan ini tidak dapat dibatalkan.");
-    if (!confirmed) return;
+    setCancelDialogBooking(booking);
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancelDialogBooking) return;
+    const bookingId = cancelDialogBooking.id;
 
     setCancellingId(bookingId);
     setMessage("");
@@ -281,6 +289,7 @@ function MyBookingsPageContent() {
       );
       setMessage("Booking berhasil dibatalkan.");
       setActiveTab("Cancelled");
+      setCancelDialogBooking(null);
     } catch (error) {
       setPayError(error instanceof Error ? error.message : "Gagal membatalkan booking.");
     } finally {
@@ -336,6 +345,7 @@ function MyBookingsPageContent() {
             id: String(item.id),
             bookingCode: item.bookingCode,
             airline: item.flight.airline.name,
+            airlineLogo: item.flight.airline.logo ?? "",
             route: `${item.flight.origin.code ?? item.flight.origin.city} → ${item.flight.destination.code ?? item.flight.destination.city}`,
             date: formatDate(item.flight.departureTime),
             status,
@@ -369,7 +379,7 @@ function MyBookingsPageContent() {
 
         if (statusFromQuery === "success") {
           setActiveTab("Upcoming");
-          setMessage("Pembayaran berhasil. Booking tampil di tab Upcoming sampai e-ticket terbit.");
+          setMessage("Pembayaran berhasil. Booking tampil di tab Upcoming sampai E-Ticket terbit.");
           router.replace("/bookings");
         }
       } catch (error) {
@@ -579,14 +589,14 @@ function MyBookingsPageContent() {
                       )}
                       {booking.status === "Paid" && (
                         <p className="mt-1 text-xs font-semibold text-blue-700">
-                          Sudah dibayar, menunggu e-ticket terbit
+                          Sudah dibayar, menunggu E-Ticket terbit
                         </p>
                       )}
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
                         {booking.status === "Pending" && (
                           <>
                             <button
-                              onClick={() => void handleCancelBooking(booking.id)}
+                              onClick={() => openCancelDialog(booking.id)}
                               disabled={cancellingId === booking.id || payingId === booking.id || syncingId === booking.id}
                               className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                             >
@@ -637,6 +647,37 @@ function MyBookingsPageContent() {
           )}
         </section>
       </main>
+
+      {cancelDialogBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-rose-100 bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-black text-slate-900">Batalkan Booking?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Booking <span className="font-semibold text-slate-900">{cancelDialogBooking.bookingCode}</span> akan dibatalkan permanen dan tidak bisa dipulihkan.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {cancelDialogBooking.route} • {cancelDialogBooking.date}
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setCancelDialogBooking(null)}
+                disabled={cancellingId === cancelDialogBooking.id}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Kembali
+              </button>
+              <button
+                onClick={() => void handleCancelBooking()}
+                disabled={cancellingId === cancelDialogBooking.id}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cancellingId === cancelDialogBooking.id ? "Membatalkan..." : "Ya, Batalkan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
