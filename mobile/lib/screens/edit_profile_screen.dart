@@ -26,7 +26,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   bool _isLoading = false;
   bool _isUploadingAvatar = false;
   bool _isUpdatingTwoFactor = false;
+  bool _isUpdatingSplashSound = false;
   bool _obscureNik = true;
+  bool _splashSoundEnabled = true;
   late AnimationController _animCtrl;
   Uint8List? _localAvatarBytes;
   DateTime? _dob;
@@ -47,6 +49,13 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       duration: const Duration(milliseconds: 600),
     );
     _animCtrl.forward();
+    _loadSplashSoundPreference();
+  }
+
+  Future<void> _loadSplashSoundPreference() async {
+    final enabled = await LocalStorage.isSplashSoundEnabled();
+    if (!mounted) return;
+    setState(() => _splashSoundEnabled = enabled);
   }
 
   @override
@@ -499,6 +508,90 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                                               () =>
                                                   _isUpdatingTwoFactor = false,
                                             );
+                                        }
+                                      },
+                                    ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Suara Splash Screen',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Putar suara singkat saat aplikasi dibuka',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _isUpdatingSplashSound
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Switch(
+                                      value: _splashSoundEnabled,
+                                      activeThumbColor: AppColors.primary,
+                                      onChanged: (enabled) async {
+                                        setState(
+                                          () => _isUpdatingSplashSound = true,
+                                        );
+                                        try {
+                                          await LocalStorage
+                                              .setSplashSoundEnabled(enabled);
+                                          if (!mounted) return;
+                                          setState(
+                                            () =>
+                                                _splashSoundEnabled = enabled,
+                                          );
+                                          showSnackBar(
+                                            context,
+                                            enabled
+                                                ? 'Suara splash diaktifkan'
+                                                : 'Suara splash dinonaktifkan',
+                                          );
+                                        } catch (_) {
+                                          if (!mounted) return;
+                                          showSnackBar(
+                                            context,
+                                            'Gagal mengubah pengaturan suara splash',
+                                            isError: true,
+                                          );
+                                        } finally {
+                                          if (mounted) {
+                                            setState(
+                                              () => _isUpdatingSplashSound =
+                                                  false,
+                                            );
+                                          }
                                         }
                                       },
                                     ),

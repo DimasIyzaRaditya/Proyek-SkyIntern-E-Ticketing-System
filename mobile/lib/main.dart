@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'utils/app_theme.dart';
+import 'utils/helpers.dart';
 import 'providers/auth_provider.dart';
 import 'providers/flight_provider.dart';
 import 'providers/booking_provider.dart';
@@ -25,6 +26,7 @@ import 'screens/reset_password_screen.dart';
 import 'screens/booking_verify_screen.dart';
 import 'screens/login_2fa_screen.dart';
 import 'screens/chatbot_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/admin_airlines_screen.dart';
 import 'screens/admin_airports_screen.dart';
@@ -133,11 +135,19 @@ class _AppShellState extends State<_AppShell> {
   AppLinks? _appLinks;
   StreamSubscription<Uri>? _deepLinkSub;
   bool _didHandleInitialLink = false;
+  bool _enableSplashSound = true;
 
   @override
   void initState() {
     super.initState();
     _initDeepLinks();
+    _initPreferences();
+  }
+
+  Future<void> _initPreferences() async {
+    final enabled = await LocalStorage.isSplashSoundEnabled();
+    if (!mounted) return;
+    setState(() => _enableSplashSound = enabled);
   }
 
   Future<void> _initDeepLinks() async {
@@ -228,12 +238,16 @@ class _AppShellState extends State<_AppShell> {
                 return const ResetPasswordScreen();
               }
             }
-            if (!authProvider.isInitialized) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return const SearchScreen();
+            return SplashGate(
+              role: authProvider.user?.role,
+              isAppReady: authProvider.isInitialized,
+              enableIntroSound: _enableSplashSound,
+              child: authProvider.isInitialized
+                  ? const SearchScreen()
+                  : const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    ),
+            );
           },
         ),
         routes: {

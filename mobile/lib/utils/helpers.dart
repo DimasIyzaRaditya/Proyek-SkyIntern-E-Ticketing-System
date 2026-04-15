@@ -8,6 +8,7 @@ class LocalStorage {
   static const String userKey = 'skyintern_user';
   static const String tokenKey = 'skyintern_token';
   static const String recentAccountsKey = 'skyintern_recent_accounts';
+  static const String splashSoundEnabledKey = 'skyintern_splash_sound_enabled';
 
   static Future<void> saveUser(UserSession user, String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -91,6 +92,16 @@ class LocalStorage {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(recentAccountsKey, json.encode(accounts));
+  }
+
+  static Future<void> setSplashSoundEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(splashSoundEnabledKey, enabled);
+  }
+
+  static Future<bool> isSplashSoundEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(splashSoundEnabledKey) ?? true;
   }
 }
 
