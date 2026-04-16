@@ -61,12 +61,21 @@ function VerifyPageContent() {
   const [result, setResult]   = useState<VerifyBookingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
   const [showOpenAppHint, setShowOpenAppHint] = useState(false);
   const qrValue =
     typeof window !== "undefined"
       ? `${window.location.origin}/bookings/verify?code=${encodeURIComponent(code)}`
       : `/bookings/verify?code=${encodeURIComponent(code)}`;
   const appLink = `skyintern://bookings/e-ticket?code=${encodeURIComponent(code)}`;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setNowMs(Date.now());
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!code) {
@@ -112,8 +121,8 @@ function VerifyPageContent() {
 
   const booking      = result?.booking;
   const displayedError = error ?? (!code ? "Kode booking tidak ditemukan dalam QR code." : null);
-  const isPastDeparture = booking?.flight?.departureTime
-    ? new Date(booking.flight.departureTime).getTime() < Date.now()
+  const isPastDeparture = booking?.flight?.departureTime && nowMs !== null
+    ? new Date(booking.flight.departureTime).getTime() < nowMs
     : false;
   const shouldShowPastFlight = Boolean(
     booking
