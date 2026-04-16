@@ -95,6 +95,7 @@ export const updateAirline = async (req: AuthRequest, res: Response) => {
 
     let logoUrl = existingAirline.logo // Pertahankan logo lama jika tidak ada file baru
 
+    
     if (file) {
       // Delete old logo if exists
       if (existingAirline.logo) {
