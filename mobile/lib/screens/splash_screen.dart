@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -308,19 +309,50 @@ class SplashGate extends StatefulWidget {
 
 class _SplashGateState extends State<SplashGate> {
   bool _minDurationPassed = false;
+  bool _didPlayIntroSound = false;
+
+  Future<void> _playIntroSoundIfNeeded() async {
+    if (_didPlayIntroSound || !widget.enableIntroSound || kIsWeb) {
+      return;
+    }
+
+    _didPlayIntroSound = true;
+
+    try {
+      await SystemSound.play(SystemSoundType.alert);
+    } catch (_) {
+      // Keep splash flow resilient even if platform sound API is unavailable.
+    }
+
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 90));
+      await SystemSound.play(SystemSoundType.click);
+    } catch (_) {
+      // Ignore and continue showing splash without blocking navigation.
+    }
+  }
 
   @override
   void initState() {
     super.initState();
 
-    if (widget.enableIntroSound) {
-      SystemSound.play(SystemSoundType.click);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _playIntroSoundIfNeeded();
+    });
 
-    Future<void>.delayed(const Duration(milliseconds: 2100), () {
+    Future<void>.delayed(const Duration(milliseconds: 2800), () {
       if (!mounted) return;
       setState(() => _minDurationPassed = true);
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant SplashGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!oldWidget.enableIntroSound && widget.enableIntroSound) {
+      _playIntroSoundIfNeeded();
+    }
   }
 
   @override

@@ -241,7 +241,7 @@ class _AppShellState extends State<_AppShell> {
             return SplashGate(
               role: authProvider.user?.role,
               isAppReady: authProvider.isInitialized,
-              enableIntroSound: _enableSplashSound,
+              enableIntroSound: true,
               child: authProvider.isInitialized
                   ? const SearchScreen()
                   : const Scaffold(
