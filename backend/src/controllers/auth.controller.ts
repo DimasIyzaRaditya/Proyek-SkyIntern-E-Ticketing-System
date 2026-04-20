@@ -345,7 +345,17 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         data.dateOfBirth = parsedDate
       }
     }
-    if (avatarUrl === null || typeof avatarUrl === "string") data.avatarUrl = avatarUrl
+    if (avatarUrl === null) {
+      data.avatarUrl = null
+    } else if (typeof avatarUrl === "string") {
+      const trimmedAvatarUrl = avatarUrl.trim()
+      if (trimmedAvatarUrl.startsWith("data:image")) {
+        return res.status(400).json({
+          message: "Avatar base64 tidak didukung. Gunakan endpoint /api/auth/avatar untuk upload file."
+        })
+      }
+      data.avatarUrl = trimmedAvatarUrl
+    }
 
     const user = await prisma.user.update({ // Perbarui profil user di database
       where: { id: req.user?.id },

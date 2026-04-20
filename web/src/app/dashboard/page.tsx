@@ -9,7 +9,7 @@ import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
-import { getProfileFromApi, updateProfileFromApi } from "@/lib/auth-api";
+import { getProfileFromApi, uploadAvatarToApi } from "@/lib/auth-api";
 import { getMyBookingsFromApi } from "@/lib/booking-api";
 
 type BookingCard = {
@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [email, setEmail] = useState(() => getUserSession()?.email ?? "");
   const [phoneNumber, setPhoneNumber] = useState(() => getUserSession()?.phoneNumber ?? "");
   const [avatarUrl, setAvatarUrl] = useState(() => getUserSession()?.avatarUrl ?? "");
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [bookings, setBookings] = useState<BookingCard[]>([]);
   const [historyRowsPerPage, setHistoryRowsPerPage] = useState(5);
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
@@ -133,21 +134,25 @@ export default function DashboardPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Ukuran file maksimal 5MB.");
+      return;
+    }
 
-      try {
-        const profile = await updateProfileFromApi({ avatarUrl: result });
-        setUserSession(profile);
-        setAvatarUrl(profile.avatarUrl ?? "");
-        setMessage("Foto profil berhasil diperbarui.");
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Gagal upload foto profil.");
-      }
-    };
-    reader.readAsDataURL(file);
+    setAvatarUploading(true);
+    setMessage("");
+
+    try {
+      const profile = await uploadAvatarToApi(file);
+      setUserSession(profile);
+      setAvatarUrl(profile.avatarUrl ?? "");
+      setMessage("Foto profil berhasil diperbarui.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gagal upload foto profil.");
+    } finally {
+      setAvatarUploading(false);
+      if (event.target) event.target.value = "";
+    }
   };
 
   if (!authenticated || showSkeleton) {
@@ -209,8 +214,12 @@ export default function DashboardPage() {
                 type="file"
                 accept="image/*"
                 onChange={handleAvatarChange}
+                disabled={avatarUploading}
                 className="mt-2 block text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:font-semibold file:text-white hover:file:bg-blue-700"
               />
+              {avatarUploading && (
+                <p className="mt-2 text-xs text-slate-500">Mengupload foto profil...</p>
+              )}
             </div>
           </div>
 

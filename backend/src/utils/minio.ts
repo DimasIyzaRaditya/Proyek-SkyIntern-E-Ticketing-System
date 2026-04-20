@@ -15,13 +15,26 @@ export const minioClient = new Client({
 const BUCKET_NAME = "skyintern" // Nama bucket penyimpanan semua file aplikasi
 export const MINIO_BUCKET_NAME = BUCKET_NAME
 
-const getPublicBaseUrl = () => {
+const sanitizeBaseUrl = (url: string) => url.replace(/\/+$/, "")
+
+const getProxyPublicBaseUrl = () => {
   if (process.env.FILE_PUBLIC_BASE_URL) return process.env.FILE_PUBLIC_BASE_URL
   if (process.env.BACKEND_PUBLIC_URL) return process.env.BACKEND_PUBLIC_URL
 
   const port = process.env.PORT || "3000"
   return `http://localhost:${port}`
 }
+
+const getMinioPublicBaseUrl = () => {
+  const explicitPublicUrl = process.env.MINIO_PUBLIC_URL?.trim()
+  return explicitPublicUrl ? sanitizeBaseUrl(explicitPublicUrl) : null
+}
+
+const encodeObjectKey = (fileName: string) =>
+  fileName
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")
 
 const PUBLIC_READ_POLICY = JSON.stringify({
   Version: "2012-10-17",
@@ -66,7 +79,7 @@ export const uploadFile = async (
       "Content-Type": contentType
     })
 
-    return `${getPublicBaseUrl()}/api/files?key=${encodeURIComponent(fileName)}`
+    return getFileUrl(fileName)
   } catch (error: any) {
     if (error.code === "ECONNREFUSED") {
       throw new Error("Server MinIO tidak berjalan. Fitur upload file dinonaktifkan.")
@@ -76,7 +89,12 @@ export const uploadFile = async (
 }
 
 export const getFileUrl = (fileName: string): string => {
-  return `${getPublicBaseUrl()}/api/files?key=${encodeURIComponent(fileName)}`
+  const minioPublicBaseUrl = getMinioPublicBaseUrl()
+  if (minioPublicBaseUrl) {
+    return `${minioPublicBaseUrl}/${BUCKET_NAME}/${encodeObjectKey(fileName)}`
+  }
+
+  return `${sanitizeBaseUrl(getProxyPublicBaseUrl())}/api/files?key=${encodeURIComponent(fileName)}`
 }
 
 export const extractFileKeyFromUrl = (fileUrl: string): string | null => {

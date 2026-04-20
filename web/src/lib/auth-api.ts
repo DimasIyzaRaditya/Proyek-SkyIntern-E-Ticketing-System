@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api-client";
 import type { UserSession } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/api-client";
 
 type AuthLoginResponse = {
   message: string;
@@ -39,6 +40,32 @@ export type AuthPendingTwoFactorPayload = {
 
 export type AuthLoginResult = AuthSessionPayload | AuthPendingTwoFactorPayload;
 
+const normalizeAvatarUrl = (url: string | null): string => {
+  const raw = (url ?? "").trim();
+  if (!raw) return "";
+
+  const avatarUri = UriTryParse(raw);
+  if (!avatarUri) return raw;
+
+  const apiUri = UriTryParse(API_BASE_URL);
+  if (!apiUri) return raw;
+
+  const host = avatarUri.hostname.toLowerCase();
+  const shouldReplaceHost = host === "localhost" || host === "127.0.0.1" || host === "10.0.2.2";
+  if (!shouldReplaceHost) return raw;
+
+  avatarUri.host = apiUri.hostname;
+  return avatarUri.toString();
+};
+
+const UriTryParse = (value: string): URL | null => {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+};
+
 const toUserSession = (user: AuthProfileResponse["user"]): UserSession => ({
   id: user.id,
   fullName: user.name,
@@ -46,7 +73,7 @@ const toUserSession = (user: AuthProfileResponse["user"]): UserSession => ({
   phoneNumber: user.phone ?? "",
   nik: user.nik ?? "",
   dateOfBirth: user.dateOfBirth ? user.dateOfBirth.slice(0, 10) : "",
-  avatarUrl: user.avatarUrl ?? "",
+  avatarUrl: normalizeAvatarUrl(user.avatarUrl),
   twoFactorEnabled: user.twoFactorEnabled,
   role: user.role === "ADMIN" ? "admin" : "user",
 });
