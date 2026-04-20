@@ -14,6 +14,10 @@ export const createAirline = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Kode, nama, dan negara wajib diisi" })
     }
 
+    if (file && file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: "Ukuran logo maksimal 5MB" })
+    }
+
     let logoUrl: string | undefined // URL logo setelah diupload ke MinIO
 
     if (file) {
@@ -83,6 +87,10 @@ export const updateAirline = async (req: AuthRequest, res: Response) => {
 
     if (!code || !name || !country) {
       return res.status(400).json({ message: "Kode, nama, dan negara wajib diisi" })
+    }
+
+    if (file && file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: "Ukuran logo maksimal 5MB" })
     }
 
     const existingAirline = await prisma.airline.findUnique({
