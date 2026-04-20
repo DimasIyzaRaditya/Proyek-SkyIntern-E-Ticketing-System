@@ -485,20 +485,20 @@ function MyBookingsPageContent() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-6xl px-6 py-10 page-enter">
-        <h1 className="inline-flex items-center gap-2 text-3xl font-black text-slate-900">
-          <Ticket className="h-7 w-7 text-blue-700" /> My Bookings
+      <main className="mx-auto max-w-6xl px-3 py-8 page-enter sm:px-6 sm:py-10">
+        <h1 className="inline-flex items-center gap-2 text-2xl font-black text-slate-900 sm:text-3xl">
+          <Ticket className="h-6 w-6 text-blue-700 sm:h-7 sm:w-7" /> My Bookings
         </h1>
         {message && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{message}</p>}
         {payError && <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{payError}</p>}
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-1.5 rounded-2xl border border-blue-100 bg-white p-1 shadow-sm">
+          <div className="flex max-w-full gap-1.5 overflow-x-auto rounded-2xl border border-blue-100 bg-white p-1 shadow-sm">
             {(["Upcoming", "Completed", "Cancelled"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                className={`shrink-0 rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 ${
                   activeTab === tab
                     ? "bg-blue-600 text-white shadow-sm"
                     : "text-slate-500 hover:text-slate-800 hover:bg-blue-50"
@@ -508,10 +508,10 @@ function MyBookingsPageContent() {
               </button>
             ))}
           </div>
-          <div className="flex gap-1 rounded-2xl border border-blue-100 bg-white p-1 shadow-sm">
+          <div className="flex w-full gap-1 rounded-2xl border border-blue-100 bg-white p-1 shadow-sm sm:w-auto">
             <button
               onClick={() => setSortOrder("newest")}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200 sm:flex-none ${
                 sortOrder === "newest"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-800 hover:bg-blue-50"
@@ -522,7 +522,7 @@ function MyBookingsPageContent() {
             </button>
             <button
               onClick={() => setSortOrder("oldest")}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200 sm:flex-none ${
                 sortOrder === "oldest"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-800 hover:bg-blue-50"

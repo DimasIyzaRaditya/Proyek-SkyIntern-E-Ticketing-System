@@ -226,10 +226,6 @@ function SearchResultsPageContent() {
     const showPromoPagination = sortedPromos.length > PROMOS_PER_PAGE;
     const promoPageNumbers = Array.from({ length: totalPromoPages }, (_, index) => index + 1);
 
-    const promoNames = sortedPromos
-      .map((promo) => `${promo.title} (${promo.discount}%)`)
-      .join(" • ");
-
     return (
       <div className="space-y-2">
         <div className="rounded-xl border border-emerald-200 bg-linear-to-b from-emerald-50 to-white p-2.5">
@@ -343,15 +339,15 @@ function SearchResultsPageContent() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-7xl px-6 py-10 page-enter">
-        <h1 className="text-3xl font-black text-slate-900">Hasil Pencarian Penerbangan</h1>
-        <p className="mt-1 text-sm text-slate-600">
+      <main className="mx-auto max-w-7xl px-3 py-8 page-enter sm:px-6 sm:py-10">
+        <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">Hasil Pencarian Penerbangan</h1>
+        <p className="mt-1 text-xs text-slate-600 sm:text-sm">
           {origin} → {destination} • {departureDate}
           {returnDate ? ` - ${returnDate}` : " (Sekali jalan)"} • {adult} Adult / {child} Child / {infant} Infant
         </p>
 
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
-          <aside className="h-fit self-start rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+          <aside className="h-fit self-start rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)] sm:rounded-[30px] sm:p-6">
             <h2 className="text-lg font-bold text-slate-900">Filter Section</h2>
             <div className="mt-5 space-y-2.5 text-sm">
               <button onClick={() => handleSortChange("price-low")} className={`w-full rounded-xl border px-4 py-2.5 text-left font-semibold transition ${sortBy === "price-low" ? "border-blue-600 bg-blue-600 text-white" : "border-blue-100 bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>Price Low to High</button>
@@ -407,11 +403,11 @@ function SearchResultsPageContent() {
                     </button>
                   </div>
 
-                  <p className="text-sm text-slate-600">
+                  <p className="text-xs text-slate-600 sm:text-sm">
                     {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalFlights)} of {totalFlights.toLocaleString("en-US")}
                   </p>
 
-                  <div className="ml-auto flex items-center gap-2 text-sm text-slate-700">
+                  <div className="flex w-full items-center gap-2 text-xs text-slate-700 sm:ml-auto sm:w-auto sm:text-sm">
                     <label htmlFor="items-per-page" className="font-medium">Result per page</label>
                     <select
                       id="items-per-page"
@@ -441,7 +437,7 @@ function SearchResultsPageContent() {
                         {/* Airline name + time grid */}
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div className="skeleton h-6 w-36 rounded-lg" />
-                          <div className="grid min-w-60 grid-cols-[auto_1fr_auto] items-center gap-4 text-center">
+                          <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 text-center sm:min-w-60 sm:gap-4">
                             <div className="space-y-1">
                               <div className="skeleton h-9 w-16 rounded" />
                               <div className="skeleton mx-auto h-3.5 w-10 rounded" />
@@ -501,7 +497,7 @@ function SearchResultsPageContent() {
               return (
                 <article
                   key={`${sortBy}-${flight.id}`}
-                  className="card-enter rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-transform duration-200 hover:-translate-y-0.5"
+                  className="card-enter rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 sm:p-4"
                   style={{ animationDelay: `${Math.min(idx, 5) * 55}ms` }}
                 >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -523,18 +519,18 @@ function SearchResultsPageContent() {
                           <p className="text-xl font-bold text-slate-900">{flight.airline}</p>
                         </div>
 
-                        <div className="grid min-w-60 grid-cols-[auto_1fr_auto] items-center gap-4 text-center text-slate-900">
+                        <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 text-center text-slate-900 sm:min-w-60 sm:gap-4">
                           <div>
-                            <p className="text-3xl font-black">{flight.departureTime}</p>
-                            <p className="text-sm text-slate-600">{extractAirportCode(flight.origin)}</p>
+                            <p className="text-2xl font-black sm:text-3xl">{flight.departureTime}</p>
+                            <p className="text-xs text-slate-600 sm:text-sm">{extractAirportCode(flight.origin)}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-slate-500">{flight.duration}</p>
+                            <p className="text-xs text-slate-500 sm:text-sm">{flight.duration}</p>
                             <div className="mx-auto mt-1 h-0.5 w-16 bg-slate-300" />
                           </div>
                           <div>
-                            <p className="text-3xl font-black">{flight.arrivalTime}</p>
-                            <p className="text-sm text-slate-600">{extractAirportCode(flight.destination)}</p>
+                            <p className="text-2xl font-black sm:text-3xl">{flight.arrivalTime}</p>
+                            <p className="text-xs text-slate-600 sm:text-sm">{extractAirportCode(flight.destination)}</p>
                           </div>
                         </div>
                       </div>
@@ -567,7 +563,7 @@ function SearchResultsPageContent() {
                           Tanpa promo
                         </div>
                       )}
-                      <p className="text-3xl font-black text-orange-600">{formatRupiah(flight.price)}<span className="text-sm font-semibold text-slate-500">/pax</span></p>
+                      <p className="text-2xl font-black text-orange-600 sm:text-3xl">{formatRupiah(flight.price)}<span className="text-sm font-semibold text-slate-500">/pax</span></p>
 
                       <Link
                         href={`/search/detail/${flight.id}?${query.toString()}`}
