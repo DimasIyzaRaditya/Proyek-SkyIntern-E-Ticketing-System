@@ -602,11 +602,11 @@ function TabScroller({ children, label }: { children: React.ReactNode; label?: s
 }
 
 // ── Skeleton loaders ─────────────────────────────────────────────────────────
-function DomesticSkeletons() {
+function FlightCardSkeletons() {
   return (
     <div className="flex gap-3 sm:gap-4 overflow-hidden">
       {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-52 md:w-60 lg:w-72 shrink-0 rounded-2xl overflow-hidden bg-slate-200 animate-pulse">
+        <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-52 md:w-60 lg:w-72 shrink-0 rounded-2xl overflow-hidden bg-slate-200 animate-pulse">
           <div className="h-32 sm:h-36 md:h-40 bg-slate-300" />
           <div className="p-3.5 space-y-2">
             <div className="h-3.5 w-36 bg-slate-300 rounded" />
@@ -759,9 +759,9 @@ export default function HomePromoSection() {
 
             {/* Cards */}
             {loadingDeals ? (
-              <DomesticSkeletons />
+              <FlightCardSkeletons />
             ) : (
-              <HorizontalScroll>
+              <HorizontalScroll key={`domestic-${selectedCity || "all"}`}>
                 {displayDomestic.map((flight, i) => (
                   <DomesticFlightCard key={flight.id} flight={flight} promos={promos} index={i} />
                 ))}
@@ -798,13 +798,9 @@ export default function HomePromoSection() {
             )}
 
             {loadingDeals ? (
-              <div className="flex gap-3 sm:gap-4 overflow-hidden">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-[calc(100vw-2rem)] max-w-none sm:w-52 md:w-60 lg:w-72 shrink-0 h-36 sm:h-40 md:h-44 animate-pulse rounded-2xl bg-slate-200" />
-                ))}
-              </div>
+              <FlightCardSkeletons />
             ) : (
-              <HorizontalScroll>
+              <HorizontalScroll key={`intl-${selectedIntlCountry || "all"}`}>
                 {displayInternational.map((flight, i) => (
                   <IntlFlightCard key={flight.id} flight={flight} promos={promos} index={i} />
                 ))}
