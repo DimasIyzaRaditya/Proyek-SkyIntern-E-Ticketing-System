@@ -149,10 +149,12 @@ class AuthService {
       throw Exception('Sesi login tidak valid. Silakan login kembali.');
     }
 
+    final baseUrl = await ApiClient.getBaseUrl();
+
     final request =
         http.MultipartRequest(
             'POST',
-            Uri.parse('${ApiClient.baseUrl}/api/auth/avatar'),
+            Uri.parse('$baseUrl/api/auth/avatar'),
           )
           ..headers['Authorization'] = 'Bearer $token'
           ..headers['X-Platform'] = 'mobile';

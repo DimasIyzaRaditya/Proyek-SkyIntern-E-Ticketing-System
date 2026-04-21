@@ -22,10 +22,12 @@ class AdminService {
     String? logoFileName,
     String? logoMimeType,
   }) async {
+    final baseUrl = await ApiClient.getBaseUrl();
+
     final request =
         http.MultipartRequest(
             'POST',
-            Uri.parse('${ApiClient.baseUrl}/api/admin/airlines'),
+            Uri.parse('$baseUrl/api/admin/airlines'),
           )
           ..headers['X-Platform'] = 'mobile'
           ..headers['Authorization'] = 'Bearer ${ApiClient.authToken}'
@@ -67,10 +69,12 @@ class AdminService {
     String? logoFileName,
     String? logoMimeType,
   }) async {
+    final baseUrl = await ApiClient.getBaseUrl();
+
     final request =
         http.MultipartRequest(
             'PUT',
-            Uri.parse('${ApiClient.baseUrl}/api/admin/airlines/$id'),
+            Uri.parse('$baseUrl/api/admin/airlines/$id'),
           )
           ..headers['X-Platform'] = 'mobile'
           ..headers['Authorization'] = 'Bearer ${ApiClient.authToken}'
