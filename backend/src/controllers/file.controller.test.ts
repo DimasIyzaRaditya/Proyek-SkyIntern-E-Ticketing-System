@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/testdb";
 
 const controller = require("./file.controller") as typeof import("./file.controller");

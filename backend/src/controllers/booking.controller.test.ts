@@ -8,7 +8,6 @@ process.env.JWT_SECRET ||= "dummy";
 
 const controller = require("./booking.controller") as typeof import("./booking.controller");
 const prisma = require("../prisma/client").default as any;
-const bookingExpiry = require("../utils/booking-expiry") as any;
 
 const createMockResponse = () => {
   const res: any = {
@@ -57,24 +56,21 @@ test("[CREATE] createBooking status 201 dan data benar", async () => {
   }
 });
 
-test("[READ] getMyBookings status 200 dan data sesuai", async () => {
-  const req: any = { user: { id: 11 }, query: {} };
+test("[READ] verifyBookingByCode status 200 dan data sesuai", async () => {
+  const req: any = { query: { code: "ABC123" } };
   const res = createMockResponse();
-  const rows = [{ id: 1, bookingCode: "ABC123", status: "PENDING" }];
-  const originalExpirePendingBookings = bookingExpiry.expirePendingBookings;
-  const originalFindMany = prisma.booking.findMany;
+  const row = { id: 1, bookingCode: "ABC123", status: "PENDING" };
+  const originalFindUnique = prisma.booking.findUnique;
 
-  bookingExpiry.expirePendingBookings = async () => 0;
-  prisma.booking.findMany = async () => rows;
+  prisma.booking.findUnique = async () => row;
 
   try {
-    await controller.getMyBookings(req, res);
+    await controller.verifyBookingByCode(req, res);
 
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.payload.bookings, rows);
+    assert.deepEqual(res.payload.booking, row);
   } finally {
-    bookingExpiry.expirePendingBookings = originalExpirePendingBookings;
-    prisma.booking.findMany = originalFindMany;
+    prisma.booking.findUnique = originalFindUnique;
   }
 });
 

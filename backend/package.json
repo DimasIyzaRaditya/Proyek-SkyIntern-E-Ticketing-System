@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "ts-node-dev src/index.ts --port 3000",
     "build": "tsc",
-    "pretest": "npm run build",
-    "test": "node --test dist/**/*.test.js",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"src/**/*.spec.ts\"",
+    "test:controllers": "node --import tsx --test \"src/controllers/**/*.test.ts\" \"src/controllers/**/*.spec.ts\"",
+    "test:controllers:coverage": "c8 --reporter=text-summary --reporter=lcov --check-coverage --lines=80 --functions=80 --branches=70 --statements=80 --all --src=src --include=src/controllers/**/*.ts --exclude=src/controllers/**/*.test.ts --exclude=src/controllers/**/*.spec.ts node --import tsx --test \"src/controllers/**/*.test.ts\" \"src/controllers/**/*.spec.ts\"",
     "start": "node dist/index.js",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",

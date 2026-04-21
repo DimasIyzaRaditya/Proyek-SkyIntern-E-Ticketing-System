@@ -165,7 +165,7 @@ jobs:
             echo "Controller test files:"
             echo "$test_files"
 
-            npm run test:controllers
+            npm test
           else
             echo "No controller test files found under src/controllers/**/*.test.ts or **/*.spec.ts"
             echo "Ensure your controller tests are stored under backend/src/controllers/**/*.test.ts or .spec.ts"
