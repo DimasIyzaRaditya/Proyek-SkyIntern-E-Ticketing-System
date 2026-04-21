@@ -103,8 +103,8 @@ export default function AdminUsersPage() {
 
   return (
     <AdminShell title="User Management" description="Daftar user terdaftar. Admin dapat memblokir/membuka blokir akun user.">
-      <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <p className="text-sm text-slate-600">
             {loading ? "Memuat data..." : `${users.length} user ditemukan`}
           </p>
@@ -119,8 +119,8 @@ export default function AdminUsersPage() {
 
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="max-w-full overflow-x-auto">
+          <table className="min-w-180 w-full text-left text-sm">
             <thead className="bg-blue-50 text-slate-600">
               <tr>
                 <th className="rounded-l-xl p-3">ID</th>

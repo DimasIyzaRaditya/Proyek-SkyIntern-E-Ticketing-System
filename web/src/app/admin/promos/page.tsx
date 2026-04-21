@@ -197,11 +197,11 @@ export default function AdminPromosPage() {
       )}
 
       {/* Toolbar */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <p className="text-sm text-slate-500">{promos.length} promo terdaftar</p>
         <button
           onClick={openCreate}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 sm:w-auto"
         >
           <Plus className="h-4 w-4" /> Tambah Promo
         </button>
@@ -218,8 +218,8 @@ export default function AdminPromosPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="max-w-full overflow-x-auto">
+            <table className="min-w-180 w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Judul</th>
@@ -384,7 +384,7 @@ export default function AdminPromosPage() {
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-600">
                     Tanggal Mulai <span className="text-red-500">*</span>

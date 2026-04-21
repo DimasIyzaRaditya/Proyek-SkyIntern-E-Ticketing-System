@@ -4,11 +4,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { formatRupiah } from "@/lib/currency";
 import { getAdminFlights, deleteAdminFlight, type AdminFlight } from "@/lib/admin-api";
 
 type SortField = "flightNumber" | "route" | "basePrice" | "departureTime" | "arrivalTime";
 type SortDirection = "asc" | "desc";
+
+const SORT_FIELD_OPTIONS: Array<{ value: SortField; label: string }> = [
+  { value: "departureTime", label: "Departure" },
+  { value: "arrivalTime", label: "Arrival" },
+  { value: "flightNumber", label: "Flight" },
+  { value: "route", label: "Route" },
+  { value: "basePrice", label: "Base Price" },
+];
+
+const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
+  { value: "asc", label: "Ascending" },
+  { value: "desc", label: "Descending" },
+];
 
 export default function AdminSchedulesPage() {
   const [flights, setFlights] = useState<AdminFlight[]>([]);
@@ -120,11 +134,11 @@ export default function AdminSchedulesPage() {
 
   return (
     <AdminShell title="Flight Schedule Management" description="Manage flight schedules from the list. Use Add Schedule to create new data.">
-      <section className="mt-5 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+      <section className="mt-5 max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-4 flex justify-end">
           <Link
             href="/admin/schedules/create"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 sm:w-auto"
           >
             <Plus className="h-4 w-4" /> Add Schedule
           </Link>
@@ -132,33 +146,26 @@ export default function AdminSchedulesPage() {
 
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
-        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_150px_auto]">
+        <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search flight, airline, origin, or destination"
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+            className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
           />
-          <select
+          <ResponsiveSelect
             value={sortField}
-            onChange={(event) => setSortField(event.target.value as SortField)}
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          >
-            <option value="departureTime">Sort: Departure</option>
-            <option value="arrivalTime">Sort: Arrival</option>
-            <option value="flightNumber">Sort: Flight</option>
-            <option value="route">Sort: Route</option>
-            <option value="basePrice">Sort: Base Price</option>
-          </select>
-          <select
+            onChange={(nextValue) => setSortField(nextValue as SortField)}
+            options={SORT_FIELD_OPTIONS}
+            placeholder="Sort by"
+          />
+          <ResponsiveSelect
             value={sortDirection}
-            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-          <div className="flex items-center justify-end text-sm font-medium text-slate-600">
+            onChange={(nextValue) => setSortDirection(nextValue as SortDirection)}
+            options={SORT_DIRECTION_OPTIONS}
+            placeholder="Direction"
+          />
+          <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end">
             Total: {displayedFlights.length}
           </div>
         </div>
@@ -167,8 +174,8 @@ export default function AdminSchedulesPage() {
           Tabel ini menampilkan jadwal penerbangan aktif. Geser ke samping pada layar kecil untuk melihat semua kolom.
         </p>
 
-        <div className="overflow-x-auto rounded-2xl">
-          <table className="min-w-195 w-full text-left text-sm">
+        <div className="max-w-full overflow-x-auto rounded-2xl">
+          <table className="min-w-180 w-full text-left text-sm">
             <thead className="bg-blue-50 text-slate-600">
               <tr>
                 <th className="rounded-l-xl p-3">Flight</th>
@@ -191,13 +198,13 @@ export default function AdminSchedulesPage() {
                 </tr>
               ) : visibleFlights.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
-                  <td className="whitespace-nowrap p-3 font-semibold">{item.flightNumber}</td>
-                  <td className="whitespace-nowrap p-3 font-semibold">{item.origin.city} → {item.destination.city}</td>
-                  <td className="whitespace-nowrap p-3">{formatRupiah(item.basePrice)}</td>
-                  <td className="whitespace-nowrap p-3">{new Date(item.departureTime).toLocaleString("id-ID")}</td>
-                  <td className="whitespace-nowrap p-3">{new Date(item.arrivalTime).toLocaleString("id-ID")}</td>
-                  <td className="whitespace-nowrap p-3">{item.aircraft ?? "—"}</td>
-                  <td className="p-3">
+                  <td className="p-3 font-semibold">{item.flightNumber}</td>
+                  <td className="p-3 font-semibold">{item.origin.city} → {item.destination.city}</td>
+                  <td className="p-3">{formatRupiah(item.basePrice)}</td>
+                  <td className="p-3">{new Date(item.departureTime).toLocaleString("id-ID")}</td>
+                  <td className="p-3">{new Date(item.arrivalTime).toLocaleString("id-ID")}</td>
+                  <td className="p-3">{item.aircraft ?? "—"}</td>
+                  <td className="whitespace-nowrap p-3">
                     <div className="flex flex-wrap gap-2">
                       <Link
                         href={`/admin/schedules/${item.id}`}

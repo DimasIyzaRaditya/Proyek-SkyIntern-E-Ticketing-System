@@ -245,7 +245,7 @@ export default function AdminPage() {
           {/* Stat cards skeleton */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <div key={i} className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
                 <div className="skeleton mb-3 h-3.5 w-20 rounded" />
                 <div className="skeleton h-9 w-24 rounded-lg" />
                 <div className="skeleton mt-2 h-3 w-32 rounded" />
@@ -253,7 +253,7 @@ export default function AdminPage() {
             ))}
           </div>
           {/* Chart skeleton */}
-          <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+          <div className="rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
             <div className="skeleton mb-4 h-6 w-36 rounded-lg" />
             <div className="skeleton h-56 w-full rounded-2xl" />
           </div>
@@ -264,7 +264,7 @@ export default function AdminPage() {
           {/* ── Stat Cards ── */}
           <LazySection>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <p className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 uppercase tracking-wide">
                 <UserCircle2 className="h-3.5 w-3.5" /> Admin
               </p>
@@ -272,19 +272,19 @@ export default function AdminPage() {
               <p className="text-xs text-slate-500 truncate">{adminEmail}</p>
             </div>
 
-            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Booking</p>
               <p className="mt-1 text-3xl font-black text-indigo-700 sm:text-4xl">{stats.total}</p>
               <p className="mt-1 text-xs text-slate-500">Hari ini: <span className="font-bold text-indigo-600">{stats.today}</span></p>
             </div>
 
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tiket Terjual</p>
               <p className="mt-1 text-3xl font-black text-emerald-700 sm:text-4xl">{stats.paid + stats.issued}</p>
               <p className="mt-1 text-xs text-slate-500">Paid: {stats.paid} · Issued: {stats.issued}</p>
             </div>
 
-            <div className="rounded-2xl border border-violet-100 bg-violet-50 p-5 shadow-sm">
+            <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Revenue</p>
               <p className="mt-1 text-lg font-black leading-tight text-violet-700 sm:text-xl">{formatRupiah(stats.revenue)}</p>
               <p className="mt-1 text-xs text-slate-500">Pending: {stats.pending} · Batal: {stats.cancelled}</p>
@@ -298,13 +298,13 @@ export default function AdminPage() {
             <div className="flex flex-col lg:flex-row">
 
               {/* Sales chart with Daily / Monthly / Yearly tabs */}
-              <div className="flex-1 min-w-0 p-5 sm:p-6">
+              <div className="flex-1 min-w-0 p-4 sm:p-6">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-900 sm:text-lg">
                     <TrendingUp className="h-5 w-5 text-blue-600" />
                     {chartTypeTab === "penjualan" ? "Grafik Penjualan" : "Grafik Penjualan Tiket"}
                   </h2>
-                  <div className="flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1">
+                  <div className="flex w-full flex-wrap gap-1 rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold sm:w-auto sm:flex-nowrap">
                     {(["daily", "monthly", "yearly"] as const).map((v) => (
                       <button
                         key={v}
@@ -322,7 +322,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Chart type tabs */}
-                <div className="mb-4 flex rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold gap-1 w-fit">
+                <div className="mb-4 flex w-full flex-wrap gap-1 rounded-xl border border-blue-100 bg-slate-50 p-1 text-xs font-semibold sm:w-fit sm:flex-nowrap">
                   {(["tiket", "penjualan"] as const).map((t) => (
                     <button
                       key={t}
@@ -430,12 +430,12 @@ export default function AdminPage() {
 
           {/* ── Recent Bookings Table ── */}
           <LazySection delay={2}>
-          <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+          <section className="rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-4 inline-flex items-center gap-2 text-lg font-black text-slate-900 sm:text-xl">
               <ReceiptText className="h-5 w-5 text-blue-700" /> Booking Terbaru
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
+            <div className="max-w-full overflow-x-auto">
+              <table className="min-w-180 w-full text-left text-xs sm:text-sm">
                 <thead className="bg-blue-50 text-slate-600">
                   <tr>
                     <th className="rounded-l-xl p-3">Kode</th>

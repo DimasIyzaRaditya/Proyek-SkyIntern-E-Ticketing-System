@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 type SelectOption = {
-  value: number;
+  value: string | number;
   label: string;
 };
 
 type ResponsiveSelectProps = {
-  value: number;
-  onChange: (value: number) => void;
+  value: string | number;
+  onChange: (value: string | number) => void;
   options: SelectOption[];
   placeholder?: string;
   disabled?: boolean;

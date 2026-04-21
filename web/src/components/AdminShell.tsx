@@ -24,11 +24,11 @@ export default function AdminShell({ title, description, children }: AdminShellP
   const isAllowed = role === "admin";
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
+    <div className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#dbeafe_0%,#eef5ff_45%,#dbeafe_100%)]">
       <MainNav />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 lg:px-6 lg:py-8">
         {!isHydrated ? (
-          <section className="rounded-3xl border border-blue-100 bg-white p-6 text-center shadow-sm sm:p-8">
+          <section className="rounded-3xl border border-blue-100 bg-white p-4 text-center shadow-sm sm:p-8">
             <p className="text-xs text-slate-600 sm:text-sm">Memuat akses admin...</p>
           </section>
         ) : isAllowed ? (
@@ -41,7 +41,7 @@ export default function AdminShell({ title, description, children }: AdminShellP
             {children}
           </>
         ) : (
-          <section className="rounded-3xl border border-red-200 bg-white p-6 text-center shadow-sm sm:p-8">
+          <section className="rounded-3xl border border-red-200 bg-white p-4 text-center shadow-sm sm:p-8">
             <h1 className="text-xl font-black text-red-700 sm:text-2xl">Akses Admin Ditolak</h1>
             <p className="mt-2 text-xs text-slate-600 sm:text-sm">Silakan login menggunakan akun admin terlebih dahulu.</p>
             <Link href="/auth/login" className="mt-4 inline-block rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 sm:px-5 sm:py-2.5 sm:text-sm">

@@ -4,10 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { getAdminAirports, deleteAdminAirport, type AdminAirport } from "@/lib/admin-api";
 
 type SortField = "id" | "name" | "city" | "country" | "timezone";
 type SortDirection = "asc" | "desc";
+
+const SORT_FIELD_OPTIONS: Array<{ value: SortField; label: string }> = [
+  { value: "name", label: "Name" },
+  { value: "city", label: "City" },
+  { value: "country", label: "Country" },
+  { value: "timezone", label: "Timezone" },
+  { value: "id", label: "ID" },
+];
+
+const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
+  { value: "asc", label: "Ascending" },
+  { value: "desc", label: "Descending" },
+];
 
 export default function AdminAirportsPage() {
   const [airports, setAirports] = useState<AdminAirport[]>([]);
@@ -98,11 +112,11 @@ export default function AdminAirportsPage() {
 
   return (
     <AdminShell title="Airport Management" description="Manage airports from the list. Use Add Airport to create a new record.">
-      <section className="mt-5 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+      <section className="mt-5 max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-4 flex justify-end">
           <Link
             href="/admin/airports/create"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 sm:w-auto"
           >
             <Plus className="h-4 w-4" /> Add Airport
           </Link>
@@ -110,39 +124,32 @@ export default function AdminAirportsPage() {
 
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
-        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_150px_auto]">
+        <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search ID, name, city, country, or timezone"
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+            className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
           />
-          <select
+          <ResponsiveSelect
             value={sortField}
-            onChange={(event) => setSortField(event.target.value as SortField)}
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          >
-            <option value="name">Sort: Name</option>
-            <option value="city">Sort: City</option>
-            <option value="country">Sort: Country</option>
-            <option value="timezone">Sort: Timezone</option>
-            <option value="id">Sort: ID</option>
-          </select>
-          <select
+            onChange={(nextValue) => setSortField(nextValue as SortField)}
+            options={SORT_FIELD_OPTIONS}
+            placeholder="Sort by"
+          />
+          <ResponsiveSelect
             value={sortDirection}
-            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-          <div className="flex items-center justify-end text-sm font-medium text-slate-600">
+            onChange={(nextValue) => setSortDirection(nextValue as SortDirection)}
+            options={SORT_DIRECTION_OPTIONS}
+            placeholder="Direction"
+          />
+          <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end">
             Total: {displayedAirports.length}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="max-w-full overflow-x-auto">
+          <table className="min-w-180 w-full text-left text-sm">
             <thead className="bg-blue-50 text-slate-600">
               <tr>
                 <th className="rounded-l-xl p-3">ID</th>
@@ -169,7 +176,7 @@ export default function AdminAirportsPage() {
                   <td className="p-3">{item.city}</td>
                   <td className="p-3">{item.country}</td>
                   <td className="p-3">{item.timezone}</td>
-                  <td className="p-3">
+                  <td className="whitespace-nowrap p-3">
                     <div className="flex gap-2">
                       <Link
                         href={`/admin/airports/${item.id}`}

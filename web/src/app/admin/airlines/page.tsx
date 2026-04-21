@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import ResponsiveSelect from "@/components/ResponsiveSelect";
 import {
   deleteAdminAirline,
   getAdminAirlines,
@@ -15,6 +16,16 @@ type SortField = "id" | "code" | "name" | "country";
 type SortDirection = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const SORT_FIELD_OPTIONS: Array<{ value: SortField; label: string }> = [
+  { value: "name", label: "Name" },
+  { value: "code", label: "Code" },
+  { value: "country", label: "Country" },
+  { value: "id", label: "ID" },
+];
+const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
+  { value: "asc", label: "Ascending" },
+  { value: "desc", label: "Descending" },
+];
 
 export default function AdminAirlinesPage() {
   const [airlines, setAirlines] = useState<AdminAirline[]>([]);
@@ -106,11 +117,11 @@ export default function AdminAirlinesPage() {
 
   return (
     <AdminShell title="Airline Management" description="Click Add Airline to create a new airline. Edit and delete are available in this table and the detail page.">
-      <section className="mt-5 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+      <section className="mt-5 max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-4 flex justify-end">
           <Link
             href="/admin/airlines/create"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 sm:w-auto"
           >
             <Plus className="h-4 w-4" /> Add Airline
           </Link>
@@ -118,38 +129,32 @@ export default function AdminAirlinesPage() {
 
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
-        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_150px_auto]">
+        <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search code, name, country, or ID"
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+            className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 lg:col-span-1"
           />
-          <select
+          <ResponsiveSelect
             value={sortField}
-            onChange={(event) => setSortField(event.target.value as SortField)}
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          >
-            <option value="name">Sort: Name</option>
-            <option value="code">Sort: Code</option>
-            <option value="country">Sort: Country</option>
-            <option value="id">Sort: ID</option>
-          </select>
-          <select
+            onChange={(nextValue) => setSortField(nextValue as SortField)}
+            options={SORT_FIELD_OPTIONS}
+            placeholder="Sort by"
+          />
+          <ResponsiveSelect
             value={sortDirection}
-            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-          <div className="flex items-center justify-end text-sm font-medium text-slate-600">
+            onChange={(nextValue) => setSortDirection(nextValue as SortDirection)}
+            options={SORT_DIRECTION_OPTIONS}
+            placeholder="Direction"
+          />
+          <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end lg:justify-end">
             Total: {filteredAndSorted.length}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="max-w-full overflow-x-auto">
+          <table className="min-w-180 w-full text-left text-sm">
             <thead className="bg-blue-50 text-slate-600">
               <tr>
                 <th className="rounded-l-xl p-3">Logo</th>
@@ -186,7 +191,7 @@ export default function AdminAirlinesPage() {
                   <td className="p-3 font-semibold">{item.name}</td>
                   <td className="p-3">{item.country}</td>
                   <td className="p-3">{item.id}</td>
-                  <td className="p-3">
+                  <td className="whitespace-nowrap p-3">
                     <div className="flex gap-2">
                       <Link
                         href={`/admin/airlines/${item.id}`}

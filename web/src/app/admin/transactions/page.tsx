@@ -7,6 +7,7 @@ import { Eye, X } from "lucide-react";
 
 import AdminShell from "@/components/AdminShell";
 // Layout halaman admin
+import ResponsiveSelect from "@/components/ResponsiveSelect";
 
 import { formatRupiah } from "@/lib/currency";
 // Fungsi untuk mengubah angka menjadi format Rupiah
@@ -19,6 +20,14 @@ import { getAdminBookings, updateAdminBookingStatus, sendAdminDepartureReminder,
 type TransactionStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
 
 type StatusAction = "markpending" | "markpaid" | "markissued" | "cancel";
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "All", label: "All" },
+  { value: "Pending", label: "Pending" },
+  { value: "Paid", label: "Paid" },
+  { value: "Issued", label: "Issued" },
+  { value: "Cancelled", label: "Cancelled" },
+] as const;
 
 // Semua kemungkinan transisi status — setiap status bisa pindah ke 3 status lainnya
 const statusTransitions: Record<
@@ -251,19 +260,20 @@ export default function AdminTransactionsPage() {
       description="Tabel transaksi lengkap dengan filter status dan view detail."
     >
 
-      <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+      <section className="max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
 
         {/* Filter status transaksi */}
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <p className="text-sm font-semibold text-slate-700">
             Filter by Status
           </p>
 
-          <select
+          <div className="w-full sm:w-56">
+          <ResponsiveSelect
             value={statusFilter}
-            onChange={(event) =>
+            onChange={(nextValue) =>
               setStatusFilter(
-                event.target.value as
+                nextValue as
                   | "All"
                   | "Pending"
                   | "Paid"
@@ -271,14 +281,10 @@ export default function AdminTransactionsPage() {
                   | "Cancelled"
               )
             }
-            className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm"
-          >
-            <option value="All">All</option>
-            <option value="Pending">Pending</option>
-            <option value="Paid">Paid</option>
-            <option value="Issued">Issued</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+            options={STATUS_FILTER_OPTIONS.map((option) => ({ ...option }))}
+            placeholder="Status"
+          />
+          </div>
         </div>
 
         {/* jika ada pesan error */}
@@ -286,10 +292,10 @@ export default function AdminTransactionsPage() {
           <p className="mb-3 text-sm text-rose-700">{message}</p>
         )}
 
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto">
 
           {/* tabel transaksi */}
-          <table className="w-full text-left text-sm">
+          <table className="min-w-180 w-full text-left text-sm">
 
             <thead className="bg-blue-50 text-slate-600">
               <tr>
@@ -436,7 +442,7 @@ export default function AdminTransactionsPage() {
 
                                 {/* dialog konfirmasi aksi */}
                                 {pendingAction?.item.id === item.id && (
-                                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                                  <div className="mt-3 flex flex-col items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
                                     <p className="flex-1 text-xs text-amber-800">
                                       Konfirmasi: <span className="font-semibold">{pendingAction.label}</span> untuk booking #{item.id}?
                                     </p>
