@@ -688,7 +688,7 @@ export default function SearchPage() {
   return (
     <>
       <div
-        className="min-h-[52vh] bg-cover bg-center bg-no-repeat md:min-h-[58vh]"
+        className="min-h-screen bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage:
             "linear-gradient(160deg, rgba(6,24,44,0.58) 0%, rgba(12,45,84,0.42) 45%, rgba(8,20,36,0.62) 100%), url('/bg.jpg'), url('/home-hero.svg')",

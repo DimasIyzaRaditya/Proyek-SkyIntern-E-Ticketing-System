@@ -29,18 +29,32 @@ dependencies:
   pdf: ^3.11.1
   open_filex: ^4.6.0
   file_selector: ^1.0.3
+  flutter_svg: ^2.0.17
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/skyintern_logo_square.png
+  adaptive_icon_background: "#0E3A78"
+  adaptive_icon_foreground: assets/images/skyintern_logo_square.png
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/
+    - assets/images/bg.jpg
+    - assets/images/home-hero.svg
+    - assets/images/skyintern_logo.png
+    - assets/images/skyintern_logo_square.png
+    - assets/images/flutter_logo.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

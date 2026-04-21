@@ -346,9 +346,4 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  Future<void> _switchAccount() async {
-    await context.read<AuthProvider>().logout();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-  }
 }

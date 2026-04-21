@@ -34,9 +34,9 @@ class _BookingPassengerScreenState extends State<BookingPassengerScreen> {
   final TextEditingController _lastNameCtrl = TextEditingController();
   final TextEditingController _idNumberCtrl = TextEditingController();
 
-  String _title = 'Mr.';
+  final String _title = 'Mr.';
   String _idType = 'KTP';
-  String _nationality = 'Indonesia';
+  final String _nationality = 'Indonesia';
   DateTime? _dob;
 
   int get _totalPassengers => _adults + _children;

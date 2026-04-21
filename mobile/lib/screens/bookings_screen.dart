@@ -192,12 +192,13 @@ class _BookingsScreenState extends State<BookingsScreen>
         await context.read<BookingProvider>().loadBookings();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showSnackBar(
           context,
           e.toString().replaceFirst('Exception: ', ''),
           isError: true,
         );
+      }
     } finally {
       if (mounted) setState(() => _syncingIds.remove(bookingId));
     }
@@ -243,12 +244,13 @@ class _BookingsScreenState extends State<BookingsScreen>
         await context.read<BookingProvider>().cancelBooking(bookingId);
         if (mounted) showSnackBar(context, 'Pemesanan berhasil dibatalkan');
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           showSnackBar(
             context,
             e.toString().replaceFirst('Exception: ', ''),
             isError: true,
           );
+        }
       }
     }
   }
@@ -506,14 +508,6 @@ class _BookingsScreenState extends State<BookingsScreen>
     final isPending = booking.status.toUpperCase() == 'PENDING';
     final isIssued = booking.ticket != null;
     final isPaid = booking.status.toUpperCase() == 'PAID' && !isIssued;
-
-    // Count adult/child from passenger list
-    final adults = booking.passengers
-        .where((p) => p.type.toUpperCase() == 'ADULT')
-        .length;
-    final children = booking.passengers
-        .where((p) => p.type.toUpperCase() == 'CHILD')
-        .length;
 
     return GlassCard(
       padding: const EdgeInsets.all(16),

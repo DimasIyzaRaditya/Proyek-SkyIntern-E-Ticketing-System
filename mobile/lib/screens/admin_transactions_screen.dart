@@ -116,11 +116,12 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
+      }
     }
   }
 

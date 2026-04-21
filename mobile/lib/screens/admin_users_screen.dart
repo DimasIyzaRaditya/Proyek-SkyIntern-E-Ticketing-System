@@ -106,11 +106,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
+      }
     }
   }
 

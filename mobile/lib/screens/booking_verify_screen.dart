@@ -322,7 +322,7 @@ class _BookingVerifyScreenState extends State<BookingVerifyScreen> {
           const SizedBox(height: 12),
 
           // Passengers
-          if (passengers != null && passengers.isNotEmpty)
+          if (passengers.isNotEmpty)
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Column(

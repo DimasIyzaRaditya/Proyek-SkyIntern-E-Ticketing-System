@@ -119,11 +119,12 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
+      }
     }
   }
 
@@ -547,6 +548,7 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
         lastDate: now.add(const Duration(days: 730)),
       );
       if (picked == null) return;
+      if (!ctx.mounted) return;
       final pickedTime = await showTimePicker(
         context: ctx,
         initialTime: TimeOfDay.fromDateTime(
@@ -554,6 +556,7 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
         ),
       );
       if (pickedTime == null) return;
+      if (!ctx.mounted) return;
       final combined = DateTime(
         picked.year,
         picked.month,

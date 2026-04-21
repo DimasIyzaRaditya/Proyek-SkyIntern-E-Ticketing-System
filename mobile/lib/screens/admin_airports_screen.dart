@@ -103,15 +103,17 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString();
         });
+      }
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
+      }
     }
   }
 

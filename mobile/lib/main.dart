@@ -5,7 +5,6 @@ import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'utils/app_theme.dart';
-import 'utils/helpers.dart';
 import 'providers/auth_provider.dart';
 import 'providers/flight_provider.dart';
 import 'providers/booking_provider.dart';
@@ -135,19 +134,11 @@ class _AppShellState extends State<_AppShell> {
   AppLinks? _appLinks;
   StreamSubscription<Uri>? _deepLinkSub;
   bool _didHandleInitialLink = false;
-  bool _enableSplashSound = true;
 
   @override
   void initState() {
     super.initState();
     _initDeepLinks();
-    _initPreferences();
-  }
-
-  Future<void> _initPreferences() async {
-    final enabled = await LocalStorage.isSplashSoundEnabled();
-    if (!mounted) return;
-    setState(() => _enableSplashSound = enabled);
   }
 
   Future<void> _initDeepLinks() async {

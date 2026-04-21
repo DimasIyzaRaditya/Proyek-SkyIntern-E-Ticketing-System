@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../models/flight_model.dart';
 import '../providers/flight_provider.dart';
@@ -17,6 +18,10 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen>
     with SingleTickerProviderStateMixin {
+  static const String _heroBgAsset = 'assets/images/bg.jpg';
+  static const String _heroPatternAsset = 'assets/images/home-hero.svg';
+  static const String _promoBgAsset = 'assets/images/bg.jpg';
+
   String? originCode;
   String? destinationCode;
   int? originId;
@@ -650,18 +655,53 @@ class _SearchScreenState extends State<SearchScreen>
                 isWide ? 34 : 16,
                 26,
               ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF0C3B7E), Color(0xFF1D4E9B)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: isWide ? 760 : 520),
-                  child: Column(
-                    children: [
+              decoration: const BoxDecoration(color: Color(0xFF0B1F3B)),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRect(
+                      child: Image.asset(
+                        _heroBgAsset,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        filterQuality: FilterQuality.medium,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF0C3B7E),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(-0.9, -1.0),
+                          end: Alignment(1.0, 1.0),
+                          colors: [
+                            Color(0x6E06182C),
+                            Color(0x430C2D54),
+                            Color(0x7A081424),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.09,
+                        child: SvgPicture.asset(
+                          _heroPatternAsset,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: isWide ? 760 : 520),
+                      child: Column(
+                        children: [
                       const SizedBox(height: 4),
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -704,7 +744,7 @@ class _SearchScreenState extends State<SearchScreen>
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 26),
                             Container(
                               margin: const EdgeInsets.fromLTRB(6, 0, 6, 12),
                               decoration: BoxDecoration(
@@ -738,143 +778,119 @@ class _SearchScreenState extends State<SearchScreen>
                                       ),
                                     ),
                                   ),
-                                  Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Row(
+                                  InkWell(
+                                    onTap: () => _showAirportPicker(true),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        12,
+                                        12,
+                                        12,
+                                        8,
+                                      ),
+                                      child: Row(
                                         children: [
-                                          Expanded(
-                                            child: InkWell(
-                                              onTap: () =>
-                                                  _showAirportPicker(true),
-                                              borderRadius:
-                                                  const BorderRadius.only(
-                                                    topLeft: Radius.circular(
-                                                      22,
-                                                    ),
-                                                  ),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.fromLTRB(
-                                                      12,
-                                                      12,
-                                                      8,
-                                                      12,
-                                                    ),
-                                                child: Row(
-                                                  children: [
-                                                    const Icon(
-                                                      Icons
-                                                          .flight_takeoff_rounded,
-                                                      color: Color(0xFF2563EB),
-                                                      size: 20,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text(
-                                                        originDisplay,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: const TextStyle(
-                                                          fontSize: 15,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color: Color(
-                                                            0xFF111827,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
+                                          const Icon(
+                                            Icons.flight_takeoff_rounded,
+                                            color: Color(0xFF2563EB),
+                                            size: 20,
                                           ),
-                                          const SizedBox(width: 18),
+                                          const SizedBox(width: 8),
                                           Expanded(
-                                            child: InkWell(
-                                              onTap: () =>
-                                                  _showAirportPicker(false),
-                                              borderRadius:
-                                                  const BorderRadius.only(
-                                                    topRight: Radius.circular(
-                                                      22,
-                                                    ),
-                                                  ),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.fromLTRB(
-                                                      8,
-                                                      12,
-                                                      12,
-                                                      12,
-                                                    ),
-                                                child: Row(
-                                                  children: [
-                                                    const Icon(
-                                                      Icons.flight_land_rounded,
-                                                      color: Color(0xFF2563EB),
-                                                      size: 20,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text(
-                                                        destinationDisplay,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: const TextStyle(
-                                                          fontSize: 15,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color: Color(
-                                                            0xFF111827,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
+                                            child: Text(
+                                              originDisplay,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF111827),
                                               ),
                                             ),
                                           ),
                                         ],
                                       ),
-                                      GestureDetector(
-                                        onTap: () => setState(() {
-                                          final tmpCode = originCode;
-                                          originCode = destinationCode;
-                                          destinationCode = tmpCode;
-                                          final tmpId = originId;
-                                          originId = destinationId;
-                                          destinationId = tmpId;
-                                        }),
-                                        child: Container(
-                                          width: 46,
-                                          height: 46,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFFFFFF),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: const Color(0xFFD5DCE8),
+                                    ),
+                                  ),
+                                  const Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    color: Color(0xFFE9EEF5),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                    ),
+                                    child: GestureDetector(
+                                      onTap: () => setState(() {
+                                        final tmpCode = originCode;
+                                        originCode = destinationCode;
+                                        destinationCode = tmpCode;
+                                        final tmpId = originId;
+                                        originId = destinationId;
+                                        destinationId = tmpId;
+                                      }),
+                                      child: Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: const Color(0xFFD5DCE8),
+                                          ),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0x330F172A),
+                                              blurRadius: 8,
+                                              offset: Offset(0, 2),
                                             ),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Color(0x330F172A),
-                                                blurRadius: 8,
-                                                offset: Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(
-                                            Icons.swap_vert_rounded,
-                                            color: Color(0xFF2563EB),
-                                            size: 22,
-                                          ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.swap_vert_rounded,
+                                          color: Color(0xFF2563EB),
+                                          size: 20,
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ),
+                                  const Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    color: Color(0xFFE9EEF5),
+                                  ),
+                                  InkWell(
+                                    onTap: () => _showAirportPicker(false),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        12,
+                                        4,
+                                        12,
+                                        12,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.flight_land_rounded,
+                                            color: Color(0xFF2563EB),
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              destinationDisplay,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF111827),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                   const Padding(
                                     padding: EdgeInsets.fromLTRB(14, 8, 14, 0),
@@ -1097,9 +1113,11 @@ class _SearchScreenState extends State<SearchScreen>
                           ],
                         ),
                       ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
             Padding(
@@ -1205,13 +1223,7 @@ class _SearchScreenState extends State<SearchScreen>
                     );
                   },
                   child: Ink(
-                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF13438B), Color(0xFF2563EB)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: const [
                         BoxShadow(
@@ -1221,81 +1233,135 @@ class _SearchScreenState extends State<SearchScreen>
                         ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 5,
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.asset(
+                              _promoBgAsset,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.centerRight,
+                              filterQuality: FilterQuality.medium,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFF1D4E9B),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                'HEMAT ${promo.discount}%',
-                                style: const TextStyle(
-                                  color: Color(0xFF1E3A8A),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Opacity(
+                              opacity: 0.06,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: SvgPicture.asset(
+                                  _heroPatternAsset,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
-                            const Spacer(),
-                            Icon(
-                              promo.isFlightPromo
-                                  ? Icons.flight_takeoff_rounded
-                                  : Icons.public_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          promo.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if ((promo.description ?? '').trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            promo.description!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFFDDE8FF),
-                              fontSize: 12,
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0x7A06182C),
+                                  Color(0x520C2D54),
+                                  Color(0x8A081424),
+                                ],
+                                begin: Alignment(-0.9, -1.0),
+                                end: Alignment(1.0, 1.0),
+                              ),
+                              border: Border.fromBorderSide(
+                                BorderSide(color: Color(0x33FFFFFF)),
+                              ),
                             ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          promo.sourceLabel ?? 'Promo SkyIntern',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        if (until != null)
-                          Text(
-                            'Berlaku sampai $until',
-                            style: const TextStyle(
-                              color: Color(0xFFD3E1FF),
-                              fontSize: 11,
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'HEMAT ${promo.discount}%',
+                                      style: const TextStyle(
+                                        color: Color(0xFF1E3A8A),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(
+                                    promo.isFlightPromo
+                                        ? Icons.flight_takeoff_rounded
+                                        : Icons.public_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                promo.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if ((promo.description ?? '').trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  promo.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFDDE8FF),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              Text(
+                                promo.sourceLabel ?? 'Promo SkyIntern',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (until != null)
+                                Text(
+                                  'Berlaku sampai $until',
+                                  style: const TextStyle(
+                                    color: Color(0xFFD3E1FF),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -1310,31 +1376,3 @@ class _SearchScreenState extends State<SearchScreen>
   }
 }
 
-class _DealTab extends StatelessWidget {
-  final String label;
-  final bool active;
-
-  const _DealTab({required this.label, this.active = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFFE8F0FF) : Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: active ? const Color(0xFFBFD3FF) : const Color(0xFFD7DEEA),
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-          color: active ? const Color(0xFF1D4ED8) : const Color(0xFF64748B),
-        ),
-      ),
-    );
-  }
-}
