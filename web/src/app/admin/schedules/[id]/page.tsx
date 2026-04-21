@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import CompactDatePicker from "@/components/CompactDatePicker";
+import CompactTimePicker from "@/components/CompactTimePicker";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
 import {
   getAdminAirlines,
@@ -173,7 +175,7 @@ export default function AdminScheduleDetailPage() {
 
   return (
     <AdminShell title="Manage Schedule" description="Edit schedule details or delete the schedule from this page.">
-      <section className="max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
+      <section className="max-w-full overflow-x-hidden overflow-y-visible rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <Link
             href="/admin/schedules"
@@ -244,54 +246,46 @@ export default function AdminScheduleDetailPage() {
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-600">Departure Time</label>
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-blue-100 bg-blue-50 p-2 transition-all duration-300 ease-out focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-200 sm:grid-cols-2">
-                  <input
-                    type="date"
+                  <CompactDatePicker
                     value={departureParts.date}
-                    onChange={(event) =>
+                    onChange={(nextValue) =>
                       setForm((prev) => ({
                         ...prev,
-                        departureTime: mergeLocalDateTime(event.target.value, splitLocalDateTime(prev.departureTime).time),
+                        departureTime: mergeLocalDateTime(nextValue, splitLocalDateTime(prev.departureTime).time),
                       }))
                     }
-                    className="w-full min-w-0 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none ring-blue-200 transition duration-200 focus:ring"
                   />
-                  <input
-                    type="time"
+                  <CompactTimePicker
                     value={departureParts.time}
-                    onChange={(event) =>
+                    onChange={(nextValue) =>
                       setForm((prev) => ({
                         ...prev,
-                        departureTime: mergeLocalDateTime(splitLocalDateTime(prev.departureTime).date, event.target.value),
+                        departureTime: mergeLocalDateTime(splitLocalDateTime(prev.departureTime).date, nextValue),
                       }))
                     }
-                    className="w-full min-w-0 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none ring-blue-200 transition duration-200 focus:ring"
                   />
                 </div>
               </div>
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-600">Arrival Time</label>
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-blue-100 bg-blue-50 p-2 transition-all duration-300 ease-out focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-200 sm:grid-cols-2">
-                  <input
-                    type="date"
+                  <CompactDatePicker
                     value={arrivalParts.date}
-                    onChange={(event) =>
+                    onChange={(nextValue) =>
                       setForm((prev) => ({
                         ...prev,
-                        arrivalTime: mergeLocalDateTime(event.target.value, splitLocalDateTime(prev.arrivalTime).time),
+                        arrivalTime: mergeLocalDateTime(nextValue, splitLocalDateTime(prev.arrivalTime).time),
                       }))
                     }
-                    className="w-full min-w-0 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none ring-blue-200 transition duration-200 focus:ring"
                   />
-                  <input
-                    type="time"
+                  <CompactTimePicker
                     value={arrivalParts.time}
-                    onChange={(event) =>
+                    onChange={(nextValue) =>
                       setForm((prev) => ({
                         ...prev,
-                        arrivalTime: mergeLocalDateTime(splitLocalDateTime(prev.arrivalTime).date, event.target.value),
+                        arrivalTime: mergeLocalDateTime(splitLocalDateTime(prev.arrivalTime).date, nextValue),
                       }))
                     }
-                    className="w-full min-w-0 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none ring-blue-200 transition duration-200 focus:ring"
                   />
                 </div>
               </div>

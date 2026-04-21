@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -423,11 +424,14 @@ function ETicketContent() {
             <div className="mb-4 flex flex-row items-center gap-3 sm:mb-0 sm:flex-col sm:items-start sm:justify-start sm:w-32">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-black text-blue-700 border border-blue-100">
                 {airlineLogo && !isAirlineLogoBroken ? (
-                  <img
+                  <Image
                     src={airlineLogo}
                     alt={airline || "Airline"}
+                    width={80}
+                    height={80}
                     className="h-full w-full rounded-full object-cover"
                     crossOrigin="anonymous"
+                    unoptimized
                     onError={() => setIsAirlineLogoBroken(true)}
                   />
                 ) : airline ? (
