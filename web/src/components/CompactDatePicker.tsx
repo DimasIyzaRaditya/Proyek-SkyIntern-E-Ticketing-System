@@ -59,7 +59,7 @@ export default function CompactDatePicker({
   const yearListRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = typeof window !== "undefined";
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
@@ -137,26 +137,21 @@ export default function CompactDatePicker({
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
+    const base = selectedDate ?? today;
+    setCursorYear(base.getFullYear());
+    setCursorMonth(base.getMonth());
+    updatePopupPosition();
     setOpen(true);
     setVisible(true);
   };
 
   useEffect(() => {
-    setMounted(true);
     return () => {
       if (closeTimerRef.current) {
         window.clearTimeout(closeTimerRef.current);
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const base = selectedDate ?? today;
-    setCursorYear(base.getFullYear());
-    setCursorMonth(base.getMonth());
-    updatePopupPosition();
-  }, [open, selectedDate, today]);
 
   useEffect(() => {
     if (!open) return;

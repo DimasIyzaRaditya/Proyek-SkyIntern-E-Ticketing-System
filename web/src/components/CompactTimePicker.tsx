@@ -55,7 +55,7 @@ export default function CompactTimePicker({
   const minuteRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = typeof window !== "undefined";
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
   const [popupPos, setPopupPos] = useState<{
@@ -115,27 +115,21 @@ export default function CompactTimePicker({
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
+    setHour12(parsed.hour12);
+    setMinute(parsed.minute);
+    setPeriod(parsed.period);
+    updatePopupPosition();
     setOpen(true);
     setVisible(true);
   };
 
   useEffect(() => {
-    setMounted(true);
     return () => {
       if (closeTimerRef.current) {
         window.clearTimeout(closeTimerRef.current);
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    setHour12(parsed.hour12);
-    setMinute(parsed.minute);
-    setPeriod(parsed.period);
-    updatePopupPosition();
-  }, [open, parsed.hour12, parsed.minute, parsed.period]);
 
   useEffect(() => {
     if (!open) return;

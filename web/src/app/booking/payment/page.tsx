@@ -389,7 +389,7 @@ function PaymentSummaryPageContent() {
     return () => {
       isMounted = false;
     };
-  }, [buildPassengersFromQuery, draftCountdownKey, existingBookingId, flightId, getSeatIdsFromQuery, router, searchParams, selectedPromo?.id]);
+  }, [buildPassengersFromQuery, draftCountdownKey, existingBookingId, flightId, getSeatIdsFromQuery, router, searchParams, selectedPromoId]);
 
   // Auto-cancel booking when countdown expires
   useEffect(() => {
