@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MainNav from "@/components/MainNav";
+import CompactDatePicker from "@/components/CompactDatePicker";
+import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { isAuthenticated, getUserSession } from "@/lib/auth";
 import { getPassengerProfile } from "@/lib/passenger-profile";
 import { validateDateOfBirth, validateIdentityNumber } from "@/lib/identity-validation";
@@ -152,14 +154,15 @@ function PassengerFormPageContent() {
               <label className="mb-1 block text-sm font-semibold text-slate-700">
                 Jenis Identitas <span className="text-red-500">*</span>
               </label>
-              <select
+              <ResponsiveSelect
                 value={idType}
-                onChange={(e) => handleIdentityTypeChange(e.target.value === "PASSPORT" ? "PASSPORT" : "KTP")}
-                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 focus:border-blue-400 focus:outline-none"
-              >
-                <option>KTP</option>
-                <option value="PASSPORT">Passport</option>
-              </select>
+                onChange={(nextValue) => handleIdentityTypeChange(nextValue === "PASSPORT" ? "PASSPORT" : "KTP")}
+                options={[
+                  { value: "KTP", label: "KTP" },
+                  { value: "PASSPORT", label: "Passport" },
+                ]}
+                placeholder="Pilih jenis identitas"
+              />
             </div>
 
             {/* ID Number */}
@@ -203,17 +206,14 @@ function PassengerFormPageContent() {
               <label className="mb-1 block text-sm font-semibold text-slate-700">
                 Tanggal Lahir <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
+              <CompactDatePicker
                 value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                onBlur={() => setDobTouched(true)}
+                onChange={(nextValue) => {
+                  setDob(nextValue);
+                  setDobTouched(true);
+                }}
                 max={new Date().toISOString().slice(0, 10)}
-                className={`w-full rounded-2xl border px-4 py-3 focus:outline-none ${
-                  dobError
-                    ? "border-red-400 bg-red-50 focus:border-red-400"
-                    : "border-blue-100 bg-blue-50 focus:border-blue-400"
-                }`}
+                placeholder="YYYY-MM-DD"
               />
               {dobError && (
                 <p className="mt-1 text-xs text-red-500">{dobError}</p>

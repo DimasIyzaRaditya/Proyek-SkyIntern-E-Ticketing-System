@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Pencil, Plus, Tag, Trash2, ToggleLeft, ToggleRight, Plane, Globe, X } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import CompactDatePicker from "@/components/CompactDatePicker";
 import {
   getAdminPromos,
   getAdminFlights,
@@ -20,6 +21,12 @@ const fmtDate = (iso: string) =>
 const toInputDate = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const isValidDateInput = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
 
 const isCurrentlyActive = (promo: Promo) => {
   if (!promo.isActive) return false;
@@ -132,6 +139,10 @@ export default function AdminPromosPage() {
     setFormError("");
     if (!form.title.trim()) { setFormError("Judul promo wajib diisi."); return; }
     if (!form.startDate || !form.endDate) { setFormError("Tanggal wajib diisi."); return; }
+    if (!isValidDateInput(form.startDate) || !isValidDateInput(form.endDate)) {
+      setFormError("Format tanggal harus YYYY-MM-DD.");
+      return;
+    }
     if (form.endDate <= form.startDate) { setFormError("Tanggal akhir harus setelah tanggal awal."); return; }
 
     const payload: PromoPayload = {
@@ -389,23 +400,21 @@ export default function AdminPromosPage() {
                   <label className="mb-1 block text-xs font-bold text-slate-600">
                     Tanggal Mulai <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <CompactDatePicker
                     value={form.startDate}
-                    onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    onChange={(nextValue) => setForm((f) => ({ ...f, startDate: nextValue }))}
+                    placeholder="YYYY-MM-DD"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-600">
                     Tanggal Akhir <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <CompactDatePicker
                     value={form.endDate}
+                    onChange={(nextValue) => setForm((f) => ({ ...f, endDate: nextValue }))}
                     min={form.startDate}
-                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    placeholder="YYYY-MM-DD"
                   />
                 </div>
               </div>

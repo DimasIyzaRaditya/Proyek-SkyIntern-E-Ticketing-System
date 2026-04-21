@@ -385,7 +385,7 @@ function SearchResultsPageContent() {
                           onClick={() => setCurrentPage(item)}
                           className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-sm font-medium transition ${
                             currentPage === item
-                              ? "border-black bg-black text-white"
+                                ? "border-blue-600 bg-blue-600 text-white"
                               : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
                           }`}
                         >
@@ -567,7 +567,7 @@ function SearchResultsPageContent() {
 
                       <Link
                         href={`/search/detail/${flight.id}?${query.toString()}`}
-                        className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-600 lg:w-auto"
+                        className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 lg:w-auto"
                       >
                         Choose
                       </Link>
