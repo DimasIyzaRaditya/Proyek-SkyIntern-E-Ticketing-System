@@ -1,0 +1,173 @@
+name: Backend Controller Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - developd
+    paths:
+      - backend/**
+      - .github/workflows/backend-controller-tests.yml
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - backend/**
+      - .github/workflows/backend-controller-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend-controller-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controller-unit-tests:
+    name: Controller Unit Tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify each controller has a unit test file
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+          while IFS= read -r controller_file; do
+            file_name="$(basename "$controller_file")"
+            base_name="${file_name%.controller.ts}"
+
+            candidates=(
+              "src/controllers/${base_name}.controller.test.ts"
+              "src/controllers/${base_name}.controller.spec.ts"
+              "src/controllers/${base_name}.test.ts"
+              "src/controllers/${base_name}.spec.ts"
+              "src/controllers/__tests__/${base_name}.controller.test.ts"
+              "src/controllers/__tests__/${base_name}.controller.spec.ts"
+              "src/controllers/__tests__/${base_name}.test.ts"
+              "src/controllers/__tests__/${base_name}.spec.ts"
+            )
+
+            found=0
+            for candidate in "${candidates[@]}"; do
+              if [[ -f "$candidate" ]]; then
+                found=1
+                break
+              fi
+            done
+
+            if [[ "$found" -eq 0 ]]; then
+              echo "Missing controller test for: $controller_file"
+              echo "Expected one of:"
+              for candidate in "${candidates[@]}"; do
+                echo "  - $candidate"
+              done
+              missing=1
+            fi
+          done < <(find src/controllers -maxdepth 1 -type f -name "*.controller.ts" | sort)
+
+          if [[ "$missing" -ne 0 ]]; then
+            echo "At least one controller does not have a unit test file."
+            exit 1
+          fi
+
+      - name: Verify CRUD scenarios exist in each controller test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+          while IFS= read -r controller_file; do
+            file_name="$(basename "$controller_file")"
+            base_name="${file_name%.controller.ts}"
+
+            candidates=(
+              "src/controllers/${base_name}.controller.test.ts"
+              "src/controllers/${base_name}.controller.spec.ts"
+              "src/controllers/${base_name}.test.ts"
+              "src/controllers/${base_name}.spec.ts"
+              "src/controllers/__tests__/${base_name}.controller.test.ts"
+              "src/controllers/__tests__/${base_name}.controller.spec.ts"
+              "src/controllers/__tests__/${base_name}.test.ts"
+              "src/controllers/__tests__/${base_name}.spec.ts"
+            )
+
+            test_file=""
+            for candidate in "${candidates[@]}"; do
+              if [[ -f "$candidate" ]]; then
+                test_file="$candidate"
+                break
+              fi
+            done
+
+            # Allow non-CRUD controllers to opt-out explicitly.
+            if grep -Eiq '@no-crud-required' "$test_file"; then
+              echo "Skip CRUD marker check for $test_file (@no-crud-required)"
+              continue
+            fi
+
+            has_create=0
+            has_read=0
+            has_update=0
+            has_delete=0
+
+            grep -Eiq '(\[CREATE\]|\bcreate\b|\bpost\b)' "$test_file" && has_create=1 || true
+            grep -Eiq '(\[READ\]|\bread\b|\blist\b|\bget\b)' "$test_file" && has_read=1 || true
+            grep -Eiq '(\[UPDATE\]|\bupdate\b|\bput\b|\bpatch\b)' "$test_file" && has_update=1 || true
+            grep -Eiq '(\[DELETE\]|\bdelete\b|\bremove\b)' "$test_file" && has_delete=1 || true
+
+            if [[ "$has_create" -eq 0 || "$has_read" -eq 0 || "$has_update" -eq 0 || "$has_delete" -eq 0 ]]; then
+              echo "CRUD scenarios not complete in: $test_file"
+              echo "Required markers/keywords:"
+              echo "  - CREATE: [CREATE] / create / post"
+              echo "  - READ  : [READ] / read / list / get"
+              echo "  - UPDATE: [UPDATE] / update / put / patch"
+              echo "  - DELETE: [DELETE] / delete / remove"
+              echo "If this controller is not CRUD, add '@no-crud-required' in the test file."
+              missing=1
+            fi
+          done < <(find src/controllers -maxdepth 1 -type f -name "*.controller.ts" | sort)
+
+          if [[ "$missing" -ne 0 ]]; then
+            echo "At least one controller test is missing CRUD scenarios."
+            exit 1
+          fi
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Run controller unit tests
+        shell: bash
+        run: |
+          test_files=$(find src/controllers -type f \( -name "*.test.ts" -o -name "*.spec.ts" \) | sort)
+          if [[ -n "$test_files" ]]; then
+            echo "Controller test files:"
+            echo "$test_files"
+
+            npm run test:controllers
+          else
+            echo "No controller test files found under src/controllers/**/*.test.ts or **/*.spec.ts"
+            echo "Ensure your controller tests are stored under backend/src/controllers/**/*.test.ts or .spec.ts"
+            exit 1
+          fi
