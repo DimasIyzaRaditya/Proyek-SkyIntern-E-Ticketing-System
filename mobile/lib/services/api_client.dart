@@ -1,32 +1,98 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
-  // Ubah host ini jika pindah jaringan Wi-Fi (khusus device fisik).
-  // Cukup edit nilai ini di source code lalu jalankan ulang `flutter run`.
-  // Contoh: 192.168.1.10
-  static const String _hardcodedApiHost = '192.168.18.38';
+  // Optional override via --dart-define=API_HOST=192.168.x.x
+  static const String _forcedApiHost = String.fromEnvironment(
+    'API_HOST',
+    defaultValue: '',
+  );
+
+  // Default LAN host for physical devices when no override is provided.
+  static const String _defaultLanApiHost = String.fromEnvironment(
+    'API_LAN_HOST',
+    defaultValue: '192.168.18.39',
+  );
 
   static const String _apiPort = '3000';
   static const String _apiScheme = 'http';
   static const Duration _requestTimeout = Duration(seconds: 20);
+  static const Duration _hostProbeTimeout = Duration(milliseconds: 800);
 
-  static String get _resolvedHost {
-    if (_hardcodedApiHost.isNotEmpty) return _hardcodedApiHost;
+  static String? _resolvedHostCache;
+  static Future<String>? _hostResolverFuture;
 
-    // Fallback default per platform jika hardcoded host dikosongkan.
+  static String _fallbackHost() {
+    if (_forcedApiHost.trim().isNotEmpty) return _forcedApiHost.trim();
+
     if (kIsWeb) return 'localhost';
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return '10.0.2.2'; // Android emulator -> host machine
+        return '10.0.2.2';
       default:
-        return 'localhost'; // Desktop/iOS simulator
+        return _defaultLanApiHost;
     }
   }
 
-  static String get baseUrl => '$_apiScheme://$_resolvedHost:$_apiPort';
+  static String _baseUrlForHost(String host) => '$_apiScheme://$host:$_apiPort';
+
+  static List<String> _candidateHosts() {
+    if (_forcedApiHost.trim().isNotEmpty) return [_forcedApiHost.trim()];
+
+    if (kIsWeb) return ['localhost'];
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        // Android emulator first, then physical-device LAN fallback.
+        return ['10.0.2.2', _defaultLanApiHost, 'localhost'];
+      default:
+        return [_defaultLanApiHost, 'localhost'];
+    }
+  }
+
+  static Future<bool> _isHostReachable(String host) async {
+    try {
+      final response = await http
+          .get(Uri.parse('${_baseUrlForHost(host)}/'))
+          .timeout(_hostProbeTimeout);
+      return response.statusCode >= 100;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<String> _resolveHost() async {
+    if (_resolvedHostCache != null) return _resolvedHostCache!;
+    if (_hostResolverFuture != null) return _hostResolverFuture!;
+
+    _hostResolverFuture = () async {
+      for (final host in _candidateHosts()) {
+        if (await _isHostReachable(host)) {
+          _resolvedHostCache = host;
+          return host;
+        }
+      }
+
+      _resolvedHostCache = _fallbackHost();
+      return _resolvedHostCache!;
+    }();
+
+    final host = await _hostResolverFuture!;
+    _hostResolverFuture = null;
+    return host;
+  }
+
+  static String get _effectiveHostSync => _resolvedHostCache ?? _fallbackHost();
+
+  static String get baseUrl => _baseUrlForHost(_effectiveHostSync);
+
+  static Future<String> getBaseUrl() async {
+    final host = await _resolveHost();
+    return _baseUrlForHost(host);
+  }
 
   static String normalizePublicUrl(String url) {
     final trimmed = url.trim();
@@ -44,7 +110,7 @@ class ApiClient {
 
     if (!shouldReplaceHost) return trimmed;
 
-    return uri.replace(host: _resolvedHost).toString();
+    return uri.replace(host: _effectiveHostSync).toString();
   }
 
   static String? _authToken;
@@ -64,6 +130,7 @@ class ApiClient {
     bool requireAuth = false,
   }) async {
     try {
+      final resolvedBaseUrl = await getBaseUrl();
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
@@ -71,7 +138,7 @@ class ApiClient {
       };
 
       final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse('$resolvedBaseUrl$endpoint'),
         headers: headers,
       ).timeout(_requestTimeout);
 
@@ -92,7 +159,7 @@ class ApiClient {
 
       return json.decode(response.body) as Map<String, dynamic>;
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
+      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -104,6 +171,7 @@ class ApiClient {
     bool requireAuth = false,
   }) async {
     try {
+      final resolvedBaseUrl = await getBaseUrl();
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
@@ -111,7 +179,7 @@ class ApiClient {
       };
 
       final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse('$resolvedBaseUrl$endpoint'),
         headers: headers,
         body: json.encode(body),
       ).timeout(_requestTimeout);
@@ -137,7 +205,7 @@ class ApiClient {
 
       return json.decode(response.body) as Map<String, dynamic>;
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
+      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -149,6 +217,7 @@ class ApiClient {
     bool requireAuth = false,
   }) async {
     try {
+      final resolvedBaseUrl = await getBaseUrl();
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
@@ -156,7 +225,7 @@ class ApiClient {
       };
 
       final response = await http.put(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse('$resolvedBaseUrl$endpoint'),
         headers: headers,
         body: json.encode(body),
       ).timeout(_requestTimeout);
@@ -182,7 +251,7 @@ class ApiClient {
 
       return json.decode(response.body) as Map<String, dynamic>;
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
+      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -193,6 +262,7 @@ class ApiClient {
     bool requireAuth = false,
   }) async {
     try {
+      final resolvedBaseUrl = await getBaseUrl();
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
@@ -200,7 +270,7 @@ class ApiClient {
       };
 
       final response = await http.delete(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse('$resolvedBaseUrl$endpoint'),
         headers: headers,
       ).timeout(_requestTimeout);
 
@@ -218,7 +288,7 @@ class ApiClient {
         }
       }
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
+      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
@@ -229,13 +299,14 @@ class ApiClient {
     bool requireAuth = false,
   }) async {
     try {
+      final resolvedBaseUrl = await getBaseUrl();
       final headers = {
         'X-Platform': 'mobile',
         if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
       };
 
       final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse('$resolvedBaseUrl$endpoint'),
         headers: headers,
       ).timeout(_requestTimeout);
 
@@ -265,7 +336,7 @@ class ApiClient {
         contentType: response.headers['content-type'],
       );
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di $baseUrl dan jaringan Anda.');
+      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
     } catch (e) {
       rethrow;
     }
