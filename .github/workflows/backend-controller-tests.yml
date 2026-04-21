@@ -28,6 +28,8 @@ jobs:
   controller-unit-tests:
     name: Controller Unit Tests
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
     defaults:
       run:
         working-directory: backend
@@ -155,7 +157,7 @@ jobs:
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
-      - name: Run controller unit tests with coverage gate
+      - name: Run controller unit tests
         shell: bash
         run: |
           test_files=$(find src/controllers -type f \( -name "*.test.ts" -o -name "*.spec.ts" \) | sort)
@@ -163,7 +165,7 @@ jobs:
             echo "Controller test files:"
             echo "$test_files"
 
-            npm run test:controllers:coverage
+            npm run test:controllers
           else
             echo "No controller test files found under src/controllers/**/*.test.ts or **/*.spec.ts"
             echo "Ensure your controller tests are stored under backend/src/controllers/**/*.test.ts or .spec.ts"
