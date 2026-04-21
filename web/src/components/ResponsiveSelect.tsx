@@ -3,26 +3,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
-type SelectOption = {
-  value: string | number;
+type SelectOption<T extends string | number> = {
+  value: T;
   label: string;
 };
 
-type ResponsiveSelectProps = {
-  value: string | number;
-  onChange: (value: string | number) => void;
-  options: SelectOption[];
+type ResponsiveSelectProps<T extends string | number> = {
+  value: T;
+  onChange: (value: T) => void;
+  options: SelectOption<T>[];
   placeholder?: string;
   disabled?: boolean;
 };
 
-export default function ResponsiveSelect({
+export default function ResponsiveSelect<T extends string | number>({
   value,
   onChange,
   options,
   placeholder = "Pilih opsi",
   disabled = false,
-}: ResponsiveSelectProps) {
+}: ResponsiveSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
