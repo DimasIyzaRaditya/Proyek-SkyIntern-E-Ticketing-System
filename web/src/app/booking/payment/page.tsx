@@ -445,6 +445,7 @@ function PaymentSummaryPageContent() {
           }
 
           if (result.status === "CANCELLED") {
+            setBookingLoading(false);
             setPaymentPending(false);
             setPendingSnapToken(null);
             setPendingRedirectUrl(null);
@@ -483,9 +484,11 @@ function PaymentSummaryPageContent() {
         }
 
         if (payload.status === "CANCELLED") {
+          setBookingLoading(false);
           setPaymentPending(false);
           setPendingSnapToken(null);
           setPendingRedirectUrl(null);
+          setSnapClosed(false);
           setCountdown(0);
           setBookingError("Booking dibatalkan sebelum pembayaran selesai.");
         }
@@ -505,6 +508,7 @@ function PaymentSummaryPageContent() {
     if (typeof window !== "undefined" && window.snap) {
       window.snap.pay(token, {
         onSuccess: () => {
+          setBookingLoading(false);
           if (bookingIdForPayment) {
             handlePaidConfirmed(bookingIdForPayment);
           }
@@ -512,6 +516,7 @@ function PaymentSummaryPageContent() {
         onPending: () => {
           // Async payment initiated (GoPay QR shown, VA number shown, etc.)
           // Token is now consumed — do NOT reopen popup, just show waiting state
+          setBookingLoading(false);
           setPaymentPending(true);
           setPendingSnapToken(null);
           setPendingRedirectUrl(null);
@@ -520,6 +525,7 @@ function PaymentSummaryPageContent() {
         },
         onError: () => {
           // Token consumed — clear so user can start fresh
+          setBookingLoading(false);
           setPendingSnapToken(null);
           setPendingRedirectUrl(null);
           setSnapClosed(false);
@@ -528,6 +534,7 @@ function PaymentSummaryPageContent() {
         },
         onClose: () => {
           // Popup closed before choosing / before paying — token still valid, allow resume
+          setBookingLoading(false);
           setSnapClosed(true);
         },
       });
