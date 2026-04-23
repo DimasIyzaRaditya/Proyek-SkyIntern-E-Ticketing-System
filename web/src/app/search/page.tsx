@@ -688,7 +688,7 @@ export default function SearchPage() {
   return (
     <>
       <div
-        className="relative rounded-4xl px-20 py-20 text-white shadow-xl bg-cover bg-center bg-no-repeat"
+        className="relative rounded-4xl text-white shadow-xl bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage:
             "linear-gradient(160deg, rgba(6,24,44,0.58) 0%, rgba(12,45,84,0.42) 45%, rgba(8,20,36,0.62) 100%), url('/bg.jpg'), url('/home-hero.svg')",
