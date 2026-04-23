@@ -27,7 +27,26 @@ const getProxyPublicBaseUrl = () => {
 
 const getMinioPublicBaseUrl = () => {
   const explicitPublicUrl = process.env.MINIO_PUBLIC_URL?.trim()
-  return explicitPublicUrl ? sanitizeBaseUrl(explicitPublicUrl) : null
+  if (!explicitPublicUrl) return null
+
+  try {
+    const parsed = new URL(explicitPublicUrl)
+    const host = parsed.hostname.toLowerCase()
+    const isPrivateIpv4 = /^10\./.test(host) ||
+      /^127\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+
+    // In local/dev network use backend proxy URL so clients can access files
+    // consistently from localhost, emulator, or LAN hosts.
+    if (host === "localhost" || host === "0.0.0.0" || isPrivateIpv4) {
+      return null
+    }
+  } catch {
+    return null
+  }
+
+  return sanitizeBaseUrl(explicitPublicUrl)
 }
 
 const encodeObjectKey = (fileName: string) =>
@@ -125,6 +144,37 @@ export const normalizeFileUrl = (fileUrl: string | null | undefined): string | n
   if (!fileUrl) return null
   const key = extractFileKeyFromUrl(fileUrl)
   if (!key) return fileUrl
+  return getFileUrl(key)
+}
+
+export const isFileExists = async (fileName: string): Promise<boolean> => {
+  try {
+    await minioClient.statObject(BUCKET_NAME, fileName)
+    return true
+  } catch (error: any) {
+    const code = String(error?.code || "")
+    const notFoundCodes = new Set(["NoSuchKey", "NoSuchObject", "NotFound"])
+    if (notFoundCodes.has(code)) return false
+
+    if (code === "ECONNREFUSED") {
+      // MinIO unavailable: keep existing behavior and don't silently remove URL.
+      throw new Error("Server penyimpanan file tidak tersedia")
+    }
+
+    throw error
+  }
+}
+
+export const normalizeFileUrlIfExists = async (
+  fileUrl: string | null | undefined
+): Promise<string | null> => {
+  if (!fileUrl) return null
+  const key = extractFileKeyFromUrl(fileUrl)
+  if (!key) return fileUrl
+
+  const exists = await isFileExists(key)
+  if (!exists) return null
+
   return getFileUrl(key)
 }
 

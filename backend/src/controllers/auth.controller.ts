@@ -9,7 +9,7 @@ import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateResetToken, addMinutes } from "../utils/helpers"
 import { sendResetPasswordEmail, sendTwoFactorCodeEmail } from "../utils/email"
-import { uploadFile, deleteFile, extractFileKeyFromUrl, normalizeFileUrl } from "../utils/minio"
+import { uploadFile, deleteFile, extractFileKeyFromUrl, normalizeFileUrlIfExists } from "../utils/minio"
 
 const TWO_FACTOR_CODE_TTL_MINUTES = 10
 
@@ -315,10 +315,12 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Pengguna tidak ditemukan" })
     }
 
+    const normalizedAvatarUrl = await normalizeFileUrlIfExists(user.avatarUrl)
+
     res.json({
       user: {
         ...user,
-        avatarUrl: normalizeFileUrl(user.avatarUrl)
+        avatarUrl: normalizedAvatarUrl
       }
     })
   } catch (error) {
@@ -373,11 +375,13 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
       }
     })
 
+    const normalizedAvatarUrl = await normalizeFileUrlIfExists(user.avatarUrl)
+
     res.json({
       message: "Profil berhasil diperbarui",
       user: {
         ...user,
-        avatarUrl: normalizeFileUrl(user.avatarUrl)
+        avatarUrl: normalizedAvatarUrl
       }
     })
   } catch (error) {
@@ -472,11 +476,13 @@ export const uploadAvatar = async (req: AuthRequest, res: Response) => {
       }
     })
 
+    const normalizedAvatarUrl = await normalizeFileUrlIfExists(user.avatarUrl)
+
     res.json({
       message: "Foto profil berhasil diperbarui",
       user: {
         ...user,
-        avatarUrl: normalizeFileUrl(user.avatarUrl)
+        avatarUrl: normalizedAvatarUrl
       }
     })
   } catch (error: any) {

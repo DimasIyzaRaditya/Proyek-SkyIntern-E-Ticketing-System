@@ -18,7 +18,8 @@ export const getPublicFile = async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "public, max-age=86400")
     objectStream.pipe(res)
   } catch (error: any) {
-    if (error?.code === "NoSuchKey") {
+    const notFoundCodes = new Set(["NoSuchKey", "NoSuchObject", "NotFound"])
+    if (notFoundCodes.has(String(error?.code))) {
       return res.status(404).json({ message: "File tidak ditemukan" })
     }
 

@@ -13,7 +13,7 @@ class ApiClient {
   // Default LAN host for physical devices when no override is provided.
   static const String _defaultLanApiHost = String.fromEnvironment(
     'API_LAN_HOST',
-    defaultValue: '192.168.18.38',
+    defaultValue: '192.168.18.39',
   );
 
   static const String _apiPort = '3000';
@@ -37,6 +37,46 @@ class ApiClient {
   }
 
   static String _baseUrlForHost(String host) => '$_apiScheme://$host:$_apiPort';
+
+  static bool _isPrivateIpv4Host(String host) {
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+
+    final octets = <int>[];
+    for (final part in parts) {
+      final value = int.tryParse(part);
+      if (value == null || value < 0 || value > 255) return false;
+      octets.add(value);
+    }
+
+    final first = octets[0];
+    final second = octets[1];
+
+    if (first == 10) return true;
+    if (first == 127) return true;
+    if (first == 192 && second == 168) return true;
+    if (first == 172 && second >= 16 && second <= 31) return true;
+
+    return false;
+  }
+
+  static bool _isLocalNetworkHost(String host) {
+    final normalized = host.toLowerCase();
+    if (normalized == 'localhost' || normalized == '0.0.0.0') return true;
+    if (normalized == '10.0.2.2') return true;
+    return _isPrivateIpv4Host(normalized);
+  }
+
+  static String? _extractMinioObjectKey(Uri uri) {
+    final segments = uri.pathSegments;
+    if (segments.length < 2) return null;
+
+    // Expected shape: /<bucket>/<object-key...>
+    final objectSegments = segments.skip(1).toList();
+    if (objectSegments.isEmpty) return null;
+
+    return objectSegments.join('/');
+  }
 
   static List<String> _candidateHosts() {
     if (_forcedApiHost.trim().isNotEmpty) return [_forcedApiHost.trim()];
@@ -103,17 +143,21 @@ class ApiClient {
     }
 
     final host = uri.host.toLowerCase();
-    final shouldReplaceHost = host == 'localhost' ||
-        host == '127.0.0.1' ||
-        host == '10.0.2.2';
+    if (!_isLocalNetworkHost(host)) return trimmed;
 
-    if (!shouldReplaceHost) return trimmed;
+    final minioObjectKey = _extractMinioObjectKey(uri);
+    if (minioObjectKey != null && uri.port == 9000) {
+      final apiUri = Uri.parse(baseUrl);
+      return apiUri
+          .replace(path: '/api/files', queryParameters: {'key': minioObjectKey})
+          .toString();
+    }
 
     return uri.replace(host: _effectiveHostSync).toString();
   }
 
   static String? _authToken;
-  
+
   static String? get authToken => _authToken;
 
   static void setAuthToken(String token) {
@@ -133,13 +177,13 @@ class ApiClient {
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
-        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+        if (requireAuth && _authToken != null)
+          'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http.get(
-        Uri.parse('$resolvedBaseUrl$endpoint'),
-        headers: headers,
-      ).timeout(_requestTimeout);
+      final response = await http
+          .get(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -148,7 +192,9 @@ class ApiClient {
 
       if (response.statusCode == 403) {
         clearAuthToken();
-        throw Exception('ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.');
+        throw Exception(
+          'ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.',
+        );
       }
 
       if (response.statusCode != 200) {
@@ -158,7 +204,9 @@ class ApiClient {
 
       return json.decode(response.body) as Map<String, dynamic>;
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
+      throw Exception(
+        'Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.',
+      );
     } catch (e) {
       rethrow;
     }
@@ -174,14 +222,17 @@ class ApiClient {
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
-        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+        if (requireAuth && _authToken != null)
+          'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http.post(
-        Uri.parse('$resolvedBaseUrl$endpoint'),
-        headers: headers,
-        body: json.encode(body),
-      ).timeout(_requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('$resolvedBaseUrl$endpoint'),
+            headers: headers,
+            body: json.encode(body),
+          )
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 401 && requireAuth) {
         clearAuthToken();
@@ -190,7 +241,9 @@ class ApiClient {
 
       if (response.statusCode == 403) {
         clearAuthToken();
-        throw Exception('ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.');
+        throw Exception(
+          'ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.',
+        );
       }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -204,7 +257,9 @@ class ApiClient {
 
       return json.decode(response.body) as Map<String, dynamic>;
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
+      throw Exception(
+        'Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.',
+      );
     } catch (e) {
       rethrow;
     }
@@ -220,14 +275,17 @@ class ApiClient {
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
-        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+        if (requireAuth && _authToken != null)
+          'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http.put(
-        Uri.parse('$resolvedBaseUrl$endpoint'),
-        headers: headers,
-        body: json.encode(body),
-      ).timeout(_requestTimeout);
+      final response = await http
+          .put(
+            Uri.parse('$resolvedBaseUrl$endpoint'),
+            headers: headers,
+            body: json.encode(body),
+          )
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -236,7 +294,9 @@ class ApiClient {
 
       if (response.statusCode == 403) {
         clearAuthToken();
-        throw Exception('ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.');
+        throw Exception(
+          'ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.',
+        );
       }
 
       if (response.statusCode != 200) {
@@ -250,7 +310,9 @@ class ApiClient {
 
       return json.decode(response.body) as Map<String, dynamic>;
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
+      throw Exception(
+        'Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.',
+      );
     } catch (e) {
       rethrow;
     }
@@ -265,13 +327,13 @@ class ApiClient {
       final headers = {
         'Content-Type': 'application/json',
         'X-Platform': 'mobile',
-        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+        if (requireAuth && _authToken != null)
+          'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http.delete(
-        Uri.parse('$resolvedBaseUrl$endpoint'),
-        headers: headers,
-      ).timeout(_requestTimeout);
+      final response = await http
+          .delete(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -287,27 +349,29 @@ class ApiClient {
         }
       }
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
+      throw Exception(
+        'Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.',
+      );
     } catch (e) {
       rethrow;
     }
   }
 
-  static Future<({Uint8List bytes, String? contentDisposition, String? contentType})> getBytes(
-    String endpoint, {
-    bool requireAuth = false,
-  }) async {
+  static Future<
+    ({Uint8List bytes, String? contentDisposition, String? contentType})
+  >
+  getBytes(String endpoint, {bool requireAuth = false}) async {
     try {
       final resolvedBaseUrl = await getBaseUrl();
       final headers = {
         'X-Platform': 'mobile',
-        if (requireAuth && _authToken != null) 'Authorization': 'Bearer $_authToken',
+        if (requireAuth && _authToken != null)
+          'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http.get(
-        Uri.parse('$resolvedBaseUrl$endpoint'),
-        headers: headers,
-      ).timeout(_requestTimeout);
+      final response = await http
+          .get(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 401) {
         clearAuthToken();
@@ -326,7 +390,9 @@ class ApiClient {
         } catch (_) {
           message = null;
         }
-        throw Exception(message ?? 'Download gagal (status ${response.statusCode})');
+        throw Exception(
+          message ?? 'Download gagal (status ${response.statusCode})',
+        );
       }
 
       return (
@@ -335,7 +401,9 @@ class ApiClient {
         contentType: response.headers['content-type'],
       );
     } on TimeoutException {
-      throw Exception('Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.');
+      throw Exception(
+        'Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.',
+      );
     } catch (e) {
       rethrow;
     }
