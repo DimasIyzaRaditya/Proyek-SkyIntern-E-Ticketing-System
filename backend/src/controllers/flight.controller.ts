@@ -1,4 +1,4 @@
-﻿// Controller penerbangan (flight). Menyediakan CRUD penerbangan untuk admin
+// Controller penerbangan (flight). Menyediakan CRUD penerbangan untuk admin
 // serta fitur pencarian penerbangan publik dengan filter asal, tujuan,
 // tanggal keberangkatan, harga, dan pengurutan hasil.
 import { Response } from "express"
@@ -99,12 +99,13 @@ export const createFlight = async (req: AuthRequest, res: Response) => {
 // Admin: Get All Flights
 export const getAllFlightsAdmin = async (req: AuthRequest, res: Response) => {
   try {
-    const pageParam = Number(req.query.page)
-    const limitParam = Number(req.query.limit)
-    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
-    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
-    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "departureTime"
-    const sortDirection = req.query.sortDirection === "desc" ? "desc" : "asc"
+    const query = req.query ?? {}
+    const pageParam = Number(query.page)
+    const limitParam = Number(query.limit)
+    const hasPagination = query.page !== undefined || query.limit !== undefined
+    const search = typeof query.search === "string" ? query.search.trim() : ""
+    const sortBy = typeof query.sortBy === "string" ? query.sortBy : "departureTime"
+    const sortDirection = query.sortDirection === "desc" ? "desc" : "asc"
 
     const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
     const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20

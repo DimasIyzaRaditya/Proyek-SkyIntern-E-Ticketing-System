@@ -1,4 +1,4 @@
-﻿// Controller maskapai penerbangan (airline). Menyediakan operasi CRUD untuk data
+// Controller maskapai penerbangan (airline). Menyediakan operasi CRUD untuk data
 // maskapai, termasuk upload/hapus logo ke MinIO object storage.
 import { Response } from "express"
 import prisma from "../prisma/client"
@@ -49,12 +49,13 @@ export const createAirline = async (req: AuthRequest, res: Response) => {
 
 export const getAllAirlines = async (req: AuthRequest, res: Response) => {
   try {
-    const pageParam = Number(req.query.page)
-    const limitParam = Number(req.query.limit)
-    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
-    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
-    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "name"
-    const sortDirection = req.query.sortDirection === "desc" ? "desc" : "asc"
+    const query = req.query ?? {}
+    const pageParam = Number(query.page)
+    const limitParam = Number(query.limit)
+    const hasPagination = query.page !== undefined || query.limit !== undefined
+    const search = typeof query.search === "string" ? query.search.trim() : ""
+    const sortBy = typeof query.sortBy === "string" ? query.sortBy : "name"
+    const sortDirection = query.sortDirection === "desc" ? "desc" : "asc"
 
     const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
     const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
