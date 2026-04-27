@@ -604,7 +604,42 @@ export const deleteAccount = async (req: AuthRequest, res: Response) => {
 
 export const getAllUsers = async (req: AuthRequest, res: Response) => {
   try {
-    const users = await prisma.user.findMany({ // Ambil semua user (tanpa password) urut dari terbaru
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
+
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
+    const role = typeof req.query.role === "string" ? req.query.role : undefined
+    const excludeRole = typeof req.query.excludeRole === "string" ? req.query.excludeRole : undefined
+    const includeStats = req.query.includeStats === "true"
+
+    const where: any = {}
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } }
+      ]
+    }
+
+    if (role) {
+      where.role = role
+    }
+
+    if (excludeRole) {
+      where.role = {
+        ...(where.role ? { equals: where.role } : {}),
+        not: excludeRole
+      }
+      if (where.role.equals && where.role.equals === excludeRole) {
+        return res.status(400).json({ message: "role dan excludeRole tidak boleh sama" })
+      }
+    }
+
+    const queryOptions: any = {
+      where,
       select: {
         id: true,
         name: true,
@@ -617,9 +652,68 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
         createdAt: true
       },
       orderBy: { createdAt: "desc" }
-    })
+    }
 
-    res.json({ users })
+    const totalItems = hasPagination ? await prisma.user.count({ where }) : undefined
+    const totalPages = hasPagination ? Math.max(1, Math.ceil(totalItems! / limit)) : undefined
+    const safePage = hasPagination ? Math.min(page, totalPages!) : undefined
+
+    let users = hasPagination
+      ? await prisma.user.findMany({
+          ...queryOptions,
+          skip: ((safePage as number) - 1) * limit,
+          take: limit
+        })
+      : await prisma.user.findMany(queryOptions)
+
+    if (includeStats && users.length > 0) {
+      const userIds = users.map((user: any) => user.id)
+
+      const [bookingCounts, paidSums] = await Promise.all([
+        prisma.booking.groupBy({
+          by: ["userId"],
+          where: { userId: { in: userIds } },
+          _count: { _all: true }
+        }),
+        prisma.booking.groupBy({
+          by: ["userId"],
+          where: {
+            userId: { in: userIds },
+            status: "PAID"
+          },
+          _sum: { totalPrice: true }
+        })
+      ])
+
+      const bookingCountMap = new Map<number, number>(
+        bookingCounts.map((item: any) => [item.userId, item._count._all])
+      )
+      const totalSpentMap = new Map<number, number>(
+        paidSums.map((item: any) => [item.userId, item._sum.totalPrice ?? 0])
+      )
+
+      users = users.map((user: any) => ({
+        ...user,
+        bookingCount: bookingCountMap.get(user.id) ?? 0,
+        totalSpent: totalSpentMap.get(user.id) ?? 0
+      }))
+    }
+
+    if (!hasPagination) {
+      return res.json({ users })
+    }
+
+    return res.json({
+      users,
+      pagination: {
+        page: safePage!,
+        limit,
+        totalItems: totalItems!,
+        totalPages: totalPages!,
+        hasNextPage: safePage! < totalPages!,
+        hasPrevPage: safePage! > 1
+      }
+    })
   } catch (error) {
     console.error("Get all users error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })

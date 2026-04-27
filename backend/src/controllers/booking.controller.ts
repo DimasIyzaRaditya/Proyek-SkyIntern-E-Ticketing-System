@@ -393,7 +393,12 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
   try {
     await expirePendingBookings(req.user!.id)
 
-    const { status } = req.query // Filter status booking (PENDING/PAID/CANCELLED) dari query string
+    const { status, statusFilter, sortDirection } = req.query // Filter status booking dari query string
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
 
     const where: any = {
       userId: req.user!.id // Hanya tampilkan booking milik user yang login
@@ -403,7 +408,20 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
       where.status = status as string
     }
 
-    const bookings = await prisma.booking.findMany({
+    if (typeof statusFilter === "string" && statusFilter !== "All") {
+      if (statusFilter === "Pending") {
+        where.status = "PENDING"
+      } else if (statusFilter === "Paid") {
+        where.status = "PAID"
+        where.ticket = { is: null }
+      } else if (statusFilter === "Issued") {
+        where.ticket = { isNot: null }
+      } else if (statusFilter === "Cancelled") {
+        where.status = { in: ["CANCELLED", "EXPIRED"] }
+      }
+    }
+
+    const queryOptions: any = {
       where,
       include: {
         flight: {
@@ -418,11 +436,36 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
         ticket: true
       },
       orderBy: {
-        createdAt: "desc"
+        createdAt: sortDirection === "asc" ? "asc" : "desc"
       }
-    }) // Ambil booking user beserta detail penerbangan, penumpang, pembayaran, dan tiket
+    }
 
-    res.json({ bookings })
+    if (!hasPagination) {
+      const bookings = await prisma.booking.findMany(queryOptions)
+      return res.json({ bookings })
+    }
+
+    const totalItems = await prisma.booking.count({ where })
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
+    const safePage = Math.min(page, totalPages)
+
+    const bookings = await prisma.booking.findMany({
+      ...queryOptions,
+      skip: (safePage - 1) * limit,
+      take: limit
+    })
+
+    return res.json({
+      bookings,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    })
   } catch (error) {
     console.error("Get my bookings error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
@@ -434,14 +477,42 @@ export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
   try {
     await expirePendingBookings()
 
-    const { status } = req.query // Filter status booking dari query string (opsional)
+    const { status, statusFilter, search } = req.query // Filter status booking dari query string (opsional)
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
 
     const where: any = {} // Kondisi filter, kosong berarti tampilkan semua booking
     if (status) {
       where.status = status as string
     }
 
-    const bookings = await prisma.booking.findMany({
+    if (typeof search === "string" && search.trim()) {
+      const keyword = search.trim()
+      where.OR = [
+        { bookingCode: { contains: keyword, mode: "insensitive" } },
+        { user: { name: { contains: keyword, mode: "insensitive" } } },
+        { user: { email: { contains: keyword, mode: "insensitive" } } },
+        { flight: { flightNumber: { contains: keyword, mode: "insensitive" } } }
+      ]
+    }
+
+    if (typeof statusFilter === "string" && statusFilter !== "All") {
+      if (statusFilter === "Pending") {
+        where.status = "PENDING"
+      } else if (statusFilter === "Paid") {
+        where.status = "PAID"
+        where.ticket = { is: null }
+      } else if (statusFilter === "Issued") {
+        where.ticket = { isNot: null }
+      } else if (statusFilter === "Cancelled") {
+        where.status = { in: ["CANCELLED", "EXPIRED"] }
+      }
+    }
+
+    const queryOptions: any = {
       where,
       include: {
         user: {
@@ -465,9 +536,35 @@ export const getAllBookingsAdmin = async (req: AuthRequest, res: Response) => {
       orderBy: {
         createdAt: "desc"
       }
+    }
+
+    if (!hasPagination) {
+      const bookings = await prisma.booking.findMany(queryOptions)
+      return res.json({ bookings })
+    }
+
+    const totalItems = await prisma.booking.count({ where })
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
+    const safePage = Math.min(page, totalPages)
+
+    const bookings = await prisma.booking.findMany({
+      ...queryOptions,
+      skip: (safePage - 1) * limit,
+      take: limit
     })
 
-    res.json({ bookings })
+    return res.json({
+      bookings,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    })
+
   } catch (error) {
     console.error("Get all bookings admin error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })

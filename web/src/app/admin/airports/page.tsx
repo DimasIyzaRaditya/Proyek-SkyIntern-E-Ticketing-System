@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
-import { getAdminAirports, deleteAdminAirport, type AdminAirport } from "@/lib/admin-api";
+import { getAdminAirportsPage, deleteAdminAirport, type AdminAirport } from "@/lib/admin-api";
 
 type SortField = "id" | "name" | "city" | "country" | "timezone";
 type SortDirection = "asc" | "desc";
@@ -25,6 +25,8 @@ const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
 
 export default function AdminAirportsPage() {
   const [airports, setAirports] = useState<AdminAirport[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -33,42 +35,6 @@ export default function AdminAirportsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
-
-  const displayedAirports = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    const filtered = keyword
-      ? airports.filter((item) =>
-          [String(item.id), item.name, item.city, item.country, item.timezone]
-            .join(" ")
-            .toLowerCase()
-            .includes(keyword),
-        )
-      : airports;
-
-    return [...filtered].sort((a, b) => {
-      const directionFactor = sortDirection === "asc" ? 1 : -1;
-
-      if (sortField === "id") {
-        return (a.id - b.id) * directionFactor;
-      }
-
-      const left = a[sortField].toLowerCase();
-      const right = b[sortField].toLowerCase();
-
-      if (left < right) return -1 * directionFactor;
-      if (left > right) return 1 * directionFactor;
-      return 0;
-    });
-  }, [airports, search, sortField, sortDirection]);
-
-  const totalPages = Math.max(1, Math.ceil(displayedAirports.length / rowsPerView));
-
-  const visibleAirports = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerView;
-    const end = start + rowsPerView;
-    return displayedAirports.slice(start, end);
-  }, [displayedAirports, currentPage, rowsPerView]);
 
   const pageNumbers = useMemo(() => {
     if (totalPages <= 5) {
@@ -88,8 +54,19 @@ export default function AdminAirportsPage() {
       setMessage("");
 
       try {
-        const data = await getAdminAirports();
-        setAirports(data);
+        const result = await getAdminAirportsPage({
+          page: currentPage,
+          limit: rowsPerView,
+          search,
+          sortBy: sortField,
+          sortDirection,
+        });
+        setAirports(result.data);
+        setTotalItems(result.pagination.totalItems);
+        setTotalPages(result.pagination.totalPages);
+        if (result.pagination.page !== currentPage) {
+          setCurrentPage(result.pagination.page);
+        }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Failed to load airports.");
       } finally {
@@ -98,17 +75,11 @@ export default function AdminAirportsPage() {
     };
 
     void loadAirports();
-  }, []);
+  }, [currentPage, rowsPerView, search, sortField, sortDirection]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [search, sortField, sortDirection, rowsPerView]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   return (
     <AdminShell title="Airport Management" description="Manage airports from the list. Use Add Airport to create a new record.">
@@ -144,7 +115,7 @@ export default function AdminAirportsPage() {
             placeholder="Direction"
           />
           <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end">
-            Total: {displayedAirports.length}
+            Total: {totalItems}
           </div>
         </div>
 
@@ -165,11 +136,11 @@ export default function AdminAirportsPage() {
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-slate-500">Loading airports...</td>
                 </tr>
-              ) : displayedAirports.length === 0 ? (
+              ) : airports.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-slate-500">No airports match the current filter.</td>
                 </tr>
-              ) : visibleAirports.map((item) => (
+              ) : airports.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3 font-semibold">{item.id}</td>
                   <td className="p-3">{item.name}</td>
@@ -190,7 +161,12 @@ export default function AdminAirportsPage() {
                           setDeletingId(item.id);
                           try {
                             await deleteAdminAirport(item.id);
-                            setAirports((prev) => prev.filter((a) => a.id !== item.id));
+                            if (airports.length === 1 && currentPage > 1) {
+                              setCurrentPage((prev) => prev - 1);
+                            } else {
+                              setAirports((prev) => prev.filter((a) => a.id !== item.id));
+                              setTotalItems((prev) => Math.max(0, prev - 1));
+                            }
                           } catch (err) {
                             setMessage(err instanceof Error ? err.message : "Gagal menghapus bandara.");
                           } finally {
@@ -210,11 +186,11 @@ export default function AdminAirportsPage() {
           </table>
         </div>
 
-        {!loading && displayedAirports.length > 0 && (
+        {!loading && totalItems > 0 && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, displayedAirports.length)} dari {displayedAirports.length} data.
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, totalItems)} dari {totalItems} data.
               </p>
             </div>
 

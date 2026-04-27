@@ -3,35 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCcw, ShieldOff, ShieldCheck } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
-import { getAdminBookings, type AdminBooking, getAllAdminUsers, blockAdminUser, toggleAdminUserTwoFactor, type AdminUser } from "@/lib/admin-api";
+import { getAdminUsersPage, blockAdminUser, toggleAdminUserTwoFactor, type AdminUser } from "@/lib/admin-api";
 import { formatRupiah } from "@/lib/currency";
-// tes
+
 type UserView = AdminUser & {
   bookingCount: number;
   totalSpent: number;
 };
 
-const mergeUsers = (users: AdminUser[], bookings: AdminBooking[]): UserView[] => {
-  const bookingMap = new Map<number, { count: number; spent: number }>();
-  for (const b of bookings) {
-    const u = b.user;
-    if (!bookingMap.has(u.id)) bookingMap.set(u.id, { count: 0, spent: 0 });
-    const entry = bookingMap.get(u.id)!;
-    entry.count += 1;
-    if (b.status === "PAID" || b.payment?.status === "SUCCESS") entry.spent += b.totalPrice;
-  }
-  return users
-    .filter((u) => u.role !== "ADMIN")
-    .map((u) => ({
-      ...u,
-      bookingCount: bookingMap.get(u.id)?.count ?? 0,
-      totalSpent: bookingMap.get(u.id)?.spent ?? 0,
-    }))
-    .sort((a, b) => b.bookingCount - a.bookingCount);
-};
-
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserView[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [blockingId, setBlockingId] = useState<number | null>(null);
@@ -43,8 +26,25 @@ export default function AdminUsersPage() {
     setLoading(true);
     setMessage("");
     try {
-      const [allUsers, bookings] = await Promise.all([getAllAdminUsers(), getAdminBookings()]);
-      setUsers(mergeUsers(allUsers, bookings));
+      const result = await getAdminUsersPage({
+        page: currentPage,
+        limit: rowsPerView,
+        excludeRole: "ADMIN",
+        includeStats: true,
+      });
+
+      const mapped: UserView[] = result.data.map((user) => ({
+        ...user,
+        bookingCount: user.bookingCount ?? 0,
+        totalSpent: user.totalSpent ?? 0,
+      }));
+
+      setUsers(mapped);
+      setTotalItems(result.pagination.totalItems);
+      setTotalPages(result.pagination.totalPages);
+      if (result.pagination.page !== currentPage) {
+        setCurrentPage(result.pagination.page);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Gagal memuat data user.");
     } finally {
@@ -54,7 +54,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [currentPage, rowsPerView]);
 
   const handleToggleBlock = async (userId: number) => {
     setBlockingId(userId);
@@ -86,13 +86,6 @@ export default function AdminUsersPage() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(users.length / rowsPerView));
-
-  const visibleUsers = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerView;
-    return users.slice(start, start + rowsPerView);
-  }, [users, currentPage, rowsPerView]);
-
   const pageNumbers = useMemo(() => {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
     const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
@@ -106,7 +99,7 @@ export default function AdminUsersPage() {
       <section className="max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <p className="text-sm text-slate-600">
-            {loading ? "Memuat data..." : `${users.length} user ditemukan`}
+            {loading ? "Memuat data..." : `${totalItems} user ditemukan`}
           </p>
           <button
             onClick={() => void loadData()}
@@ -137,7 +130,7 @@ export default function AdminUsersPage() {
                 <tr><td colSpan={7} className="p-4 text-center text-slate-500">Memuat data user...</td></tr>
               ) : users.length === 0 ? (
                 <tr><td colSpan={7} className="p-4 text-center text-slate-500">Belum ada data user.</td></tr>
-              ) : visibleUsers.map((item) => (
+              ) : users.map((item) => (
                 <tr key={item.id} className={`border-b border-blue-100 last:border-0 ${item.isBlocked ? "bg-red-50" : ""}`}>
                   <td className="p-3 font-semibold text-slate-700">#{item.id}</td>
                   <td className="p-3 font-semibold text-slate-900">{item.name}</td>
@@ -200,11 +193,11 @@ export default function AdminUsersPage() {
           </table>
         </div>
 
-        {!loading && users.length > 0 && (
+        {!loading && totalItems > 0 && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, users.length)} dari {users.length} data.
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, totalItems)} dari {totalItems} data.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">

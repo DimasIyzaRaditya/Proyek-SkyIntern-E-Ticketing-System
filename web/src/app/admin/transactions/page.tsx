@@ -12,7 +12,7 @@ import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { formatRupiah } from "@/lib/currency";
 // Fungsi untuk mengubah angka menjadi format Rupiah
 
-import { getAdminBookings, updateAdminBookingStatus, sendAdminDepartureReminder, type AdminBooking } from "@/lib/admin-api";
+import { getAdminBookingsPage, updateAdminBookingStatus, sendAdminDepartureReminder, type AdminBooking } from "@/lib/admin-api";
 // Mengambil data booking dari API admin
 
 
@@ -101,6 +101,8 @@ export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // status loading
   const [loading, setLoading] = useState(true);
@@ -121,7 +123,12 @@ export default function AdminTransactionsPage() {
   } | null>(null);
 
   const refreshTransactions = async () => {
-    const bookings = await getAdminBookings();
+    const result = await getAdminBookingsPage({
+      page: currentPage,
+      limit: rowsPerView,
+      statusFilter,
+    });
+    const bookings = result.data;
     const mapped: TransactionItem[] = bookings.map((item) => ({
       id: String(item.id),
       customer: item.user.name,
@@ -132,6 +139,11 @@ export default function AdminTransactionsPage() {
       createdAt: item.createdAt,
     }));
     setTransactions(mapped);
+    setTotalItems(result.pagination.totalItems);
+    setTotalPages(result.pagination.totalPages);
+    if (result.pagination.page !== currentPage) {
+      setCurrentPage(result.pagination.page);
+    }
   };
 
 
@@ -163,7 +175,7 @@ export default function AdminTransactionsPage() {
 
     void loadTransactions();
 
-  }, []);
+  }, [currentPage, rowsPerView, statusFilter]);
 
 
   // fungsi untuk melakukan aksi edit status booking
@@ -212,23 +224,6 @@ export default function AdminTransactionsPage() {
   };
 
 
-  // filter transaksi berdasarkan status
-  const filteredTransactions = useMemo(() => {
-
-    if (statusFilter === "All") return transactions;
-
-    return transactions.filter((item) => item.status === statusFilter);
-
-  }, [statusFilter, transactions]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / rowsPerView));
-
-  const visibleTransactions = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerView;
-    const end = start + rowsPerView;
-    return filteredTransactions.slice(start, end);
-  }, [filteredTransactions, currentPage, rowsPerView]);
-
   const pageNumbers = useMemo(() => {
     if (totalPages <= 5) {
       return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -245,12 +240,6 @@ export default function AdminTransactionsPage() {
     setCurrentPage(1);
     setExpandedId(null);
   }, [statusFilter, rowsPerView]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
 
   return (
@@ -321,7 +310,7 @@ export default function AdminTransactionsPage() {
               ) : (
 
                 // menampilkan transaksi yang sudah difilter
-                visibleTransactions.flatMap((item) => {
+                transactions.flatMap((item) => {
                   const isOpen = expandedId === item.id;
                   return [
                     <tr
@@ -489,11 +478,11 @@ export default function AdminTransactionsPage() {
 
         </div>
 
-        {!loading && filteredTransactions.length > 0 && (
+        {!loading && totalItems > 0 && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, filteredTransactions.length)} dari {filteredTransactions.length} data.
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, totalItems)} dari {totalItems} data.
               </p>
             </div>
 

@@ -23,8 +23,51 @@ export const getActivePromos = async (req: Request, res: Response) => {
 // Admin: get all promos
 export const getAllPromos = async (req: Request, res: Response) => {
   try {
-    const promos = await prisma.promo.findMany({
-      orderBy: { createdAt: "desc" },
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
+    const statusFilter = typeof req.query.statusFilter === "string" ? req.query.statusFilter : "All"
+    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "createdAt"
+    const sortDirection = req.query.sortDirection === "asc" ? "asc" : "desc"
+
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
+
+    const where: any = {}
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { flight: { flightNumber: { contains: search, mode: "insensitive" } } },
+        { flight: { origin: { city: { contains: search, mode: "insensitive" } } } },
+        { flight: { destination: { city: { contains: search, mode: "insensitive" } } } }
+      ]
+      const searchAsNumber = Number(search)
+      if (Number.isInteger(searchAsNumber) && searchAsNumber > 0) {
+        where.OR.push({ id: searchAsNumber })
+      }
+    }
+
+    if (statusFilter === "Active") {
+      where.isActive = true
+    } else if (statusFilter === "Inactive") {
+      where.isActive = false
+    }
+
+    const sortMap: Record<string, any> = {
+      id: { id: sortDirection },
+      title: { title: sortDirection },
+      startDate: { startDate: sortDirection },
+      endDate: { endDate: sortDirection },
+      discount: { discount: sortDirection },
+      createdAt: { createdAt: sortDirection }
+    }
+    const orderBy = sortMap[sortBy] ?? { createdAt: "desc" }
+
+    const queryOptions: any = {
+      where,
+      orderBy,
       include: {
         flight: {
           select: {
@@ -35,8 +78,34 @@ export const getAllPromos = async (req: Request, res: Response) => {
           },
         },
       },
+    }
+
+    if (!hasPagination) {
+      const promos = await prisma.promo.findMany(queryOptions)
+      return res.json({ promos })
+    }
+
+    const totalItems = await prisma.promo.count({ where })
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
+    const safePage = Math.min(page, totalPages)
+
+    const promos = await prisma.promo.findMany({
+      ...queryOptions,
+      skip: (safePage - 1) * limit,
+      take: limit
     })
-    res.json({ promos })
+
+    res.json({
+      promos,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    })
   } catch {
     res.status(500).json({ message: "Gagal memuat promo." })
   }

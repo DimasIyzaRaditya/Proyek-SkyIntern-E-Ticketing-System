@@ -241,6 +241,31 @@ router.post("/:id/sync-payment", bookingController.syncPaymentStatus)
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Page number for paginated response
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Items per page
+ *       - in: query
+ *         name: statusFilter
+ *         schema:
+ *           type: string
+ *           enum: [All, Pending, Paid, Issued, Cancelled]
+ *         description: Filter by booking/payment status
+ *       - in: query
+ *         name: sortDirection
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *         description: Sort by booking creation time
+ *       - in: query
  *         name: status
  *         schema:
  *           type: string

@@ -99,7 +99,62 @@ export const createFlight = async (req: AuthRequest, res: Response) => {
 // Admin: Get All Flights
 export const getAllFlightsAdmin = async (req: AuthRequest, res: Response) => {
   try {
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
+    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "departureTime"
+    const sortDirection = req.query.sortDirection === "desc" ? "desc" : "asc"
+
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
+
+    const where: any = search
+      ? {
+          OR: [
+            { flightNumber: { contains: search, mode: "insensitive" } },
+            { airline: { name: { contains: search, mode: "insensitive" } } },
+            { airline: { code: { contains: search, mode: "insensitive" } } },
+            { origin: { city: { contains: search, mode: "insensitive" } } },
+            { origin: { name: { contains: search, mode: "insensitive" } } },
+            { destination: { city: { contains: search, mode: "insensitive" } } },
+            { destination: { name: { contains: search, mode: "insensitive" } } }
+          ]
+        }
+      : {}
+
+    const sortMap: Record<string, any> = {
+      departureTime: { departureTime: sortDirection },
+      arrivalTime: { arrivalTime: sortDirection },
+      flightNumber: { flightNumber: sortDirection },
+      basePrice: { basePrice: sortDirection },
+      route: [{ origin: { city: sortDirection } }, { destination: { city: sortDirection } }]
+    }
+    const orderBy = sortMap[sortBy] ?? { departureTime: "desc" }
+
+    if (!hasPagination) {
+      const flights = await prisma.flight.findMany({
+        where,
+        include: {
+          airline: true,
+          origin: true,
+          destination: true,
+          _count: {
+            select: { bookings: true }
+          }
+        },
+        orderBy
+      }) // Ambil semua penerbangan (mode lama, tanpa pagination)
+
+      return res.json({ flights })
+    }
+
+    const totalItems = await prisma.flight.count({ where })
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
+    const safePage = Math.min(page, totalPages)
+
     const flights = await prisma.flight.findMany({
+      where,
       include: {
         airline: true,
         origin: true,
@@ -108,10 +163,22 @@ export const getAllFlightsAdmin = async (req: AuthRequest, res: Response) => {
           select: { bookings: true }
         }
       },
-      orderBy: { departureTime: "desc" }
-    }) // Ambil semua penerbangan beserta relasi maskapai, bandara, dan jumlah booking
+      orderBy,
+      skip: (safePage - 1) * limit,
+      take: limit
+    })
 
-    res.json({ flights })
+    res.json({
+      flights,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    })
   } catch (error) {
     console.error("Get all flights error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
@@ -221,7 +288,10 @@ export const searchFlights = async (req: Request, res: Response) => {
       maxPrice,
       departureTimeStart,
       departureTimeEnd,
-      limit
+      limit,
+      page,
+      originCity,
+      destinationCity
     } = req.query
 
     const where: any = {
@@ -230,6 +300,16 @@ export const searchFlights = async (req: Request, res: Response) => {
 
     if (originId) where.originId = parseInt(originId as string) // Filter berdasarkan bandara asal
     if (destinationId) where.destinationId = parseInt(destinationId as string) // Filter berdasarkan bandara tujuan
+    if (originCity) {
+      where.origin = {
+        city: { equals: String(originCity), mode: "insensitive" }
+      }
+    }
+    if (destinationCity) {
+      where.destination = {
+        city: { equals: String(destinationCity), mode: "insensitive" }
+      }
+    }
 
     if (departureDate) {
       const date = new Date(departureDate as string)
@@ -269,6 +349,19 @@ export const searchFlights = async (req: Request, res: Response) => {
     } else if (sortBy === "duration-desc") {
       orderBy = { duration: "desc" }
     }
+
+    const rawLimit = parseInt(String(limit ?? "20"), 10)
+    const rawPage = parseInt(String(page ?? "1"), 10)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+
+    const take = Number.isInteger(rawLimit) && rawLimit > 0
+      ? Math.min(rawLimit, hasPagination ? 100 : 5000)
+      : (hasPagination ? 20 : undefined)
+    const currentPage = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+
+    const totalItems = await prisma.flight.count({ where })
+    const totalPages = take ? Math.max(1, Math.ceil(totalItems / take)) : 1
+    const safePage = take ? Math.min(currentPage, totalPages) : 1
 
     const flights = await prisma.flight.findMany({
       where, // Filter yang sudah dibangun dari query params
@@ -323,7 +416,7 @@ export const searchFlights = async (req: Request, res: Response) => {
         }
       },
       orderBy,
-      ...(limit ? { take: Math.min(parseInt(limit as string), 5000) } : {})
+      ...(take ? { skip: (safePage - 1) * take, take } : {})
     })
 
     const activeGlobalPromos = await prisma.promo.findMany({
@@ -356,11 +449,24 @@ export const searchFlights = async (req: Request, res: Response) => {
       }
     })
 
-    res.json({
+    const responsePayload: any = {
       flights: flightsWithAllPromos,
       count: flightsWithAllPromos.length,
       passengers: passengerCount ? parseInt(passengerCount as string) : 1
-    })
+    }
+
+    if (take) {
+      responsePayload.pagination = {
+        page: safePage,
+        limit: take,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    }
+
+    res.json(responsePayload)
   } catch (error) {
     console.error("Search error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })

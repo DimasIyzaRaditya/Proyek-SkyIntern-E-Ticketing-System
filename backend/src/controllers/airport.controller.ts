@@ -56,11 +56,69 @@ export const createAirport = async (req: AuthRequest, res: Response) => {
 
 export const getAllAirports = async (req: AuthRequest, res: Response) => {
   try {
-    const airports = await prisma.airport.findMany({
-      orderBy: { name: "asc" }
-    }) // Ambil semua bandara urut abjad
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
+    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "name"
+    const sortDirection = req.query.sortDirection === "desc" ? "desc" : "asc"
 
-    res.json({ airports })
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
+
+    const keywordId = Number(search)
+    const where: any = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { city: { contains: search, mode: "insensitive" } },
+            { country: { contains: search, mode: "insensitive" } },
+            { timezone: { contains: search, mode: "insensitive" } },
+            ...(Number.isInteger(keywordId) && keywordId > 0 ? [{ id: keywordId }] : [])
+          ]
+        }
+      : {}
+
+    const sortMap: Record<string, any> = {
+      id: { id: sortDirection },
+      name: { name: sortDirection },
+      city: { city: sortDirection },
+      country: { country: sortDirection },
+      timezone: { timezone: sortDirection }
+    }
+    const orderBy = sortMap[sortBy] ?? { name: "asc" }
+
+    if (!hasPagination) {
+      const airports = await prisma.airport.findMany({
+        where,
+        orderBy
+      }) // Ambil semua bandara (mode lama, tanpa pagination)
+
+      return res.json({ airports })
+    }
+
+    const totalItems = await prisma.airport.count({ where })
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
+    const safePage = Math.min(page, totalPages)
+
+    const airports = await prisma.airport.findMany({
+      where,
+      orderBy,
+      skip: (safePage - 1) * limit,
+      take: limit
+    })
+
+    res.json({
+      airports,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    })
   } catch (error) {
     console.error("Get all airports error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })

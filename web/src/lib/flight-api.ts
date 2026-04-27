@@ -59,6 +59,26 @@ type SearchFlightsResponse = {
   flights: BackendFlight[];
   count: number;
   passengers: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+};
+
+export type SearchFlightsResult = {
+  flights: FlightCardItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
 };
 
 export type FlightPriceByDateMap = Record<string, number>;
@@ -135,14 +155,22 @@ export const searchFlightsFromApi = async (params: {
   adult: string;
   child: string;
   sortBy: "price-low" | "price-high" | "duration" | "departure";
+  page: number;
+  limit: number;
 }) => {
   const passengerCount = Math.max(1, Number(params.adult || "1") + Number(params.child || "0"));
+  const originCity = extractCity(params.origin);
+  const destinationCity = extractCity(params.destination);
 
   const query = new URLSearchParams({
     departureDate: params.departureDate,
     passengerCount: String(passengerCount),
     sortBy: mapSortToApi(params.sortBy),
+    page: String(params.page),
+    limit: String(params.limit),
   });
+  if (originCity) query.set("originCity", originCity);
+  if (destinationCity) query.set("destinationCity", destinationCity);
 
   const response = await fetch(`${API_BASE_URL}/api/flights/search?${query.toString()}`, {
     cache: "no-store",
@@ -153,16 +181,19 @@ export const searchFlightsFromApi = async (params: {
   }
 
   const payload = (await response.json()) as SearchFlightsResponse;
-  const originCity = extractCity(params.origin);
-  const destinationCity = extractCity(params.destination);
+  const fallbackPagination = {
+    page: params.page,
+    limit: params.limit,
+    totalItems: payload.flights.length,
+    totalPages: Math.max(1, Math.ceil(payload.flights.length / params.limit)),
+    hasNextPage: false,
+    hasPrevPage: params.page > 1,
+  };
 
-  const filtered = payload.flights.filter((item) => {
-    const matchedOrigin = originCity ? item.origin.city.toLowerCase() === originCity : true;
-    const matchedDestination = destinationCity ? item.destination.city.toLowerCase() === destinationCity : true;
-    return matchedOrigin && matchedDestination;
-  });
-
-  return filtered.map(toCardItem);
+  return {
+    flights: payload.flights.map(toCardItem),
+    pagination: payload.pagination ?? fallbackPagination,
+  } as SearchFlightsResult;
 };
 
 export const getFlightDetailFromApi = async (id: string) => {

@@ -49,11 +49,62 @@ export const createAirline = async (req: AuthRequest, res: Response) => {
 
 export const getAllAirlines = async (req: AuthRequest, res: Response) => {
   try {
-    const airlines = await prisma.airline.findMany({
-      orderBy: { name: "asc" }
-    }) // Ambil semua maskapai urut abjad
+    const pageParam = Number(req.query.page)
+    const limitParam = Number(req.query.limit)
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
+    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "name"
+    const sortDirection = req.query.sortDirection === "desc" ? "desc" : "asc"
 
-    res.json({ airlines })
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
+
+    const where: any = search
+      ? {
+          OR: [
+            { code: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { country: { contains: search, mode: "insensitive" } },
+            ...(Number.isInteger(Number(search)) ? [{ id: Number(search) }] : [])
+          ]
+        }
+      : {}
+
+    const sortMap: Record<string, any> = {
+      id: { id: sortDirection },
+      code: { code: sortDirection },
+      name: { name: sortDirection },
+      country: { country: sortDirection }
+    }
+    const orderBy = sortMap[sortBy] ?? { name: "asc" }
+
+    if (!hasPagination) {
+      const airlines = await prisma.airline.findMany({ where, orderBy })
+      return res.json({ airlines })
+    }
+
+    const totalItems = await prisma.airline.count({ where })
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
+    const safePage = Math.min(page, totalPages)
+
+    const airlines = await prisma.airline.findMany({
+      where,
+      orderBy,
+      skip: (safePage - 1) * limit,
+      take: limit
+    })
+
+    res.json({
+      airlines,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
+    })
   } catch (error) {
     console.error("Get all airlines error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })

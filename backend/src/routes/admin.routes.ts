@@ -59,6 +59,44 @@ router.use(authenticate, isAdmin)
  *         description: Airport created
  */
 router.post("/airports", airportController.createAirport)
+/**
+ * @swagger
+ * /api/admin/airports:
+ *   get:
+ *     summary: Get all airports (supports pagination)
+ *     tags: [Admin - Airports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [id, name, city, country, timezone]
+ *       - in: query
+ *         name: sortDirection
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *     responses:
+ *       200:
+ *         description: Airports retrieved successfully
+ */
 router.get("/airports", airportController.getAllAirports)
 router.get("/airports/:id", airportController.getAirport)
 router.put("/airports/:id", airportController.updateAirport)
@@ -110,6 +148,32 @@ router.post("/airlines", upload.single("logo"), airlineController.createAirline)
  *     tags: [Admin - Airlines]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [id, code, name, country]
+ *       - in: query
+ *         name: sortDirection
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
  *     responses:
  *       200:
  *         description: List of airlines
@@ -313,6 +377,44 @@ router.delete("/airlines/:id/logo", airlineController.removeAirlineLogo)
  *         description: Flight created
  */
 router.post("/flights", flightController.createFlight)
+/**
+ * @swagger
+ * /api/admin/flights:
+ *   get:
+ *     summary: Get all flights (supports pagination)
+ *     tags: [Admin - Flights]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [flightNumber, route, basePrice, departureTime, arrivalTime]
+ *       - in: query
+ *         name: sortDirection
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *     responses:
+ *       200:
+ *         description: Flights retrieved successfully
+ */
 router.get("/flights", flightController.getAllFlightsAdmin)
 router.put("/flights/:id", flightController.updateFlight)
 router.delete("/flights/:id", flightController.deleteFlight)
@@ -388,6 +490,39 @@ router.put("/seats/:id", seatController.updateFlightSeat)
 router.post("/seats/generate", seatController.generateStandardSeats)
 
 // Booking & Transaction Management
+/**
+ * @swagger
+ * /api/admin/bookings:
+ *   get:
+ *     summary: Get all bookings (supports pagination)
+ *     tags: [Admin - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *       - in: query
+ *         name: statusFilter
+ *         schema:
+ *           type: string
+ *           enum: [All, Pending, Paid, Issued, Cancelled]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Bookings retrieved successfully
+ */
 router.get("/bookings", bookingController.getAllBookingsAdmin)
 router.put("/bookings/:id/status", bookingController.updateAdminBookingStatus)
 router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDepartureReminderByAdmin)
@@ -401,6 +536,36 @@ router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDe
  *     tags: [Admin - Users]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [ADMIN, USER]
+ *       - in: query
+ *         name: excludeRole
+ *         schema:
+ *           type: string
+ *           enum: [ADMIN, USER]
+ *       - in: query
+ *         name: includeStats
+ *         schema:
+ *           type: boolean
  *     responses:
  *       200:
  *         description: List of all users

@@ -80,12 +80,53 @@ export type AdminBooking = {
   } | null;
 };
 
+export type PaginationMeta = {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
+export type PaginatedResult<T> = {
+  data: T[];
+  pagination: PaginationMeta;
+};
+
 export const getAdminAirlines = async () => {
   const response = await apiRequest<{ airlines: AdminAirline[] }>("/api/admin/airlines", {
     auth: true,
   });
 
   return response.airlines;
+};
+
+export const getAdminAirlinesPage = async (params: {
+  page: number;
+  limit: number;
+  search?: string;
+  sortBy?: "id" | "code" | "name" | "country";
+  sortDirection?: "asc" | "desc";
+}): Promise<PaginatedResult<AdminAirline>> => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+  if (params.sortDirection) query.set("sortDirection", params.sortDirection);
+
+  const response = await apiRequest<{ airlines: AdminAirline[]; pagination: PaginationMeta }>(
+    `/api/admin/airlines?${query.toString()}`,
+    { auth: true },
+  );
+
+  return {
+    data: response.airlines,
+    pagination: response.pagination,
+  };
 };
 
 export const getAdminAirlineById = async (id: number) => {
@@ -169,6 +210,33 @@ export const getAdminAirports = async () => {
   });
 
   return response.airports;
+};
+
+export const getAdminAirportsPage = async (params: {
+  page: number;
+  limit: number;
+  search?: string;
+  sortBy?: "id" | "name" | "city" | "country" | "timezone";
+  sortDirection?: "asc" | "desc";
+}): Promise<PaginatedResult<AdminAirport>> => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+  if (params.sortDirection) query.set("sortDirection", params.sortDirection);
+
+  const response = await apiRequest<{ airports: AdminAirport[]; pagination: PaginationMeta }>(
+    `/api/admin/airports?${query.toString()}`,
+    { auth: true },
+  );
+
+  return {
+    data: response.airports,
+    pagination: response.pagination,
+  };
 };
 
 export const getAdminAirportById = async (id: number) => {
@@ -256,6 +324,33 @@ export const getAdminFlights = async () => {
   return response.flights;
 };
 
+export const getAdminFlightsPage = async (params: {
+  page: number;
+  limit: number;
+  search?: string;
+  sortBy?: "flightNumber" | "route" | "basePrice" | "departureTime" | "arrivalTime";
+  sortDirection?: "asc" | "desc";
+}): Promise<PaginatedResult<AdminFlight>> => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+  if (params.sortDirection) query.set("sortDirection", params.sortDirection);
+
+  const response = await apiRequest<{ flights: AdminFlight[]; pagination: PaginationMeta }>(
+    `/api/admin/flights?${query.toString()}`,
+    { auth: true },
+  );
+
+  return {
+    data: response.flights,
+    pagination: response.pagination,
+  };
+};
+
 export const getAdminFlightById = async (id: number) => {
   const flights = await getAdminFlights();
   const flight = flights.find((item) => item.id === id);
@@ -327,6 +422,33 @@ export const getAdminBookings = async (status?: "PENDING" | "PAID" | "CANCELLED"
   });
 
   return response.bookings;
+};
+
+export const getAdminBookingsPage = async (params: {
+  page: number;
+  limit: number;
+  statusFilter?: "All" | "Pending" | "Paid" | "Issued" | "Cancelled";
+  search?: string;
+}): Promise<PaginatedResult<AdminBooking>> => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  if (params.statusFilter && params.statusFilter !== "All") {
+    query.set("statusFilter", params.statusFilter);
+  }
+  if (params.search?.trim()) query.set("search", params.search.trim());
+
+  const response = await apiRequest<{ bookings: AdminBooking[]; pagination: PaginationMeta }>(
+    `/api/admin/bookings?${query.toString()}`,
+    { auth: true },
+  );
+
+  return {
+    data: response.bookings,
+    pagination: response.pagination,
+  };
 };
 
 export const updateAdminBookingStatus = async (
@@ -429,6 +551,8 @@ export type AdminUser = {
   twoFactorEnabled: boolean;
   avatarUrl: string | null;
   createdAt: string;
+  bookingCount?: number;
+  totalSpent?: number;
 };
 
 export const getAllAdminUsers = async (): Promise<AdminUser[]> => {
@@ -436,6 +560,35 @@ export const getAllAdminUsers = async (): Promise<AdminUser[]> => {
     auth: true,
   });
   return response.users;
+};
+
+export const getAdminUsersPage = async (params: {
+  page: number;
+  limit: number;
+  search?: string;
+  role?: "ADMIN" | "USER";
+  excludeRole?: "ADMIN" | "USER";
+  includeStats?: boolean;
+}): Promise<PaginatedResult<AdminUser>> => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.role) query.set("role", params.role);
+  if (params.excludeRole) query.set("excludeRole", params.excludeRole);
+  if (params.includeStats) query.set("includeStats", "true");
+
+  const response = await apiRequest<{ users: AdminUser[]; pagination: PaginationMeta }>(
+    `/api/admin/users?${query.toString()}`,
+    { auth: true },
+  );
+
+  return {
+    data: response.users,
+    pagination: response.pagination,
+  };
 };
 
 export const blockAdminUser = async (userId: number): Promise<AdminUser> => {

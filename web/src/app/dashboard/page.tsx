@@ -10,7 +10,7 @@ import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
 import { clearSession, getUserSession, isAuthenticated, setUserSession } from "@/lib/auth";
 import { getProfileFromApi, uploadAvatarToApi } from "@/lib/auth-api";
-import { getMyBookingsFromApi } from "@/lib/booking-api";
+import { getMyBookingsPageFromApi } from "@/lib/booking-api";
 
 type BookingCard = {
   id: number;
@@ -43,14 +43,10 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<BookingCard[]>([]);
   const [historyRowsPerPage, setHistoryRowsPerPage] = useState(5);
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+  const [historyTotalItems, setHistoryTotalItems] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
 
   const showSkeleton = useMinDelay(loading);
-
-  const historyTotalPages = Math.max(1, Math.ceil(bookings.length / historyRowsPerPage));
-  const visibleBookings = bookings.slice(
-    (historyCurrentPage - 1) * historyRowsPerPage,
-    historyCurrentPage * historyRowsPerPage,
-  );
 
   const historyPageNumbers = (() => {
     if (historyTotalPages <= 5) {
@@ -80,7 +76,13 @@ export default function DashboardPage() {
       setMessage("");
 
       try {
-        const [profile, bookingData] = await Promise.all([getProfileFromApi(), getMyBookingsFromApi()]);
+        const [profile, bookingData] = await Promise.all([
+          getProfileFromApi(),
+          getMyBookingsPageFromApi({
+            page: historyCurrentPage,
+            limit: historyRowsPerPage,
+          }),
+        ]);
 
         if (profile.role === "admin") {
           router.replace("/admin");
@@ -93,7 +95,7 @@ export default function DashboardPage() {
         setPhoneNumber(profile.phoneNumber ?? "");
         setAvatarUrl(profile.avatarUrl ?? "");
 
-        const mapped = bookingData.map((item) => ({
+        const mapped = bookingData.bookings.map((item) => ({
           id: item.id,
           flightNumber: item.flight.flightNumber,
           airline: item.flight.airline.name,
@@ -103,6 +105,11 @@ export default function DashboardPage() {
         }));
 
         setBookings(mapped);
+        setHistoryTotalItems(bookingData.pagination.totalItems);
+        setHistoryTotalPages(bookingData.pagination.totalPages);
+        if (bookingData.pagination.page !== historyCurrentPage) {
+          setHistoryCurrentPage(bookingData.pagination.page);
+        }
       } catch (error) {
         clearSession();
         setMessage(error instanceof Error ? error.message : "Sesi berakhir. Silakan login kembali.");
@@ -113,17 +120,11 @@ export default function DashboardPage() {
     };
 
     void loadDashboard();
-  }, [authenticated, router]);
+  }, [authenticated, router, historyCurrentPage, historyRowsPerPage]);
 
   useEffect(() => {
     setHistoryCurrentPage(1);
   }, [historyRowsPerPage]);
-
-  useEffect(() => {
-    if (historyCurrentPage > historyTotalPages) {
-      setHistoryCurrentPage(historyTotalPages);
-    }
-  }, [historyCurrentPage, historyTotalPages]);
 
   const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -259,7 +260,7 @@ export default function DashboardPage() {
                 Belum ada pemesanan.
               </div>
             ) : (
-              visibleBookings.map((booking, idx) => (
+              bookings.map((booking, idx) => (
                 <article key={booking.id} className={`card-lift card-enter rounded-2xl border border-blue-100 bg-blue-50 p-4 ${(["stagger-1","stagger-2","stagger-3","stagger-4","stagger-5","stagger-6"] as const)[idx] ?? ""}`}>
                   <p className="inline-flex items-center gap-2 font-semibold text-slate-900">
                     <Plane className="h-4 w-4 text-blue-700" /> {booking.airline} • {booking.flightNumber}
@@ -274,11 +275,11 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {bookings.length > 0 && (
+          {historyTotalItems > 0 && (
             <div className="mt-4 space-y-3 text-sm text-slate-600">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p>
-                  Menampilkan {(historyCurrentPage - 1) * historyRowsPerPage + 1} - {Math.min(historyCurrentPage * historyRowsPerPage, bookings.length)} dari {bookings.length} data.
+                  Menampilkan {(historyCurrentPage - 1) * historyRowsPerPage + 1} - {Math.min(historyCurrentPage * historyRowsPerPage, historyTotalItems)} dari {historyTotalItems} data.
                 </p>
               </div>
 

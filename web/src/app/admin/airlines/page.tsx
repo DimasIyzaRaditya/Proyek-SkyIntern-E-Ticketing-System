@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
@@ -8,7 +8,7 @@ import AdminShell from "@/components/AdminShell";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
 import {
   deleteAdminAirline,
-  getAdminAirlines,
+  getAdminAirlinesPage,
   type AdminAirline,
 } from "@/lib/admin-api";
 
@@ -29,6 +29,8 @@ const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
 
 export default function AdminAirlinesPage() {
   const [airlines, setAirlines] = useState<AdminAirline[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
@@ -36,41 +38,6 @@ export default function AdminAirlinesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  const filteredAndSorted = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    const filtered = keyword
-      ? airlines.filter((item) =>
-          [item.code, item.name, item.country, String(item.id)]
-            .join(" ")
-            .toLowerCase()
-            .includes(keyword),
-        )
-      : airlines;
-
-    return [...filtered].sort((a, b) => {
-      const directionFactor = sortDirection === "asc" ? 1 : -1;
-
-      if (sortField === "id") {
-        return (a.id - b.id) * directionFactor;
-      }
-
-      const left = a[sortField].toLowerCase();
-      const right = b[sortField].toLowerCase();
-
-      if (left < right) return -1 * directionFactor;
-      if (left > right) return 1 * directionFactor;
-      return 0;
-    });
-  }, [airlines, search, sortDirection, sortField]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
-
-  const displayedAirlines = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredAndSorted.slice(start, start + pageSize);
-  }, [filteredAndSorted, currentPage, pageSize]);
 
   // Reset ke halaman 1 saat filter/sort/pageSize berubah
   useEffect(() => {
@@ -82,8 +49,19 @@ export default function AdminAirlinesPage() {
     setMessage("");
 
     try {
-      const data = await getAdminAirlines();
-      setAirlines(data);
+      const result = await getAdminAirlinesPage({
+        page: currentPage,
+        limit: pageSize,
+        search,
+        sortBy: sortField,
+        sortDirection,
+      });
+      setAirlines(result.data);
+      setTotalItems(result.pagination.totalItems);
+      setTotalPages(result.pagination.totalPages);
+      if (result.pagination.page !== currentPage) {
+        setCurrentPage(result.pagination.page);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to load airlines.");
     } finally {
@@ -93,13 +71,7 @@ export default function AdminAirlinesPage() {
 
   useEffect(() => {
     void loadAirlines();
-  }, []);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  }, [currentPage, pageSize, search, sortField, sortDirection]);
 
   const handleDelete = async (id: number) => {
     const confirmed = window.confirm("Delete this airline?");
@@ -109,7 +81,11 @@ export default function AdminAirlinesPage() {
 
     try {
       await deleteAdminAirline(id);
-      await loadAirlines();
+      if (airlines.length === 1 && currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      } else {
+        await loadAirlines();
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to delete airline.");
     }
@@ -149,7 +125,7 @@ export default function AdminAirlinesPage() {
             placeholder="Direction"
           />
           <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end lg:justify-end">
-            Total: {filteredAndSorted.length}
+            Total: {totalItems}
           </div>
         </div>
 
@@ -170,11 +146,11 @@ export default function AdminAirlinesPage() {
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-slate-500">Loading airlines...</td>
                 </tr>
-              ) : displayedAirlines.length === 0 ? (
+              ) : airlines.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-slate-500">No airlines match the current filter.</td>
                 </tr>
-              ) : displayedAirlines.map((item) => (
+              ) : airlines.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3">
                     {item.logo ? (
@@ -214,7 +190,7 @@ export default function AdminAirlinesPage() {
         </div>
 
         {/* Pagination */}
-        {!loading && filteredAndSorted.length > 0 && (
+        {!loading && totalItems > 0 && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span>Baris per halaman:</span>
@@ -228,7 +204,7 @@ export default function AdminAirlinesPage() {
                 ))}
               </select>
               <span className="ml-2 text-slate-500">
-                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredAndSorted.length)} dari {filteredAndSorted.length}
+                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} dari {totalItems}
               </span>
             </div>
 

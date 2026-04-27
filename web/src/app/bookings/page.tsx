@@ -7,7 +7,7 @@ import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "
 import MainNav from "@/components/MainNav";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api-client";
-import { cancelBookingFromApi, getMyBookingsFromApi, syncPaymentFromApi } from "@/lib/booking-api";
+import { cancelBookingFromApi, getMyBookingsFromApi, getMyBookingsPageFromApi, syncPaymentFromApi } from "@/lib/booking-api";
 
 type TabKey = "Upcoming" | "Completed" | "Cancelled";
 type BookingStatus = "Pending" | "Paid" | "Issued" | "Cancelled";
@@ -133,11 +133,31 @@ function MyBookingsPageContent() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelDialogBooking, setCancelDialogBooking] = useState<BookingView | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const statusFilterByTab: Record<TabKey, "Pending" | "Issued" | "Cancelled"> = {
+    Upcoming: "Pending",
+    Completed: "Issued",
+    Cancelled: "Cancelled",
+  };
 
   const refreshBookings = useCallback(async () => {
-    const bookings = await getMyBookingsFromApi();
-    setLiveBookings(bookings.map(mapBookingToView));
-  }, []);
+    const response = await getMyBookingsPageFromApi({
+      page: currentPage,
+      limit: pageSize,
+      statusFilter: statusFilterByTab[activeTab],
+      sortDirection: sortOrder === "oldest" ? "asc" : "desc",
+    });
+    setLiveBookings(response.bookings.map(mapBookingToView));
+    setTotalItems(response.pagination.totalItems);
+    setTotalPages(response.pagination.totalPages);
+    if (response.pagination.page !== currentPage) {
+      setCurrentPage(response.pagination.page);
+    }
+  }, [activeTab, currentPage, pageSize, sortOrder]);
 
   const handleViewETicket = (booking: BookingView) => {
     const data = {
@@ -326,8 +346,13 @@ function MyBookingsPageContent() {
           }
         }
 
-        const bookings = await getMyBookingsFromApi();
-        const mapped: BookingView[] = bookings.map((item) => {
+        const bookingsResponse = await getMyBookingsPageFromApi({
+          page: currentPage,
+          limit: pageSize,
+          statusFilter: statusFilterByTab[activeTab],
+          sortDirection: sortOrder === "oldest" ? "asc" : "desc",
+        });
+        const mapped: BookingView[] = bookingsResponse.bookings.map((item) => {
           const passenger = item.passengers[0]
             ? `${item.passengers[0].firstName} ${item.passengers[0].lastName}`.trim()
             : "Passenger";
@@ -376,6 +401,8 @@ function MyBookingsPageContent() {
         });
 
         setLiveBookings(mapped);
+        setTotalItems(bookingsResponse.pagination.totalItems);
+        setTotalPages(bookingsResponse.pagination.totalPages);
 
         if (statusFromQuery === "success") {
           setActiveTab("Upcoming");
@@ -394,7 +421,7 @@ function MyBookingsPageContent() {
     // Poll fallback every 10 seconds for non-websocket updates.
     const pollInterval = setInterval(() => { void loadBookings(); }, 10000);
     return () => clearInterval(pollInterval);
-  }, [authenticated, refreshBookings, router, searchParams]);
+  }, [activeTab, authenticated, currentPage, pageSize, refreshBookings, router, searchParams, sortOrder]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -415,6 +442,10 @@ function MyBookingsPageContent() {
 
     return () => clearInterval(interval);
   }, [authenticated, liveBookings, refreshBookings]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, pageSize, sortOrder]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -446,12 +477,13 @@ function MyBookingsPageContent() {
     };
   }, [authenticated, refreshBookings]);
 
-  const bookingList = useMemo(() => {
-    const filtered = liveBookings.filter((item) => item.tab === activeTab);
-    return [...filtered].sort((a, b) =>
-      sortOrder === "newest" ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)
-    );
-  }, [activeTab, liveBookings, sortOrder]);
+  const bookingList = useMemo(() => liveBookings, [liveBookings]);
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    return Array.from({ length: 5 }, (_, i) => start + i);
+  }, [currentPage, totalPages]);
 
   const getStatusClass = (status: BookingStatus, isExpired: boolean) => {
     if (status === "Issued" && isExpired) return "bg-slate-200 text-slate-700";
@@ -644,6 +676,65 @@ function MyBookingsPageContent() {
                 </article>
               );
             })
+          )}
+
+          {!loading && totalItems > 0 && (
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p>
+                  Menampilkan {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} dari {totalItems} data.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
+                <div className="inline-flex items-center gap-2">
+                  <label htmlFor="rows-per-view-bookings" className="font-medium text-slate-700">Tampilkan</label>
+                  <select
+                    id="rows-per-view-bookings"
+                    value={pageSize}
+                    onChange={(event) => setPageSize(Number(event.target.value))}
+                    className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+                  >
+                    <option value={5}>5 data</option>
+                    <option value={10}>10 data</option>
+                    <option value={20}>20 data</option>
+                    <option value={50}>50 data</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Prev
+                  </button>
+                  {pageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page)}
+                      className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                        page === currentPage
+                          ? "bg-blue-600 text-white"
+                          : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </section>
       </main>

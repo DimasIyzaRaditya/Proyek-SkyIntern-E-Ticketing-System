@@ -6,7 +6,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { formatRupiah } from "@/lib/currency";
-import { getAdminFlights, deleteAdminFlight, type AdminFlight } from "@/lib/admin-api";
+import { getAdminFlightsPage, deleteAdminFlight, type AdminFlight } from "@/lib/admin-api";
 
 type SortField = "flightNumber" | "route" | "basePrice" | "departureTime" | "arrivalTime";
 type SortDirection = "asc" | "desc";
@@ -26,6 +26,8 @@ const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
 
 export default function AdminSchedulesPage() {
   const [flights, setFlights] = useState<AdminFlight[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -34,63 +36,6 @@ export default function AdminSchedulesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
-
-  const displayedFlights = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    const filtered = keyword
-      ? flights.filter((item) =>
-          [
-            item.flightNumber,
-            item.airline.code,
-            item.airline.name,
-            item.origin.city,
-            item.origin.name,
-            item.destination.city,
-            item.destination.name,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(keyword),
-        )
-      : flights;
-
-    return [...filtered].sort((a, b) => {
-      const directionFactor = sortDirection === "asc" ? 1 : -1;
-
-      if (sortField === "route") {
-        const left = `${a.origin.city}-${a.destination.city}`.toLowerCase();
-        const right = `${b.origin.city}-${b.destination.city}`.toLowerCase();
-        if (left < right) return -1 * directionFactor;
-        if (left > right) return 1 * directionFactor;
-        return 0;
-      }
-
-      if (sortField === "basePrice") {
-        return (a.basePrice - b.basePrice) * directionFactor;
-      }
-
-      if (sortField === "departureTime" || sortField === "arrivalTime") {
-        const left = new Date(a[sortField]).getTime();
-        const right = new Date(b[sortField]).getTime();
-        return (left - right) * directionFactor;
-      }
-
-      const left = a.flightNumber.toLowerCase();
-      const right = b.flightNumber.toLowerCase();
-      if (left < right) return -1 * directionFactor;
-      if (left > right) return 1 * directionFactor;
-      return 0;
-    });
-  }, [flights, search, sortField, sortDirection]);
-
-  const totalPages = Math.max(1, Math.ceil(displayedFlights.length / rowsPerView));
-
-  const visibleFlights = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerView;
-    const end = start + rowsPerView;
-    return displayedFlights.slice(start, end);
-  }, [displayedFlights, currentPage, rowsPerView]);
 
   const pageNumbers = useMemo(() => {
     if (totalPages <= 5) {
@@ -109,14 +54,25 @@ export default function AdminSchedulesPage() {
     setMessage("");
 
     try {
-      const flightData = await getAdminFlights();
-      setFlights(flightData);
+      const result = await getAdminFlightsPage({
+        page: currentPage,
+        limit: rowsPerView,
+        search,
+        sortBy: sortField,
+        sortDirection,
+      });
+      setFlights(result.data);
+      setTotalItems(result.pagination.totalItems);
+      setTotalPages(result.pagination.totalPages);
+      if (result.pagination.page !== currentPage) {
+        setCurrentPage(result.pagination.page);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to load schedules.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, rowsPerView, search, sortField, sortDirection]);
 
   useEffect(() => {
     void loadData();
@@ -125,12 +81,6 @@ export default function AdminSchedulesPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, sortField, sortDirection, rowsPerView]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   return (
     <AdminShell title="Flight Schedule Management" description="Manage flight schedules from the list. Use Add Schedule to create new data.">
@@ -166,7 +116,7 @@ export default function AdminSchedulesPage() {
             placeholder="Direction"
           />
           <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end">
-            Total: {displayedFlights.length}
+            Total: {totalItems}
           </div>
         </div>
 
@@ -192,11 +142,11 @@ export default function AdminSchedulesPage() {
                 <tr>
                   <td colSpan={7} className="p-4 text-center text-slate-500">Loading schedules...</td>
                 </tr>
-              ) : displayedFlights.length === 0 ? (
+              ) : flights.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-4 text-center text-slate-500">No schedules match the current filter.</td>
                 </tr>
-              ) : visibleFlights.map((item) => (
+              ) : flights.map((item) => (
                 <tr key={item.id} className="border-b border-blue-100 last:border-0">
                   <td className="p-3 font-semibold">{item.flightNumber}</td>
                   <td className="p-3 font-semibold">{item.origin.city} → {item.destination.city}</td>
@@ -218,7 +168,12 @@ export default function AdminSchedulesPage() {
                           setDeletingId(item.id);
                           try {
                             await deleteAdminFlight(item.id);
-                            setFlights((prev) => prev.filter((f) => f.id !== item.id));
+                            if (flights.length === 1 && currentPage > 1) {
+                              setCurrentPage((prev) => prev - 1);
+                            } else {
+                              setFlights((prev) => prev.filter((f) => f.id !== item.id));
+                              setTotalItems((prev) => Math.max(0, prev - 1));
+                            }
                           } catch (err) {
                             setMessage(err instanceof Error ? err.message : "Gagal menghapus jadwal.");
                           } finally {
@@ -238,11 +193,11 @@ export default function AdminSchedulesPage() {
           </table>
         </div>
 
-        {!loading && displayedFlights.length > 0 && (
+        {!loading && totalItems > 0 && (
           <div className="mt-4 space-y-3 text-sm text-slate-600">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, displayedFlights.length)} dari {displayedFlights.length} data.
+                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, totalItems)} dari {totalItems} data.
               </p>
             </div>
 

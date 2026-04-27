@@ -51,6 +51,8 @@ function SearchResultsPageContent() {
   const [selectedPromoByFlight, setSelectedPromoByFlight] = useState<Record<string, number | null>>({});
   const [promoPageByFlight, setPromoPageByFlight] = useState<Record<string, number>>({});
   const [sortedFlights, setSortedFlights] = useState<FlightCardItem[]>([]);
+  const [totalFlights, setTotalFlights] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoadingFlights, setIsLoadingFlights] = useState(true);
   const [flightError, setFlightError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(() => parsePageNumber(searchParams.get("page"), 1));
@@ -78,12 +80,21 @@ function SearchResultsPageContent() {
           adult,
           child,
           sortBy,
+          page: currentPage,
+          limit: itemsPerPage,
         });
         if (!isMounted) return;
-        setSortedFlights(data);
+        setSortedFlights(data.flights);
+        setTotalFlights(data.pagination.totalItems);
+        setTotalPages(data.pagination.totalPages);
+        if (data.pagination.page !== currentPage) {
+          setCurrentPage(data.pagination.page);
+        }
       } catch (error) {
         if (!isMounted) return;
         setSortedFlights([]);
+        setTotalFlights(0);
+        setTotalPages(1);
         setFlightError(error instanceof Error ? error.message : "Terjadi kesalahan saat mengambil flight.");
       } finally {
         if (isMounted) {
@@ -97,7 +108,7 @@ function SearchResultsPageContent() {
     return () => {
       isMounted = false;
     };
-  }, [adult, child, departureDate, destination, origin, sortBy]);
+  }, [adult, child, departureDate, destination, origin, sortBy, currentPage, itemsPerPage]);
 
   useEffect(() => {
     setSelectedPromoByFlight((prev) => {
@@ -148,13 +159,6 @@ function SearchResultsPageContent() {
     setCurrentPage((prev) => (prev === queryPage ? prev : queryPage));
   }, [searchParams]);
 
-  const totalFlights = sortedFlights.length;
-  const totalPages = Math.max(1, Math.ceil(totalFlights / itemsPerPage));
-
-  useEffect(() => {
-    setCurrentPage((prev) => Math.min(prev, totalPages));
-  }, [totalPages]);
-
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("sort", sortBy);
@@ -165,11 +169,6 @@ function SearchResultsPageContent() {
     if (nextQuery === searchParams.toString()) return;
     router.replace(`${pathname}?${nextQuery}`, { scroll: false });
   }, [currentPage, itemsPerPage, pathname, router, searchParams, sortBy]);
-
-  const paginatedFlights = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return sortedFlights.slice(start, start + itemsPerPage);
-  }, [sortedFlights, currentPage, itemsPerPage]);
 
   const paginationItems = useMemo(() => {
     const items: Array<number | "ellipsis"> = [];
@@ -482,7 +481,7 @@ function SearchResultsPageContent() {
               </div>
             )}
 
-            {paginatedFlights.map((flight, idx) => {
+            {sortedFlights.map((flight, idx) => {
               const queryData: Record<string, string> = { origin, destination, departureDate, adult, child, infant };
               if (returnDate) {
                 queryData.returnDate = returnDate;

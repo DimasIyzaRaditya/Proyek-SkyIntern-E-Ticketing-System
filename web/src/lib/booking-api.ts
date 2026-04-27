@@ -59,12 +59,46 @@ type GetMyBookingsResponse = {
   bookings: BackendBooking[];
 };
 
+type PaginatedMyBookingsResponse = {
+  bookings: BackendBooking[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+};
+
 export const getMyBookingsFromApi = async () => {
   const response = await apiRequest<GetMyBookingsResponse>("/api/bookings", {
     auth: true,
   });
 
   return response.bookings;
+};
+
+export const getMyBookingsPageFromApi = async (params: {
+  page: number;
+  limit: number;
+  status?: BookingStatusApi;
+  statusFilter?: "All" | "Pending" | "Paid" | "Issued" | "Cancelled";
+  sortDirection?: "asc" | "desc";
+}) => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  if (params.status) query.set("status", params.status);
+  if (params.statusFilter && params.statusFilter !== "All") query.set("statusFilter", params.statusFilter);
+  if (params.sortDirection) query.set("sortDirection", params.sortDirection);
+
+  const response = await apiRequest<PaginatedMyBookingsResponse>(`/api/bookings?${query.toString()}`, {
+    auth: true,
+  });
+
+  return response;
 };
 
 export type PassengerPayload = {

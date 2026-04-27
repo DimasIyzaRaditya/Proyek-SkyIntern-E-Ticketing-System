@@ -50,6 +50,29 @@ const router = Router() // Router Express untuk semua route penerbangan publik
  *         name: maxPrice
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: originCity
+ *         schema:
+ *           type: string
+ *         description: Origin city name (case-insensitive exact match)
+ *       - in: query
+ *         name: destinationCity
+ *         schema:
+ *           type: string
+ *         description: Destination city name (case-insensitive exact match)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Page number for paginated results
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Items per page
  *     responses:
  *       200:
  *         description: Flights retrieved successfully
