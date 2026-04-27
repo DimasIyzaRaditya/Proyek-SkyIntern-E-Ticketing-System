@@ -178,10 +178,38 @@ const CITY_IMAGES: Record<string, string> = {
 const DEFAULT_CITY_IMAGE =
   "https://images.unsplash.com/photo-1488085061387-422e29b40080?auto=format&fit=crop&w=480&h=280&q=80";
 
+const JAKARTA_TIMEZONE = "Asia/Jakarta";
+
+function getTodayJakartaDateKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: JAKARTA_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getScheduleDateKey(value: string): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: JAKARTA_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+}
+
 async function fetchDeals(): Promise<DealFlight[]> {
   // Make two parallel calls: one for domestic, one sorted by departure time
-  // (which surfaces more diverse/international routes), then merge + deduplicate
-  // by origin→destination so every unique route appears exactly once.
+  // (which surfaces more diverse/international routes), then merge all active
+  // schedules and deduplicate only by flight ID.
   const base = `${API_BASE_URL}/api/flights/search?passengerCount=1&limit=5000`;
   const urls = [
     `${base}&sortBy=price-asc`,
@@ -191,24 +219,27 @@ async function fetchDeals(): Promise<DealFlight[]> {
   try {
     const responses = await Promise.all(urls.map((u) => fetch(u, { cache: "no-store" })));
     const allFlights: FlightFromApi[] = [];
+    const todayJakarta = getTodayJakartaDateKey();
     for (const res of responses) {
       if (!res.ok) continue;
       const data = (await res.json()) as { flights?: FlightFromApi[] };
-      allFlights.push(...(data.flights ?? []));
+      const activeFlights = (data.flights ?? []).filter((flight) => {
+        const scheduleDate = getScheduleDateKey(flight.departureTime);
+        return scheduleDate !== null && scheduleDate >= todayJakarta;
+      });
+      allFlights.push(...activeFlights);
     }
 
-    // Deduplicate: keep cheapest per unique origin→destination pair
-    const seen = new Map<string, { flight: FlightFromApi; price: number }>();
+    // Keep all active schedules. Dedupe only identical flights (same ID)
+    // because data comes from two endpoint calls with different sorting.
+    const seen = new Map<number, FlightFromApi>();
     for (const f of allFlights) {
-      const key = `${f.origin.city}|${f.destination.city}`;
-      const price = f.basePrice + (f.tax ?? 0) + (f.adminFee ?? 0);
-      const existing = seen.get(key);
-      if (!existing || price < existing.price) {
-        seen.set(key, { flight: f, price });
-      }
+      if (!seen.has(f.id)) seen.set(f.id, f);
     }
 
-    return Array.from(seen.values()).map(({ flight: f, price }) => ({
+    return Array.from(seen.values())
+      .sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime())
+      .map((f) => ({
       id: f.id,
       flightNumber: f.flightNumber,
       origin: f.origin.city,
@@ -222,7 +253,7 @@ async function fetchDeals(): Promise<DealFlight[]> {
       logo: f.airline.logo ?? null,
       departureTime: f.departureTime,
       duration: f.duration,
-      price,
+      price: f.basePrice + (f.tax ?? 0) + (f.adminFee ?? 0),
       flightPromos: f.promos ?? [],
       departureDate: f.departureTime.slice(0, 10),
     }));
