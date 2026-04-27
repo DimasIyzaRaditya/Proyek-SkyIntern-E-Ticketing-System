@@ -651,6 +651,35 @@ export const getAdminPromos = async (): Promise<Promo[]> => {
   return response.promos;
 };
 
+export const getAdminPromosPage = async (params: {
+  page: number;
+  limit: number;
+  search?: string;
+  statusFilter?: "All" | "Active" | "Inactive";
+  sortBy?: "id" | "title" | "startDate" | "endDate" | "discount" | "createdAt";
+  sortDirection?: "asc" | "desc";
+}): Promise<PaginatedResult<Promo>> => {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.statusFilter && params.statusFilter !== "All") query.set("statusFilter", params.statusFilter);
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+  if (params.sortDirection) query.set("sortDirection", params.sortDirection);
+
+  const response = await apiRequest<{ promos: Promo[]; pagination: PaginationMeta }>(
+    `/api/admin/promos?${query.toString()}`,
+    { auth: true },
+  );
+
+  return {
+    data: response.promos,
+    pagination: response.pagination,
+  };
+};
+
 export const createAdminPromo = async (payload: PromoPayload): Promise<Promo> => {
   const response = await apiRequest<{ promo: Promo }>("/api/admin/promos", {
     method: "POST",

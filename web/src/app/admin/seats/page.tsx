@@ -5,11 +5,13 @@ import { ChevronDown, RefreshCcw, Zap } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import {
   generateAdminSeats,
-  getAdminFlights,
+  getAdminFlightsPage,
   getAdminSeatMap,
   type AdminFlight,
   type AdminSeat,
 } from "@/lib/admin-api";
+
+const FLIGHT_PAGE_SIZE = 25;
 
 const statusColor = (status: AdminSeat["status"]) => {
   if (status === "AVAILABLE") return "bg-emerald-500 text-white";
@@ -32,6 +34,10 @@ export default function AdminSeatsPage() {
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("error");
+  const [flightPage, setFlightPage] = useState(1);
+  const [flightTotalItems, setFlightTotalItems] = useState(0);
+  const [flightHasNextPage, setFlightHasNextPage] = useState(false);
+  const [loadingMoreFlights, setLoadingMoreFlights] = useState(false);
   const [flightSearch, setFlightSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -51,28 +57,58 @@ export default function AdminSeatsPage() {
     }
   };
 
-  // Load all flights on mount
-  useEffect(() => {
-    const load = async () => {
-      setLoadingFlights(true);
-      try {
-        const data = await getAdminFlights();
-        setFlights(data);
-        if (data.length > 0) {
-          setSelectedFlightId(data[0].id);
-        } else {
-          setSelectedFlightId(null);
-          setSeats([]);
+  const loadFlightsPage = async (nextPage: number, append: boolean) => {
+    if (append) setLoadingMoreFlights(true);
+    else setLoadingFlights(true);
+
+    try {
+      const result = await getAdminFlightsPage({
+        page: nextPage,
+        limit: FLIGHT_PAGE_SIZE,
+        sortBy: "departureTime",
+        sortDirection: "asc",
+      });
+
+      setFlights((prev) => {
+        if (!append) return result.data;
+
+        const seen = new Set(prev.map((item) => item.id));
+        const merged = [...prev];
+        for (const item of result.data) {
+          if (!seen.has(item.id)) {
+            merged.push(item);
+            seen.add(item.id);
+          }
         }
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Gagal memuat daftar penerbangan.");
-        setMessageType("error");
-      } finally {
-        setLoadingFlights(false);
-      }
-    };
-    void load();
+        return merged;
+      });
+
+      setFlightPage(result.pagination.page);
+      setFlightTotalItems(result.pagination.totalItems);
+      setFlightHasNextPage(result.pagination.hasNextPage);
+
+      setSelectedFlightId((prevSelected) => {
+        if (prevSelected !== null) return prevSelected;
+        return result.data[0]?.id ?? null;
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gagal memuat daftar penerbangan.");
+      setMessageType("error");
+    } finally {
+      setLoadingFlights(false);
+      setLoadingMoreFlights(false);
+    }
+  };
+
+  // Load first page of flights on mount
+  useEffect(() => {
+    void loadFlightsPage(1, false);
   }, []);
+
+  const handleLoadMoreFlights = async () => {
+    if (loadingMoreFlights || !flightHasNextPage) return;
+    await loadFlightsPage(flightPage + 1, true);
+  };
 
   // Load seat map when selected flight changes
   useEffect(() => {
@@ -180,6 +216,9 @@ export default function AdminSeatsPage() {
                           onClick={(e) => e.stopPropagation()}
                           className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
                         />
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Menampilkan {flights.length} dari {flightTotalItems} penerbangan.
+                        </p>
                       </div>
 
                       {/* List */}
@@ -208,6 +247,18 @@ export default function AdminSeatsPage() {
                         ))}
                         {filteredFlights.length === 0 && (
                           <li className="px-3 py-2 text-sm text-slate-400">Tidak ada hasil ditemukan.</li>
+                        )}
+                        {!flightSearch.trim() && flightHasNextPage && (
+                          <li className="border-t border-slate-100 p-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleLoadMoreFlights()}
+                              disabled={loadingMoreFlights}
+                              className="w-full rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {loadingMoreFlights ? "Memuat..." : "Muat lebih banyak penerbangan"}
+                            </button>
+                          </li>
                         )}
                       </ul>
                     </div>

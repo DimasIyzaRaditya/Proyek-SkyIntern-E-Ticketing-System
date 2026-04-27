@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Pencil, Plus, Tag, Trash2, ToggleLeft, ToggleRight, Plane, Globe, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, Tag, Trash2, ToggleLeft, ToggleRight, Plane, Globe, X } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import CompactDatePicker from "@/components/CompactDatePicker";
 import {
-  getAdminPromos,
+  getAdminPromosPage,
   getAdminFlights,
   createAdminPromo,
   updateAdminPromo,
@@ -14,6 +14,8 @@ import {
   type PromoPayload,
   type AdminFlight,
 } from "@/lib/admin-api";
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const fmtDate = (iso: string) =>
   new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
@@ -59,6 +61,11 @@ const emptyForm = (): FormState => ({
 export default function AdminPromosPage() {
   const [promos, setPromos] = useState<Promo[]>([]);
   const [flights, setFlights] = useState<AdminFlight[]>([]);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
@@ -90,23 +97,50 @@ export default function AdminPromosPage() {
     [flights, form.flightId],
   );
 
-  const load = async () => {
+  const loadPromos = useCallback(async () => {
     setLoading(true);
     setMessage("");
     try {
-      const [promoData, flightData] = await Promise.all([getAdminPromos(), getAdminFlights()]);
-      setPromos(promoData);
-      setFlights(flightData);
+      const result = await getAdminPromosPage({
+        page: currentPage,
+        limit: pageSize,
+        search,
+      });
+      setPromos(result.data);
+      setTotalItems(result.pagination.totalItems);
+      setTotalPages(result.pagination.totalPages);
+      if (result.pagination.page !== currentPage) {
+        setCurrentPage(result.pagination.page);
+      }
     } catch (err) {
+      setIsSuccess(false);
       setMessage(err instanceof Error ? err.message : "Gagal memuat data.");
     } finally {
       setLoading(false);
     }
+  }, [currentPage, pageSize, search]);
+
+  const loadFlights = async () => {
+    try {
+      const flightData = await getAdminFlights();
+      setFlights(flightData);
+    } catch (err) {
+      setIsSuccess(false);
+      setMessage(err instanceof Error ? err.message : "Gagal memuat daftar penerbangan.");
+    }
   };
 
   useEffect(() => {
-    void load();
+    void loadFlights();
   }, []);
+
+  useEffect(() => {
+    void loadPromos();
+  }, [loadPromos]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, pageSize]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -165,8 +199,9 @@ export default function AdminPromosPage() {
       setIsSuccess(true);
       setMessage(editingId !== null ? "Promo berhasil diperbarui." : "Promo berhasil dibuat.");
       closeModal();
-      await load();
+      await loadPromos();
     } catch (err) {
+      setIsSuccess(false);
       setFormError(err instanceof Error ? err.message : "Gagal menyimpan promo.");
     } finally {
       setSaving(false);
@@ -178,7 +213,11 @@ export default function AdminPromosPage() {
     try {
       await updateAdminPromo(promo.id, { isActive: !promo.isActive });
       setPromos((prev) => prev.map((p) => (p.id === promo.id ? { ...p, isActive: !p.isActive } : p)));
+      setIsSuccess(true);
+      setMessage("Status promo berhasil diperbarui.");
+      setTimeout(() => setMessage(""), 3000);
     } catch (err) {
+      setIsSuccess(false);
       setMessage(err instanceof Error ? err.message : "Gagal mengubah status.");
     }
   };
@@ -187,7 +226,11 @@ export default function AdminPromosPage() {
     if (!window.confirm("Hapus promo ini?")) return;
     try {
       await deleteAdminPromo(id);
-      setPromos((prev) => prev.filter((p) => p.id !== id));
+      if (promos.length === 1 && currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      } else {
+        await loadPromos();
+      }
       setIsSuccess(true);
       setMessage("Promo berhasil dihapus.");
       setTimeout(() => setMessage(""), 4000);
@@ -209,7 +252,15 @@ export default function AdminPromosPage() {
 
       {/* Toolbar */}
       <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <p className="text-sm text-slate-500">{promos.length} promo terdaftar</p>
+        <div className="w-full sm:w-auto">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari judul, deskripsi, rute, atau ID promo"
+            className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-300 sm:min-w-80"
+          />
+          <p className="mt-1 text-xs text-slate-500">Total promo: {totalItems}</p>
+        </div>
         <button
           onClick={openCreate}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 sm:w-auto"
@@ -223,7 +274,7 @@ export default function AdminPromosPage() {
         <div className="space-y-2">
           {[1, 2, 3].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}
         </div>
-      ) : promos.length === 0 ? (
+      ) : totalItems === 0 ? (
         <div className="rounded-2xl border border-blue-100 bg-white p-10 text-center text-sm text-slate-500">
           Belum ada promo. Klik <strong>Tambah Promo</strong> untuk membuat yang pertama.
         </div>
@@ -330,6 +381,84 @@ export default function AdminPromosPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && totalItems > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <span>Baris per halaman:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+            <span className="ml-2 text-slate-500">
+              {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalItems)} dari {totalItems}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+            >
+              «
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2)
+              .reduce<(number | "...")[]>((acc, page, idx, arr) => {
+                if (idx > 0 && page - (arr[idx - 1] as number) > 1) acc.push("...");
+                acc.push(page);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === "..." ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">...</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setCurrentPage(item as number)}
+                    className={`rounded-lg border px-3 py-1 text-sm font-medium ${
+                      currentPage === item
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
+            >
+              »
+            </button>
           </div>
         </div>
       )}
