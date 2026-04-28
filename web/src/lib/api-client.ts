@@ -1,4 +1,5 @@
-import { getAuthToken } from "@/lib/auth";
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { clearSession, getAuthToken, getRefreshToken, setAuthToken, setRefreshToken } from "@/lib/auth";
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
@@ -14,58 +15,109 @@ type ApiErrorPayload = {
   message?: string;
 };
 
-const readErrorMessage = async (response: Response) => {
-  try {
-    const payload = (await response.json()) as ApiErrorPayload;
-    if (payload?.message) return payload.message;
-  } catch {
-    return response.statusText || "Request failed";
+type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+const api: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+});
+
+const refreshClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+});
+
+let refreshPromise: Promise<string | null> | null = null;
+
+const requestAccessTokenRefresh = async (): Promise<string | null> => {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  if (!refreshPromise) {
+    refreshPromise = refreshClient
+      .post<{ token: string; refreshToken: string }>("/api/auth/refresh", { refreshToken })
+      .then((response) => {
+        setAuthToken(response.data.token);
+        if (response.data.refreshToken) setRefreshToken(response.data.refreshToken);
+        return response.data.token;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null;
+      });
   }
 
-  return response.statusText || "Request failed";
+  return refreshPromise;
+};
+
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError<ApiErrorPayload>) => {
+    const status = error.response?.status;
+    const originalRequest = error.config as RetriableRequestConfig | undefined;
+
+    if (!originalRequest || status !== 401 || originalRequest._retry) {
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+    const newToken = await requestAccessTokenRefresh();
+    if (!newToken) {
+      clearSession();
+      return Promise.reject(error);
+    }
+
+    originalRequest.headers = originalRequest.headers ?? {};
+    originalRequest.headers.Authorization = `Bearer ${newToken}`;
+    return api.request(originalRequest);
+  }
+);
+
+const readErrorMessage = (error: AxiosError<ApiErrorPayload>) => {
+  const payload = error.response?.data;
+  if (payload?.message) return payload.message;
+  return error.message || "Request failed";
 };
 
 export const apiRequest = async <T>(path: string, options: ApiRequestOptions = {}): Promise<T> => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers ?? {}),
-  };
-
   if (options.auth) {
     const token = getAuthToken();
     if (!token) {
       throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
     }
-
-    headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    cache: options.cache ?? "no-store",
-  });
+  try {
+    const response = await api.request<T>({
+      url: path,
+      method: options.method ?? "GET",
+      headers: options.headers,
+      data: options.body,
+    });
 
-  if (!response.ok) {
-    const message = await readErrorMessage(response);
-    // If the account is blocked, clear session and redirect to login
-    if (
-      response.status === 403 &&
-      message === "Akun Anda telah diblokir oleh admin."
-    ) {
+    return response.data as T;
+  } catch (err) {
+    const error = err as AxiosError<ApiErrorPayload>;
+    const message = readErrorMessage(error);
+
+    if (error.response?.status === 403 && message === "Akun Anda telah diblokir oleh admin.") {
       if (typeof window !== "undefined") {
-        const { clearSession } = await import("@/lib/auth");
         clearSession();
         window.location.href = "/auth/login?blocked=1";
       }
     }
+
     throw new Error(message);
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
 };

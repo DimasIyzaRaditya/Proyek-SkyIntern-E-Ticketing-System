@@ -7,13 +7,26 @@ import '../models/user_model.dart';
 class LocalStorage {
   static const String userKey = 'skyintern_user';
   static const String tokenKey = 'skyintern_token';
+  static const String refreshTokenKey = 'skyintern_refresh_token';
   static const String recentAccountsKey = 'skyintern_recent_accounts';
   static const String splashSoundEnabledKey = 'skyintern_splash_sound_enabled';
 
-  static Future<void> saveUser(UserSession user, String token) async {
+  static Future<void> saveUser(
+    UserSession user,
+    String token, {
+    String? refreshToken,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(userKey, json.encode(user.toJson()));
     await prefs.setString(tokenKey, token);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await saveRefreshToken(refreshToken);
+    }
+  }
+
+  static Future<void> saveRefreshToken(String refreshToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(refreshTokenKey, refreshToken);
   }
 
   static Future<UserSession?> getUser() async {
@@ -32,10 +45,16 @@ class LocalStorage {
     return prefs.getString(tokenKey);
   }
 
+  static Future<String?> getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(refreshTokenKey);
+  }
+
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(userKey);
     await prefs.remove(tokenKey);
+    await prefs.remove(refreshTokenKey);
   }
 
   static Future<void> saveRecentAccount(UserSession user) async {

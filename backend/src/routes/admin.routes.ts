@@ -96,6 +96,44 @@ router.post("/airports", airportController.createAirport)
  *     responses:
  *       200:
  *         description: Airports retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 airports:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       city:
+ *                         type: string
+ *                       country:
+ *                         type: string
+ *                       timezone:
+ *                         type: string
+ *                       cityImageUrl:
+ *                         type: string
+ *                         nullable: true
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
  */
 router.get("/airports", airportController.getAllAirports)
 router.get("/airports/:id", airportController.getAirport)
@@ -199,6 +237,21 @@ router.post("/airlines", upload.single("logo"), airlineController.createAirline)
  *                         type: string
  *                         nullable: true
  *                         description: URL logo di MinIO
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
  */
 router.get("/airlines", airlineController.getAllAirlines)
 /**
@@ -414,6 +467,43 @@ router.post("/flights", flightController.createFlight)
  *     responses:
  *       200:
  *         description: Flights retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 flights:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       flightNumber:
+ *                         type: string
+ *                       departureTime:
+ *                         type: string
+ *                         format: date-time
+ *                       arrivalTime:
+ *                         type: string
+ *                         format: date-time
+ *                       basePrice:
+ *                         type: integer
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
  */
 router.get("/flights", flightController.getAllFlightsAdmin)
 router.put("/flights/:id", flightController.updateFlight)
@@ -522,6 +612,37 @@ router.post("/seats/generate", seatController.generateStandardSeats)
  *     responses:
  *       200:
  *         description: Bookings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 bookings:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       bookingCode:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
  */
 router.get("/bookings", bookingController.getAllBookingsAdmin)
 router.put("/bookings/:id/status", bookingController.updateAdminBookingStatus)
@@ -594,6 +715,21 @@ router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDe
  *                       createdAt:
  *                         type: string
  *                         format: date-time
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
  */
 router.get("/users", getAllUsers)
 router.put("/users/:id/block", blockUser)
@@ -626,6 +762,79 @@ router.put("/users/:id/2fa", toggleUserTwoFactorByAdmin)
 router.delete("/users/:email", deleteUser)
 
 // Promo Management
+/**
+ * @swagger
+ * /api/admin/promos:
+ *   get:
+ *     summary: Get all promos (supports pagination)
+ *     tags: [Admin - Promos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Page number. Default 1.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Items per page. Default 20.
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search keyword (title, description, flight number, city)
+ *       - in: query
+ *         name: statusFilter
+ *         schema:
+ *           type: string
+ *           enum: [All, Active, Inactive]
+ *         description: Filter by promo status
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [id, title, startDate, endDate, discount, createdAt]
+ *         description: Sort by field
+ *       - in: query
+ *         name: sortDirection
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *         description: Sort direction
+ *     responses:
+ *       200:
+ *         description: Promos retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 promos:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Promo'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
+ */
 router.get("/promos", promoController.getAllPromos)
 router.post("/promos", promoController.createPromo)
 router.put("/promos/:id", promoController.updatePromo)

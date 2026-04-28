@@ -1,5 +1,5 @@
 /**
- * Seed major world airports into the database.
+ * Seed all airports (domestic + international) into the database.
  * Run: npx ts-node prisma/seed-airports.ts
  *  or: npx tsx prisma/seed-airports.ts
  *
@@ -223,7 +223,7 @@ const airports: AirportSeed[] = [
 ]
 
 async function main() {
-  console.log(`Seeding ${airports.length} world airports…`)
+  console.log(`Seeding ${airports.length} airports (domestic + international)…`)
   let created = 0
   let skipped = 0
 
@@ -249,7 +249,7 @@ async function main() {
     created++
   }
 
-  console.log(`✅ World airports seed complete: ${created} created, ${skipped} already existed.`)
+  console.log(`✅ Airports seed complete: ${created} created, ${skipped} already existed.`)
 }
 
 main()

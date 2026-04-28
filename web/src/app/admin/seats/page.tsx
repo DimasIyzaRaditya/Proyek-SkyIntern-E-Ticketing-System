@@ -41,6 +41,7 @@ export default function AdminSeatsPage() {
   const [flightSearch, setFlightSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
 
   const loadSeatMap = async (flightId: number) => {
     setLoadingSeats(true);
@@ -57,7 +58,7 @@ export default function AdminSeatsPage() {
     }
   };
 
-  const loadFlightsPage = async (nextPage: number, append: boolean) => {
+  const loadFlightsPage = async (nextPage: number, append: boolean, searchTerm: string) => {
     if (append) setLoadingMoreFlights(true);
     else setLoadingFlights(true);
 
@@ -65,6 +66,7 @@ export default function AdminSeatsPage() {
       const result = await getAdminFlightsPage({
         page: nextPage,
         limit: FLIGHT_PAGE_SIZE,
+        search: searchTerm.trim() || undefined,
         sortBy: "departureTime",
         sortDirection: "asc",
       });
@@ -102,12 +104,28 @@ export default function AdminSeatsPage() {
 
   // Load first page of flights on mount
   useEffect(() => {
-    void loadFlightsPage(1, false);
+    void loadFlightsPage(1, false, "");
   }, []);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      window.clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = window.setTimeout(() => {
+      void loadFlightsPage(1, false, flightSearch);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        window.clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [flightSearch]);
 
   const handleLoadMoreFlights = async () => {
     if (loadingMoreFlights || !flightHasNextPage) return;
-    await loadFlightsPage(flightPage + 1, true);
+    await loadFlightsPage(flightPage + 1, true, flightSearch);
   };
 
   // Load seat map when selected flight changes
@@ -146,17 +164,7 @@ export default function AdminSeatsPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const filteredFlights = useMemo(() => {
-    const q = flightSearch.toLowerCase();
-    if (!q) return flights;
-    return flights.filter(
-      (f) =>
-        f.flightNumber.toLowerCase().includes(q) ||
-        f.airline.name.toLowerCase().includes(q) ||
-        (f.origin?.city ?? "").toLowerCase().includes(q) ||
-        (f.destination?.city ?? "").toLowerCase().includes(q),
-    );
-  }, [flights, flightSearch]);
+  const filteredFlights = useMemo(() => flights, [flights]);
 
   const selectedFlight = useMemo(
     () => flights.find((f) => f.id === selectedFlightId) ?? null,
@@ -248,7 +256,7 @@ export default function AdminSeatsPage() {
                         {filteredFlights.length === 0 && (
                           <li className="px-3 py-2 text-sm text-slate-400">Tidak ada hasil ditemukan.</li>
                         )}
-                        {!flightSearch.trim() && flightHasNextPage && (
+                        {flightHasNextPage && (
                           <li className="border-t border-slate-100 p-2">
                             <button
                               type="button"

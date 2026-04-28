@@ -3,7 +3,7 @@
 import { NextFunction, Request, Response, Router } from "express"
 import multer from "multer"
 import rateLimit from "express-rate-limit"
-import { register, login, verifyToken, getProfile, updateProfile, uploadAvatar, forgotPassword, resetPassword, deleteAccount, verifyTwoFactorLogin, resendTwoFactorCode, updateTwoFactorSetting } from "../controllers/auth.controller"
+import { register, login, verifyToken, getProfile, updateProfile, uploadAvatar, forgotPassword, resetPassword, deleteAccount, verifyTwoFactorLogin, resendTwoFactorCode, updateTwoFactorSetting, refreshAccessToken } from "../controllers/auth.controller"
 import { authenticate } from "../middleware/auth.middleware"
 
 const upload = multer({ storage: multer.memoryStorage() }) // File avatar disimpan di memori sebelum dikirim ke MinIO
@@ -135,6 +135,31 @@ router.post("/register", register)
 router.post("/login", loginLimiter, login)
 router.post("/login/2fa/verify", verifyTwoFactorLogin)
 router.post("/login/2fa/resend", resendTwoFactorCode)
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token refreshed
+ *       401:
+ *         description: Refresh token invalid or expired
+ */
+router.post("/refresh", refreshAccessToken)
 
 /**
  * @swagger

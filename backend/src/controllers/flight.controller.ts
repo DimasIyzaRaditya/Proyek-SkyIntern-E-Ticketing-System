@@ -303,24 +303,51 @@ export const searchFlights = async (req: Request, res: Response) => {
     if (destinationId) where.destinationId = parseInt(destinationId as string) // Filter berdasarkan bandara tujuan
     if (originCity) {
       where.origin = {
-        city: { equals: String(originCity), mode: "insensitive" }
+        city: { contains: String(originCity), mode: "insensitive" }
       }
     }
     if (destinationCity) {
       where.destination = {
-        city: { equals: String(destinationCity), mode: "insensitive" }
+        city: { contains: String(destinationCity), mode: "insensitive" }
       }
     }
 
-    if (departureDate) {
-      const date = new Date(departureDate as string)
-      const nextDate = new Date(date)
-      nextDate.setDate(date.getDate() + 1)
+    const dateOrFilters: Array<{ departureTime: { gte: Date; lt: Date } }> = []
 
-      where.departureTime = {
-        gte: date,
-        lt: nextDate
-      }
+    if (departureDate) {
+      const dateKey = String(departureDate).slice(0, 10)
+      const startJakarta = new Date(`${dateKey}T00:00:00+07:00`)
+      const endJakarta = new Date(`${dateKey}T23:59:59.999+07:00`)
+
+      const jakartaFormatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      })
+      const jakartaToday = jakartaFormatter.format(new Date())
+
+      const jakartaTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Jakarta",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      })
+      const jakartaNowTime = jakartaTimeFormatter.format(new Date())
+
+      const isTodayJakarta = dateKey === jakartaToday
+      const minJakarta = isTodayJakarta
+        ? new Date(`${jakartaToday}T${jakartaNowTime}+07:00`)
+        : startJakarta
+
+      const utcToday = new Date().toISOString().slice(0, 10)
+      const startUtc = new Date(`${dateKey}T00:00:00.000Z`)
+      const endUtc = new Date(`${dateKey}T23:59:59.999Z`)
+      const minUtc = dateKey === utcToday ? new Date() : startUtc
+
+      dateOrFilters.push({ departureTime: { gte: minJakarta, lt: endJakarta } })
+      dateOrFilters.push({ departureTime: { gte: minUtc, lt: endUtc } })
     }
 
     if (minPrice || maxPrice) {
@@ -337,6 +364,8 @@ export const searchFlights = async (req: Request, res: Response) => {
         gte: startTime,
         lte: endTime
       }
+    } else if (dateOrFilters.length > 0) {
+      where.AND = [...(where.AND ?? []), { OR: dateOrFilters }]
     }
 
     let orderBy: any = { departureTime: "asc" } // Default urutan: paling awal berangkat

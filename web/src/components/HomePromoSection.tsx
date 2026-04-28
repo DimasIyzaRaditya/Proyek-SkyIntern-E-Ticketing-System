@@ -179,6 +179,50 @@ const DEFAULT_CITY_IMAGE =
   "https://images.unsplash.com/photo-1488085061387-422e29b40080?auto=format&fit=crop&w=480&h=280&q=80";
 
 const JAKARTA_TIMEZONE = "Asia/Jakarta";
+const INDONESIA_LABEL = "indonesia";
+const INDONESIAN_CITY_ALIASES = new Set([
+  "bali",
+  "denpasar",
+  "jakarta",
+  "surabaya",
+  "yogyakarta",
+  "medan",
+  "makassar",
+  "palembang",
+  "lombok",
+  "balikpapan",
+  "lampung",
+  "bandar lampung",
+  "semarang",
+  "manado",
+  "pontianak",
+  "pekanbaru",
+  "batam",
+  "solo",
+  "banjarmasin",
+  "samarinda",
+  "jayapura",
+  "ambon",
+  "kupang",
+  "padang",
+  "jambi",
+  "banda aceh",
+  "palangkaraya"
+]);
+
+const normalizeCountry = (value?: string | null) => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (!normalized) return normalized;
+  if (INDONESIAN_CITY_ALIASES.has(normalized)) return INDONESIA_LABEL;
+  return normalized;
+};
+
+const isDomesticFlight = (originCountry?: string | null, destCountry?: string | null) => {
+  const origin = normalizeCountry(originCountry);
+  const dest = normalizeCountry(destCountry);
+  if (!origin || !dest) return false;
+  return origin === INDONESIA_LABEL && dest === INDONESIA_LABEL;
+};
 
 function getTodayJakartaDateKey(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -187,6 +231,18 @@ function getTodayJakartaDateKey(): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function getJakartaNow(): Date {
+  const jakartaDate = getTodayJakartaDateKey();
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: JAKARTA_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date());
+  return new Date(`${jakartaDate}T${time}+07:00`);
 }
 
 function getScheduleDateKey(value: string): string | null {
@@ -210,7 +266,9 @@ async function fetchDeals(): Promise<DealFlight[]> {
   // Make two parallel calls: one for domestic, one sorted by departure time
   // (which surfaces more diverse/international routes), then merge all active
   // schedules and deduplicate only by flight ID.
-  const base = `${API_BASE_URL}/api/flights/search?passengerCount=1&limit=5000`;
+  const jakartaNowIso = getJakartaNow().toISOString();
+  const farFutureIso = "2100-01-01T00:00:00.000Z";
+  const base = `${API_BASE_URL}/api/flights/search?passengerCount=1&limit=5000&departureTimeStart=${encodeURIComponent(jakartaNowIso)}&departureTimeEnd=${encodeURIComponent(farFutureIso)}`;
   const urls = [
     `${base}&sortBy=price-asc`,
     `${base}&sortBy=departure-asc`,
@@ -220,12 +278,19 @@ async function fetchDeals(): Promise<DealFlight[]> {
     const responses = await Promise.all(urls.map((u) => fetch(u, { cache: "no-store" })));
     const allFlights: FlightFromApi[] = [];
     const todayJakarta = getTodayJakartaDateKey();
+    const jakartaNow = getJakartaNow();
     for (const res of responses) {
       if (!res.ok) continue;
       const data = (await res.json()) as { flights?: FlightFromApi[] };
       const activeFlights = (data.flights ?? []).filter((flight) => {
         const scheduleDate = getScheduleDateKey(flight.departureTime);
-        return scheduleDate !== null && scheduleDate >= todayJakarta;
+        if (scheduleDate === null || scheduleDate < todayJakarta) return false;
+        const departureTs = new Date(flight.departureTime).getTime();
+        if (Number.isNaN(departureTs)) return false;
+        if (scheduleDate === todayJakarta) {
+          return departureTs >= jakartaNow.getTime();
+        }
+        return true;
       });
       allFlights.push(...activeFlights);
     }
@@ -669,17 +734,13 @@ export default function HomePromoSection() {
       .then((data) => {
         setDeals(data);
         // Auto-select first canonical destination city found in domestic data
-        const domestic = data.filter(
-          (d) => d.originCountry?.toLowerCase() === "indonesia" && d.destCountry?.toLowerCase() === "indonesia",
-        );
+        const domestic = data.filter((d) => isDomesticFlight(d.originCountry, d.destCountry));
         const base = domestic.length > 0 ? domestic : data;
         const uniqueCanon = [...new Set(base.map((d) => canonicalName(d.destCity)))];
         if (uniqueCanon[0]) setSelectedCity(uniqueCanon[0]);
 
         // Auto-select first available international country tab
-        const intl = data.filter(
-          (d) => d.originCountry?.toLowerCase() !== "indonesia" || d.destCountry?.toLowerCase() !== "indonesia",
-        );
+        const intl = data.filter((d) => !isDomesticFlight(d.originCountry, d.destCountry));
         const firstIntlTab = intl
           .map((d) => INTL_COUNTRY_TAB[d.destCountry] ?? d.destCountry)
           .find(Boolean);
@@ -690,12 +751,8 @@ export default function HomePromoSection() {
   }, []);
 
   // Use country to split domestic vs international; fall back to all flights if none detected
-  const domesticDeals = deals.filter(
-    (d) => d.originCountry?.toLowerCase() === "indonesia" && d.destCountry?.toLowerCase() === "indonesia",
-  );
-  const internationalDeals = deals.filter(
-    (d) => d.destCountry?.toLowerCase() !== "indonesia",
-  );
+  const domesticDeals = deals.filter((d) => isDomesticFlight(d.originCountry, d.destCountry));
+  const internationalDeals = deals.filter((d) => !isDomesticFlight(d.originCountry, d.destCountry));
   // Fallback: if country data not available in DB, show everything as domestic
   const baseDeals = domesticDeals.length > 0 ? domesticDeals : deals;
 
@@ -806,7 +863,7 @@ export default function HomePromoSection() {
           <section>
             <div className="mb-4 sm:mb-5">
               <h2 className="text-lg font-black text-slate-900 sm:text-xl md:text-2xl">
-                Penerbangan Internasional Terbaik
+                International Best Deals for You
               </h2>
             </div>
             {/* Country tabs */}

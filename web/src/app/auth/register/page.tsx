@@ -74,6 +74,7 @@ export default function RegisterPage() {
           role: session.user.role,
         },
         session.token,
+        session.refreshToken,
       );
 
       setMessage("Registrasi berhasil. Mengarahkan...");

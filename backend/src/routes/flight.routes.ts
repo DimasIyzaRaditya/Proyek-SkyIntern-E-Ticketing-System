@@ -76,6 +76,43 @@ const router = Router() // Router Express untuk semua route penerbangan publik
  *     responses:
  *       200:
  *         description: Flights retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 flights:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       flightNumber:
+ *                         type: string
+ *                       departureTime:
+ *                         type: string
+ *                         format: date-time
+ *                       arrivalTime:
+ *                         type: string
+ *                         format: date-time
+ *                       basePrice:
+ *                         type: integer
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPrevPage:
+ *                       type: boolean
  */
 router.get("/search", flightController.searchFlights)
 

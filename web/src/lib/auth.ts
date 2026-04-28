@@ -13,10 +13,12 @@ export type UserSession = {
 const SESSION_KEY = "skyintern_session";
 const ROLE_KEY = "skyintern_role";
 const TOKEN_KEY = "skyintern_token";
+const REFRESH_TOKEN_KEY = "skyintern_refresh_token";
 
 const LEGACY_SESSION_KEY = "skybook_session";
 const LEGACY_ROLE_KEY = "skybook_role";
 const LEGACY_TOKEN_KEY = "skybook_token";
+const LEGACY_REFRESH_TOKEN_KEY = "skybook_refresh_token";
 
 const readWithLegacyFallback = (key: string, legacyKey: string) => {
   const nextValue = window.localStorage.getItem(key);
@@ -24,7 +26,7 @@ const readWithLegacyFallback = (key: string, legacyKey: string) => {
   return window.localStorage.getItem(legacyKey);
 };
 
-export const setUserSession = (session: UserSession, token?: string) => {
+export const setUserSession = (session: UserSession, token?: string, refreshToken?: string) => {
   if (typeof window === "undefined") return;
   const payload = JSON.stringify(session);
   window.localStorage.setItem(SESSION_KEY, payload);
@@ -36,6 +38,11 @@ export const setUserSession = (session: UserSession, token?: string) => {
     window.localStorage.setItem(TOKEN_KEY, token);
     window.localStorage.setItem(LEGACY_TOKEN_KEY, token);
   }
+
+  if (refreshToken) {
+    window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    window.localStorage.setItem(LEGACY_REFRESH_TOKEN_KEY, refreshToken);
+  }
 };
 
 export const getAuthToken = (): string | null => {
@@ -43,10 +50,21 @@ export const getAuthToken = (): string | null => {
   return readWithLegacyFallback(TOKEN_KEY, LEGACY_TOKEN_KEY);
 };
 
+export const getRefreshToken = (): string | null => {
+  if (typeof window === "undefined") return null;
+  return readWithLegacyFallback(REFRESH_TOKEN_KEY, LEGACY_REFRESH_TOKEN_KEY);
+};
+
 export const setAuthToken = (token: string) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(TOKEN_KEY, token);
   window.localStorage.setItem(LEGACY_TOKEN_KEY, token);
+};
+
+export const setRefreshToken = (token: string) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  window.localStorage.setItem(LEGACY_REFRESH_TOKEN_KEY, token);
 };
 
 export const clearSession = () => {
@@ -57,6 +75,8 @@ export const clearSession = () => {
   window.localStorage.removeItem(LEGACY_ROLE_KEY);
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  window.localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
 };
 
 export const getUserSession = (): UserSession | null => {

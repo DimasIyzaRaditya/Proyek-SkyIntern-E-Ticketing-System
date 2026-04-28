@@ -76,6 +76,8 @@ model User {
   twoFactorCodeExpiresAt DateTime?
   resetToken    String?   @db.VarChar(255)
   resetExpire   DateTime?
+  refreshTokenHash String? @db.VarChar(255)
+  refreshTokenExpiresAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   bookings      Booking[]

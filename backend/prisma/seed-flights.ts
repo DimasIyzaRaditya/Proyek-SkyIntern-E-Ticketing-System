@@ -112,6 +112,21 @@ const INTL_ROUTES: RouteTemplate[] = [
   { fromCity: "Jakarta",       toCity: "Dubai",         airlineCode: "EK", flightPrefix: "EK-350", durationMin: 480, basePrice: 7500000, tax: 750000, adminFee: 75000, departureHours: [23] },
   { fromCity: "Dubai",         toCity: "Jakarta",       airlineCode: "EK", flightPrefix: "EK-351", durationMin: 450, basePrice: 7500000, tax: 750000, adminFee: 75000, departureHours: [3] },
 
+  { fromCity: "Jakarta",       toCity: "Doha",          airlineCode: "QR", flightPrefix: "QR-360", durationMin: 510, basePrice: 8200000, tax: 820000, adminFee: 80000, departureHours: [21] },
+  { fromCity: "Doha",          toCity: "Jakarta",       airlineCode: "QR", flightPrefix: "QR-361", durationMin: 480, basePrice: 8200000, tax: 820000, adminFee: 80000, departureHours: [2] },
+
+  { fromCity: "Jakarta",       toCity: "London",        airlineCode: "BA", flightPrefix: "BA-800", durationMin: 860, basePrice: 10500000, tax: 1050000, adminFee: 100000, departureHours: [23] },
+  { fromCity: "London",        toCity: "Jakarta",       airlineCode: "BA", flightPrefix: "BA-801", durationMin: 820, basePrice: 10500000, tax: 1050000, adminFee: 100000, departureHours: [12] },
+
+  { fromCity: "Jakarta",       toCity: "Amsterdam",     airlineCode: "KL", flightPrefix: "KL-820", durationMin: 800, basePrice: 9800000, tax: 980000, adminFee: 90000, departureHours: [22] },
+  { fromCity: "Amsterdam",     toCity: "Jakarta",       airlineCode: "KL", flightPrefix: "KL-821", durationMin: 780, basePrice: 9800000, tax: 980000, adminFee: 90000, departureHours: [13] },
+
+  { fromCity: "Jakarta",       toCity: "Paris",         airlineCode: "AF", flightPrefix: "AF-830", durationMin: 810, basePrice: 9900000, tax: 990000, adminFee: 90000, departureHours: [22] },
+  { fromCity: "Paris",         toCity: "Jakarta",       airlineCode: "AF", flightPrefix: "AF-831", durationMin: 790, basePrice: 9900000, tax: 990000, adminFee: 90000, departureHours: [13] },
+
+  { fromCity: "Jakarta",       toCity: "Frankfurt",     airlineCode: "LH", flightPrefix: "LH-840", durationMin: 820, basePrice: 10000000, tax: 1000000, adminFee: 90000, departureHours: [22] },
+  { fromCity: "Frankfurt",     toCity: "Jakarta",       airlineCode: "LH", flightPrefix: "LH-841", durationMin: 800, basePrice: 10000000, tax: 1000000, adminFee: 90000, departureHours: [13] },
+
   // Bali international
   { fromCity: "Denpasar",      toCity: "Singapore",     airlineCode: "SQ", flightPrefix: "SQ-910", durationMin: 120, basePrice: 1700000, tax: 170000, adminFee: 25000, departureHours: [9, 14, 18] },
   { fromCity: "Denpasar",      toCity: "Singapore",     airlineCode: "GA", flightPrefix: "GA-M05", durationMin: 120, basePrice: 1900000, tax: 190000, adminFee: 25000, departureHours: [11, 16] },
@@ -133,9 +148,14 @@ const INTL_ROUTES: RouteTemplate[] = [
 ]
 
 // ── Generate daily flights for April and May 2026 ─────────────────────────────
-const START_DATE = new Date("2026-04-01T00:00:00.000Z")
-const END_DATE = new Date("2026-05-31T00:00:00.000Z")
-const DAYS_TO_GENERATE = Math.floor((END_DATE.getTime() - START_DATE.getTime()) / 86400000) + 1
+const DOMESTIC_START_DATE = new Date("2026-04-01T00:00:00.000Z")
+const DOMESTIC_END_DATE = new Date("2026-05-31T00:00:00.000Z")
+const INTL_START_DATE = new Date("2026-05-01T00:00:00.000Z")
+const INTL_END_DATE = new Date("2026-05-31T00:00:00.000Z")
+
+function daysBetweenInclusive(start: Date, end: Date): number {
+  return Math.floor((end.getTime() - start.getTime()) / 86400000) + 1
+}
 
 async function main() {
   console.log("🛫  Seeding flights...")
@@ -158,56 +178,61 @@ async function main() {
   let skipped = 0
   let flightCounter: Record<string, number> = {}
 
-  const allRoutes = [...DOMESTIC_ROUTES, ...INTL_ROUTES]
+  async function seedRoutes(routes: RouteTemplate[], startDate: Date, endDate: Date) {
+    const daysToGenerate = daysBetweenInclusive(startDate, endDate)
 
-  for (const route of allRoutes) {
-    const originId = cityToId[route.fromCity]
-    const destId   = cityToId[route.toCity]
-    const airlineId = codeToId[route.airlineCode]
+    for (const route of routes) {
+      const originId = cityToId[route.fromCity]
+      const destId   = cityToId[route.toCity]
+      const airlineId = codeToId[route.airlineCode]
 
-    if (!originId) { console.warn(`  ⚠ Airport not found: ${route.fromCity}`); continue }
-    if (!destId)   { console.warn(`  ⚠ Airport not found: ${route.toCity}`);   continue }
-    if (!airlineId){ console.warn(`  ⚠ Airline not found: ${route.airlineCode}`); continue }
+      if (!originId) { console.warn(`  ⚠ Airport not found: ${route.fromCity}`); continue }
+      if (!destId)   { console.warn(`  ⚠ Airport not found: ${route.toCity}`);   continue }
+      if (!airlineId){ console.warn(`  ⚠ Airline not found: ${route.airlineCode}`); continue }
 
-    for (let day = 0; day < DAYS_TO_GENERATE; day++) {
-      const baseDate = addDays(START_DATE, day)
+      for (let day = 0; day < daysToGenerate; day++) {
+        const baseDate = addDays(startDate, day)
 
-      for (const hour of route.departureHours) {
-        const departure = addHours(baseDate, hour)
-        const arrival   = addHours(departure, route.durationMin / 60)
+        for (const hour of route.departureHours) {
+          const departure = addHours(baseDate, hour)
+          const arrival   = addHours(departure, route.durationMin / 60)
 
-        // Generate a unique flight number
-        const key = route.flightPrefix
-        if (!flightCounter[key]) flightCounter[key] = 1
-        const flightNumber = `${key}${String(flightCounter[key]++).padStart(3, "0")}`
+          // Generate a unique flight number
+          const key = route.flightPrefix
+          if (!flightCounter[key]) flightCounter[key] = 1
+          const flightNumber = `${key}${String(flightCounter[key]++).padStart(3, "0")}`
 
-        try {
-          await prisma.flight.create({
-            data: {
-              flightNumber,
-              airlineId,
-              originId,
-              destinationId: destId,
-              departureTime: departure,
-              arrivalTime:   arrival,
-              duration:      route.durationMin,
-              basePrice:     route.basePrice,
-              tax:           route.tax,
-              adminFee:      route.adminFee,
-              status:        "SCHEDULED",
-            },
-          })
-          created++
-        } catch (err: any) {
-          if (err?.code === "P2002") {
-            skipped++ // duplicate flight number — skip silently
-          } else {
-            console.error(`  Error creating flight ${flightNumber}:`, err?.message)
+          try {
+            await prisma.flight.create({
+              data: {
+                flightNumber,
+                airlineId,
+                originId,
+                destinationId: destId,
+                departureTime: departure,
+                arrivalTime:   arrival,
+                duration:      route.durationMin,
+                basePrice:     route.basePrice,
+                tax:           route.tax,
+                adminFee:      route.adminFee,
+                status:        "SCHEDULED",
+              },
+            })
+            created++
+          } catch (err: any) {
+            if (err?.code === "P2002") {
+              skipped++ // duplicate flight number — skip silently
+            } else {
+              console.error(`  Error creating flight ${flightNumber}:`, err?.message)
+            }
           }
         }
       }
     }
   }
+
+  await seedRoutes(DOMESTIC_ROUTES, DOMESTIC_START_DATE, DOMESTIC_END_DATE)
+  await seedRoutes(INTL_ROUTES, INTL_START_DATE, INTL_END_DATE)
 
   console.log(`✅  Done! Created: ${created} flights, Skipped (duplicate): ${skipped}`)
 }

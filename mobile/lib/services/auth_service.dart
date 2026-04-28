@@ -6,11 +6,13 @@ import 'package:http_parser/http_parser.dart';
 
 class LoginResult {
   final String? token;
+  final String? refreshToken;
   final bool requiresTwoFactor;
   final String? twoFactorToken;
 
   const LoginResult({
     this.token,
+    this.refreshToken,
     this.requiresTwoFactor = false,
     this.twoFactorToken,
   });
@@ -56,13 +58,18 @@ class AuthService {
     }
 
     final token = loginResponse['token'] as String?;
+    final refreshToken = loginResponse['refreshToken'] as String?;
     if (token == null) throw Exception('Token not found in response');
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw Exception('Refresh token tidak tersedia.');
+    }
 
     ApiClient.setAuthToken(token);
-    return LoginResult(token: token);
+    ApiClient.setRefreshToken(refreshToken);
+    return LoginResult(token: token, refreshToken: refreshToken);
   }
 
-  static Future<String> verifyTwoFactorLogin({
+  static Future<LoginResult> verifyTwoFactorLogin({
     required String twoFactorToken,
     required String code,
   }) async {
@@ -72,12 +79,17 @@ class AuthService {
     );
 
     final token = verifyResponse['token'] as String?;
+    final refreshToken = verifyResponse['refreshToken'] as String?;
     if (token == null || token.isEmpty) {
       throw Exception('Token login tidak tersedia setelah verifikasi 2FA.');
     }
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw Exception('Refresh token tidak tersedia setelah verifikasi 2FA.');
+    }
 
     ApiClient.setAuthToken(token);
-    return token;
+    ApiClient.setRefreshToken(refreshToken);
+    return LoginResult(token: token, refreshToken: refreshToken);
   }
 
   static Future<void> resendTwoFactorCode({

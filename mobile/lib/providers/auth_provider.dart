@@ -8,12 +8,14 @@ import '../utils/helpers.dart';
 class AuthProvider extends ChangeNotifier {
   UserSession? _user;
   String? _token;
+  String? _refreshToken;
   bool _isLoading = false;
   String? _error;
   bool _isInitialized = false;
 
   UserSession? get user => _user;
   String? get token => _token;
+  String? get refreshToken => _refreshToken;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isInitialized => _isInitialized;
@@ -25,11 +27,14 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _init() async {
     final token = await LocalStorage.getToken();
+    final refreshToken = await LocalStorage.getRefreshToken();
     final user = await LocalStorage.getUser();
     if (token != null && user != null) {
       _token = token;
+      _refreshToken = refreshToken;
       _user = user;
       ApiClient.setAuthToken(token);
+      if (refreshToken != null) ApiClient.setRefreshToken(refreshToken);
       WebSocketService.instance.connect(token: token);
     }
     _isInitialized = true;
@@ -84,10 +89,12 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _token = loginResult.token;
+      _refreshToken = loginResult.refreshToken;
       final user = await AuthService.getProfile();
       _user = user;
-      await LocalStorage.saveUser(_user!, _token!);
+      await LocalStorage.saveUser(_user!, _token!, refreshToken: _refreshToken);
       await LocalStorage.saveRecentAccount(_user!);
+      if (_refreshToken != null) ApiClient.setRefreshToken(_refreshToken!);
       WebSocketService.instance.connect(token: _token!);
       _isLoading = false;
       notifyListeners();
@@ -109,15 +116,17 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await AuthService.verifyTwoFactorLogin(
+      final result = await AuthService.verifyTwoFactorLogin(
         twoFactorToken: twoFactorToken,
         code: code,
       );
-      _token = token;
+      _token = result.token;
+      _refreshToken = result.refreshToken;
       final user = await AuthService.getProfile();
       _user = user;
-      await LocalStorage.saveUser(_user!, _token!);
+      await LocalStorage.saveUser(_user!, _token!, refreshToken: _refreshToken);
       await LocalStorage.saveRecentAccount(_user!);
+      if (_refreshToken != null) ApiClient.setRefreshToken(_refreshToken!);
       WebSocketService.instance.connect(token: _token!);
       _isLoading = false;
       notifyListeners();
@@ -139,7 +148,9 @@ class AuthProvider extends ChangeNotifier {
     try {
       final user = await AuthService.getProfile();
       _user = user;
-      if (_token != null) await LocalStorage.saveUser(_user!, _token!);
+      if (_token != null) {
+        await LocalStorage.saveUser(_user!, _token!, refreshToken: _refreshToken);
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -164,7 +175,9 @@ class AuthProvider extends ChangeNotifier {
         dateOfBirth: dateOfBirth,
       );
       _user = user;
-      if (_token != null) await LocalStorage.saveUser(_user!, _token!);
+      if (_token != null) {
+        await LocalStorage.saveUser(_user!, _token!, refreshToken: _refreshToken);
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -187,7 +200,9 @@ class AuthProvider extends ChangeNotifier {
         mimeType: mimeType,
       );
       _user = user;
-      if (_token != null) await LocalStorage.saveUser(_user!, _token!);
+      if (_token != null) {
+        await LocalStorage.saveUser(_user!, _token!, refreshToken: _refreshToken);
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -202,7 +217,9 @@ class AuthProvider extends ChangeNotifier {
     try {
       final user = await AuthService.updateTwoFactorSetting(enabled: enabled);
       _user = user;
-      if (_token != null) await LocalStorage.saveUser(_user!, _token!);
+      if (_token != null) {
+        await LocalStorage.saveUser(_user!, _token!, refreshToken: _refreshToken);
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -214,8 +231,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _user = null;
     _token = null;
+    _refreshToken = null;
     _error = null;
     ApiClient.clearAuthToken();
+    ApiClient.clearRefreshToken();
     WebSocketService.instance.disconnect();
     await LocalStorage.clearAll();
     notifyListeners();

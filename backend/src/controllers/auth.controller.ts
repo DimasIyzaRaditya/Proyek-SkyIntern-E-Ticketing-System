@@ -3,7 +3,7 @@
 // serta pengambilan daftar semua user (khusus admin).
 import bcrypt from "bcrypt"
 import crypto from "crypto"
-import jwt from "jsonwebtoken"
+import jwt, { type SignOptions } from "jsonwebtoken"
 import { Request, Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
@@ -12,20 +12,43 @@ import { sendResetPasswordEmail, sendTwoFactorCodeEmail } from "../utils/email"
 import { uploadFile, deleteFile, extractFileKeyFromUrl, normalizeFileUrlIfExists } from "../utils/minio"
 
 const TWO_FACTOR_CODE_TTL_MINUTES = 10
+const ACCESS_TOKEN_TTL = (process.env.JWT_ACCESS_TTL || "15m") as SignOptions["expiresIn"]
+const REFRESH_TOKEN_TTL_DAYS = Number(process.env.JWT_REFRESH_DAYS || 30)
+const JWT_SECRET = process.env.JWT_SECRET as string
 
 const issueAccessToken = (user: { id: number; email: string; role: string }) => {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET as string,
-    { expiresIn: "1d" }
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL }
   )
+}
+
+const issueRefreshToken = () => crypto.randomBytes(64).toString("hex")
+
+const hashToken = (token: string) => {
+  return crypto.createHash("sha256").update(token).digest("hex")
+}
+
+const addDays = (date: Date, days: number) => {
+  return new Date(date.getTime() + days * 86400000)
+}
+
+const persistRefreshToken = async (userId: number, refreshToken: string) => {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      refreshTokenHash: hashToken(refreshToken),
+      refreshTokenExpiresAt: addDays(new Date(), REFRESH_TOKEN_TTL_DAYS)
+    }
+  })
 }
 
 const issueTwoFactorToken = (user: { id: number; email: string }) => {
   return jwt.sign(
     { id: user.id, email: user.email, purpose: "2fa-login" },
-    process.env.JWT_SECRET as string,
-    { expiresIn: `${TWO_FACTOR_CODE_TTL_MINUTES}m` }
+    JWT_SECRET,
+    { expiresIn: `${TWO_FACTOR_CODE_TTL_MINUTES}m` as SignOptions["expiresIn"] }
   )
 }
 
@@ -108,10 +131,14 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const token = issueAccessToken({ id: user.id, email: user.email, role: user.role })
+    const refreshToken = issueRefreshToken()
+
+    await persistRefreshToken(user.id, refreshToken)
 
     res.json({
       message: "Login berhasil",
       token,
+      refreshToken,
       requiresTwoFactor: false
     })
 
@@ -180,10 +207,14 @@ export const verifyTwoFactorLogin = async (req: Request, res: Response) => {
     })
 
     const token = issueAccessToken({ id: user.id, email: user.email, role: user.role })
+    const refreshToken = issueRefreshToken()
+
+    await persistRefreshToken(user.id, refreshToken)
 
     res.json({
       message: "Verifikasi 2FA berhasil",
-      token
+      token,
+      refreshToken
     })
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {
@@ -823,6 +854,50 @@ export const toggleUserTwoFactorByAdmin = async (req: AuthRequest, res: Response
     })
   } catch (error) {
     console.error("Toggle user 2FA error:", error)
+    res.status(500).json({ message: "Terjadi kesalahan pada server" })
+  }
+}
+
+export const refreshAccessToken = async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body
+
+    if (!refreshToken || typeof refreshToken !== "string") {
+      return res.status(400).json({ message: "Refresh token wajib diisi" })
+    }
+
+    const tokenHash = hashToken(refreshToken)
+    const user = await prisma.user.findFirst({
+      where: { refreshTokenHash: tokenHash },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isBlocked: true,
+        refreshTokenExpiresAt: true
+      }
+    })
+
+    if (!user || !user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < new Date()) {
+      return res.status(401).json({ message: "Refresh token tidak valid atau sudah kedaluwarsa" })
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ message: "Akun Anda telah diblokir." })
+    }
+
+    const newAccessToken = issueAccessToken({ id: user.id, email: user.email, role: user.role })
+    const newRefreshToken = issueRefreshToken()
+
+    await persistRefreshToken(user.id, newRefreshToken)
+
+    res.json({
+      message: "Token berhasil diperbarui",
+      token: newAccessToken,
+      refreshToken: newRefreshToken
+    })
+  } catch (error) {
+    console.error("Refresh token error:", error)
     res.status(500).json({ message: "Terjadi kesalahan pada server" })
   }
 }

@@ -53,6 +53,7 @@ function TwoFactorPageContent() {
           role: session.user.role,
         },
         session.token,
+        session.refreshToken,
       );
 
       setIsError(false);

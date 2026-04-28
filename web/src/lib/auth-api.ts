@@ -5,6 +5,7 @@ import { API_BASE_URL } from "@/lib/api-client";
 type AuthLoginResponse = {
   message: string;
   token?: string;
+  refreshToken?: string;
   requiresTwoFactor?: boolean;
   twoFactorToken?: string;
 };
@@ -12,6 +13,7 @@ type AuthLoginResponse = {
 type AuthVerifyTwoFactorResponse = {
   message: string;
   token: string;
+  refreshToken?: string;
 };
 
 type AuthProfileResponse = {
@@ -30,6 +32,7 @@ type AuthProfileResponse = {
 
 export type AuthSessionPayload = {
   token: string;
+  refreshToken: string;
   user: UserSession;
 };
 
@@ -106,6 +109,10 @@ export const loginWithApi = async (payload: { email: string; password: string })
     throw new Error("Token login tidak tersedia.");
   }
 
+  if (!loginResponse.refreshToken) {
+    throw new Error("Refresh token tidak tersedia.");
+  }
+
   const profileResponse = await apiRequest<AuthProfileResponse>("/api/auth/profile", {
     headers: {
       Authorization: `Bearer ${loginResponse.token}`,
@@ -114,6 +121,7 @@ export const loginWithApi = async (payload: { email: string; password: string })
 
   return {
     token: loginResponse.token,
+    refreshToken: loginResponse.refreshToken,
     user: toUserSession(profileResponse.user),
   };
 };
@@ -130,8 +138,13 @@ export const verifyTwoFactorLoginWithApi = async (payload: { twoFactorToken: str
     },
   });
 
+  if (!verifyResponse.refreshToken) {
+    throw new Error("Refresh token tidak tersedia.");
+  }
+
   return {
     token: verifyResponse.token,
+    refreshToken: verifyResponse.refreshToken,
     user: toUserSession(profileResponse.user),
   };
 };

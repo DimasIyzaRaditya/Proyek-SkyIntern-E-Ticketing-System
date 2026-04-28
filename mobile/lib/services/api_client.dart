@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../utils/helpers.dart';
 
 class ApiClient {
   // Optional override via --dart-define=API_HOST=192.168.x.x
@@ -157,15 +158,74 @@ class ApiClient {
   }
 
   static String? _authToken;
+  static String? _refreshToken;
 
   static String? get authToken => _authToken;
+  static String? get refreshToken => _refreshToken;
 
   static void setAuthToken(String token) {
     _authToken = token;
   }
 
+  static void setRefreshToken(String token) {
+    _refreshToken = token;
+  }
+
   static void clearAuthToken() {
     _authToken = null;
+  }
+
+  static void clearRefreshToken() {
+    _refreshToken = null;
+  }
+
+  static Future<bool> _refreshAccessToken() async {
+    if (_refreshToken == null || _refreshToken!.isEmpty) return false;
+
+    try {
+      final resolvedBaseUrl = await getBaseUrl();
+      final response = await http
+          .post(
+            Uri.parse('$resolvedBaseUrl/api/auth/refresh'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Platform': 'mobile',
+            },
+            body: json.encode({'refreshToken': _refreshToken}),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode != 200) return false;
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      final newToken = body['token'] as String?;
+      final newRefreshToken = body['refreshToken'] as String?;
+
+      if (newToken == null || newToken.isEmpty) return false;
+
+      setAuthToken(newToken);
+      if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+        setRefreshToken(newRefreshToken);
+        await LocalStorage.saveRefreshToken(newRefreshToken);
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<http.Response> _sendWithAuthRetry(
+    Future<http.Response> Function() send, {
+    required bool requireAuth,
+  }) async {
+    final response = await send();
+    if (response.statusCode != 401 || !requireAuth) return response;
+
+    final refreshed = await _refreshAccessToken();
+    if (!refreshed) return response;
+
+    return await send();
   }
 
   static Future<Map<String, dynamic>> get(
@@ -181,12 +241,16 @@ class ApiClient {
           'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http
-          .get(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
-          .timeout(_requestTimeout);
+      final response = await _sendWithAuthRetry(
+        () => http
+            .get(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
+            .timeout(_requestTimeout),
+        requireAuth: requireAuth,
+      );
 
       if (response.statusCode == 401) {
         clearAuthToken();
+        clearRefreshToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
       }
 
@@ -226,16 +290,20 @@ class ApiClient {
           'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http
-          .post(
-            Uri.parse('$resolvedBaseUrl$endpoint'),
-            headers: headers,
-            body: json.encode(body),
-          )
-          .timeout(_requestTimeout);
+      final response = await _sendWithAuthRetry(
+        () => http
+            .post(
+              Uri.parse('$resolvedBaseUrl$endpoint'),
+              headers: headers,
+              body: json.encode(body),
+            )
+            .timeout(_requestTimeout),
+        requireAuth: requireAuth,
+      );
 
       if (response.statusCode == 401 && requireAuth) {
         clearAuthToken();
+        clearRefreshToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
       }
 
@@ -279,16 +347,20 @@ class ApiClient {
           'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http
-          .put(
-            Uri.parse('$resolvedBaseUrl$endpoint'),
-            headers: headers,
-            body: json.encode(body),
-          )
-          .timeout(_requestTimeout);
+      final response = await _sendWithAuthRetry(
+        () => http
+            .put(
+              Uri.parse('$resolvedBaseUrl$endpoint'),
+              headers: headers,
+              body: json.encode(body),
+            )
+            .timeout(_requestTimeout),
+        requireAuth: requireAuth,
+      );
 
       if (response.statusCode == 401) {
         clearAuthToken();
+        clearRefreshToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
       }
 
@@ -331,12 +403,16 @@ class ApiClient {
           'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http
-          .delete(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
-          .timeout(_requestTimeout);
+      final response = await _sendWithAuthRetry(
+        () => http
+            .delete(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
+            .timeout(_requestTimeout),
+        requireAuth: requireAuth,
+      );
 
       if (response.statusCode == 401) {
         clearAuthToken();
+        clearRefreshToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
       }
 
@@ -369,12 +445,16 @@ class ApiClient {
           'Authorization': 'Bearer $_authToken',
       };
 
-      final response = await http
-          .get(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
-          .timeout(_requestTimeout);
+      final response = await _sendWithAuthRetry(
+        () => http
+            .get(Uri.parse('$resolvedBaseUrl$endpoint'), headers: headers)
+            .timeout(_requestTimeout),
+        requireAuth: requireAuth,
+      );
 
       if (response.statusCode == 401) {
         clearAuthToken();
+        clearRefreshToken();
         throw Exception('Sesi login tidak valid. Silakan login kembali.');
       }
 
