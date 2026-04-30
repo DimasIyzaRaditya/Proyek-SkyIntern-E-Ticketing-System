@@ -51,9 +51,25 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           returnDate: returnDate,
           adult: adult,
           child: child,
+          sortBy: _backendSortBy(),
           page: page,
           limit: _perPage,
         );
+  }
+
+  String? _backendSortBy() {
+    switch (_sortBy) {
+      case 'price-low':
+        return 'price-asc';
+      case 'price-high':
+        return 'price-desc';
+      case 'duration':
+        return 'duration-asc';
+      case 'departure':
+        return 'time-asc';
+      default:
+        return null;
+    }
   }
 
   Future<void> _loadPromos() async {
@@ -224,7 +240,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             child: GestureDetector(
                               onTap: () {
                                 setState(() => _sortBy = opt['value'] as String);
-                                context.read<FlightProvider>().sortFlights(opt['value'] as String);
+                                _requestPage(1);
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),

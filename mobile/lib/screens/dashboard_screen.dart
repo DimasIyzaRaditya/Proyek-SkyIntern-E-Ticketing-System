@@ -28,6 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _historySort = 'newest';
   int _historyPage = 1;
   int _historyPerPage = 10;
+  int _historyTotalItems = 0;
 
   @override
   void initState() {
@@ -65,10 +66,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       _bookingError = null;
     });
     try {
-      final data = await BookingService.getMyBookings();
+      final result = await BookingService.getMyBookings(
+        page: _historyPage,
+        limit: _historyPerPage,
+        statusFilter: 'All',
+        sortDirection: _historySort == 'oldest' ? 'asc' : 'desc',
+      );
       if (!mounted) return;
       setState(() {
-        _bookings = data;
+        _bookings = result.items;
+        _historyTotalItems = result.pagination?.totalItems ?? result.items.length;
         final totalPages = _historyTotalPages;
         if (_historyPage > totalPages) _historyPage = totalPages;
       });
@@ -83,12 +90,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   int get _historyTotalPages {
-    if (_processedHistory.isEmpty) return 1;
-    return (_processedHistory.length / _historyPerPage).ceil();
+    if (_historyTotalItems <= 0) return 1;
+    return (_historyTotalItems / _historyPerPage).ceil();
   }
-
-  DateTime _parseDate(String? raw) =>
-      DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
 
   String _bookingName(Booking b) {
     if (b.passengers.isNotEmpty) {
@@ -100,8 +104,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   List<Booking> get _processedHistory {
     final q = _historySearch.trim().toLowerCase();
-    final data = _bookings.where((b) {
-      if (q.isEmpty) return true;
+    if (q.isEmpty) return _bookings;
+
+    return _bookings.where((b) {
       final id = b.id.toString();
       final code = b.bookingCode.toLowerCase();
       final name = _bookingName(b).toLowerCase();
@@ -112,32 +117,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           name.contains(q) ||
           route.contains(q);
     }).toList();
-
-    data.sort((x, y) {
-      switch (_historySort) {
-        case 'id':
-          return x.id.compareTo(y.id);
-        case 'name':
-          return _bookingName(
-            x,
-          ).toLowerCase().compareTo(_bookingName(y).toLowerCase());
-        case 'oldest':
-          return _parseDate(x.createdAt).compareTo(_parseDate(y.createdAt));
-        case 'newest':
-        default:
-          return _parseDate(y.createdAt).compareTo(_parseDate(x.createdAt));
-      }
-    });
-
-    return data;
   }
 
   List<Booking> get _paginatedHistory {
-    final data = _processedHistory;
-    final start = (_historyPage - 1) * _historyPerPage;
-    final end = (start + _historyPerPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
+    return _processedHistory;
   }
 
   int _countStatus(Set<String> statuses) {
@@ -531,6 +514,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                 searchQuery: _historySearch,
                 sortValue: _historySort,
                 rowsPerPage: _historyPerPage,
+                  sortOptions: const [
+                    {'value': 'oldest', 'label': 'Terlama'},
+                    {'value': 'newest', 'label': 'Terbaru'},
+                  ],
                 searchHint:
                     'Cari riwayat booking berdasarkan kode, nama, rute, atau ID...',
                 onSearchChanged: (v) => setState(() {
@@ -540,13 +527,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                 onSortChanged: (v) => setState(() {
                   _historySort = v;
                   _historyPage = 1;
+                  _loadBookings();
                 }),
                 onRowsPerPageChanged: (v) => setState(() {
                   _historyPerPage = v;
                   _historyPage = 1;
+                  _loadBookings();
                 }),
               ),
               const SizedBox(height: 10),
+              if (_processedHistory.isEmpty)
               if (_processedHistory.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
@@ -616,9 +606,12 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               ListPaginationBar(
                 currentPage: _historyPage,
-                totalItems: _processedHistory.length,
+                totalItems: _historyTotalItems,
                 itemsPerPage: _historyPerPage,
-                onPageChanged: (next) => setState(() => _historyPage = next),
+                onPageChanged: (next) {
+                  setState(() => _historyPage = next);
+                  _loadBookings();
+                },
               ),
             ],
           ],

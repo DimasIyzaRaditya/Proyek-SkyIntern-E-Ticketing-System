@@ -86,8 +86,9 @@ class ApiClient {
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        // Android emulator first, then physical-device LAN fallback.
-        return ['10.0.2.2', _defaultLanApiHost, 'localhost'];
+        // Emulator uses 10.0.2.2. Physical devices can use localhost when
+        // `adb reverse tcp:3000 tcp:3000` is active, otherwise the LAN IP.
+        return ['10.0.2.2', 'localhost', _defaultLanApiHost];
       default:
         return [_defaultLanApiHost, 'localhost'];
     }
@@ -123,6 +124,31 @@ class ApiClient {
     final host = await _hostResolverFuture!;
     _hostResolverFuture = null;
     return host;
+  }
+
+  static void _clearResolvedHost() {
+    _resolvedHostCache = null;
+    _hostResolverFuture = null;
+  }
+
+  static bool _isConnectionFailure(Object error) {
+    if (error is TimeoutException) return true;
+    if (error is http.ClientException) return true;
+
+    final message = error.toString().toLowerCase();
+    return message.contains('socketexception') ||
+        message.contains('no route to host') ||
+        message.contains('connection refused') ||
+        message.contains('failed host lookup') ||
+        message.contains('network is unreachable');
+  }
+
+  static Exception _connectionException([String? attemptedBaseUrl]) {
+    final target = attemptedBaseUrl ?? ApiClient.baseUrl;
+    return Exception(
+      'Tidak bisa terhubung ke server di $target. Pastikan backend berjalan, '
+      'HP dan laptop berada di Wi-Fi yang sama, dan firewall mengizinkan port 3000.',
+    );
   }
 
   static String get _effectiveHostSync => _resolvedHostCache ?? _fallbackHost();
@@ -282,55 +308,75 @@ class ApiClient {
     bool requireAuth = false,
   }) async {
     try {
-      final resolvedBaseUrl = await getBaseUrl();
-      final headers = {
-        'Content-Type': 'application/json',
-        'X-Platform': 'mobile',
-        if (requireAuth && _authToken != null)
-          'Authorization': 'Bearer $_authToken',
-      };
-
-      final response = await _sendWithAuthRetry(
-        () => http
-            .post(
-              Uri.parse('$resolvedBaseUrl$endpoint'),
-              headers: headers,
-              body: json.encode(body),
-            )
-            .timeout(_requestTimeout),
-        requireAuth: requireAuth,
-      );
-
-      if (response.statusCode == 401 && requireAuth) {
-        clearAuthToken();
-        clearRefreshToken();
-        throw Exception('Sesi login tidak valid. Silakan login kembali.');
-      }
-
-      if (response.statusCode == 403) {
-        clearAuthToken();
-        throw Exception(
-          'ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.',
-        );
-      }
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
+      return await _postOnce(endpoint, body: body, requireAuth: requireAuth);
+    } catch (e) {
+      if (_isConnectionFailure(e)) {
+        _clearResolvedHost();
         try {
-          final errorBody = json.decode(response.body);
-          throw Exception(errorBody['message'] ?? 'Request gagal');
-        } on FormatException {
-          throw Exception('Request gagal (status ${response.statusCode})');
+          return await _postOnce(
+            endpoint,
+            body: body,
+            requireAuth: requireAuth,
+          );
+        } catch (retryError) {
+          if (_isConnectionFailure(retryError)) {
+            _clearResolvedHost();
+            throw _connectionException();
+          }
+          rethrow;
         }
       }
-
-      return json.decode(response.body) as Map<String, dynamic>;
-    } on TimeoutException {
-      throw Exception(
-        'Koneksi ke server timeout. Cek API di ${ApiClient.baseUrl} dan jaringan Anda.',
-      );
-    } catch (e) {
       rethrow;
     }
+  }
+
+  static Future<Map<String, dynamic>> _postOnce(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    bool requireAuth = false,
+  }) async {
+    final resolvedBaseUrl = await getBaseUrl();
+    final headers = {
+      'Content-Type': 'application/json',
+      'X-Platform': 'mobile',
+      if (requireAuth && _authToken != null)
+        'Authorization': 'Bearer $_authToken',
+    };
+
+    final response = await _sendWithAuthRetry(
+      () => http
+          .post(
+            Uri.parse('$resolvedBaseUrl$endpoint'),
+            headers: headers,
+            body: json.encode(body),
+          )
+          .timeout(_requestTimeout),
+      requireAuth: requireAuth,
+    );
+
+    if (response.statusCode == 401 && requireAuth) {
+      clearAuthToken();
+      clearRefreshToken();
+      throw Exception('Sesi login tidak valid. Silakan login kembali.');
+    }
+
+    if (response.statusCode == 403) {
+      clearAuthToken();
+      throw Exception(
+        'ACCOUNT_BLOCKED: Akun Anda telah diblokir. Hubungi admin untuk bantuan.',
+      );
+    }
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      try {
+        final errorBody = json.decode(response.body);
+        throw Exception(errorBody['message'] ?? 'Request gagal');
+      } on FormatException {
+        throw Exception('Request gagal (status ${response.statusCode})');
+      }
+    }
+
+    return json.decode(response.body) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> put(

@@ -1,4 +1,5 @@
 import '../models/booking_model.dart';
+import '../models/pagination_model.dart';
 import 'api_client.dart';
 
 class TicketDownloadResult {
@@ -14,18 +15,39 @@ class TicketDownloadResult {
 }
 
 class BookingService {
-  static Future<List<Booking>> getMyBookings() async {
+  static Future<PaginatedResult<Booking>> getMyBookings({
+    int page = 1,
+    int limit = 20,
+    String? statusFilter,
+    String? sortDirection,
+    String? status,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+      if (statusFilter != null) 'statusFilter': statusFilter,
+      if (sortDirection != null) 'sortDirection': sortDirection,
+      if (status != null) 'status': status,
+    };
+    final endpoint = Uri(path: '/api/bookings', queryParameters: query)
+        .toString();
+
     final response = await ApiClient.get(
-      '/api/bookings',
+      endpoint,
       requireAuth: true,
     );
 
     final bookingsList = response['bookings'] as List?;
-    if (bookingsList == null) return [];
-
-    return bookingsList
+    final items = (bookingsList ?? [])
         .map((e) => Booking.fromJson(e as Map<String, dynamic>))
         .toList();
+    final pagination = response['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(response['pagination'] as Map),
+          )
+        : null;
+
+    return PaginatedResult(items: items, pagination: pagination);
   }
 
   static Future<Map<String, dynamic>> createBooking({

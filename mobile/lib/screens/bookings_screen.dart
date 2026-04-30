@@ -19,25 +19,20 @@ class BookingsScreen extends StatefulWidget {
   State<BookingsScreen> createState() => _BookingsScreenState();
 }
 
-class _BookingsScreenState extends State<BookingsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _BookingsScreenState extends State<BookingsScreen> {
   final Set<int> _syncingIds = {};
   final Set<int> _downloadingTicketIds = {};
   Timer? _pollTimer;
-  String _searchQuery = '';
-  String _sortBy = 'newest';
-  int _activePage = 1;
-  int _completedPage = 1;
-  int _cancelledPage = 1;
+  String _statusFilter = 'All';
+  String _sortDirection = 'desc';
+  int _page = 1;
   int _perPage = 10;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BookingProvider>().loadBookings();
+      _loadBookings();
       _startPolling();
     });
   }
@@ -45,84 +40,23 @@ class _BookingsScreenState extends State<BookingsScreen>
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) context.read<BookingProvider>().loadBookings();
+      if (mounted) _loadBookings();
     });
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
-    _tabController.dispose();
     super.dispose();
   }
 
-  List<Booking> _filter(List<Booking> all, String tab) {
-    switch (tab) {
-      case 'active':
-        return all
-            .where((b) => ['PENDING', 'PAID'].contains(b.status.toUpperCase()))
-            .toList();
-      case 'completed':
-        return all
-            .where((b) => b.status.toUpperCase() == 'PAID' && b.ticket != null)
-            .toList();
-      case 'cancelled':
-        return all
-            .where(
-              (b) => [
-                'CANCELLED',
-                'EXPIRED',
-                'FAILED',
-              ].contains(b.status.toUpperCase()),
-            )
-            .toList();
-      default:
-        return all;
-    }
-  }
-
-  DateTime _parseDate(String? raw) =>
-      DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-
-  String _bookingName(Booking b) {
-    if (b.passengers.isNotEmpty) {
-      final p = b.passengers.first;
-      return '${p.firstName} ${p.lastName}'.trim();
-    }
-    return b.flight.airline;
-  }
-
-  List<Booking> _applyQueryAndSort(List<Booking> source) {
-    final q = _searchQuery.trim().toLowerCase();
-    final data = source.where((b) {
-      if (q.isEmpty) return true;
-      final id = b.id.toString();
-      final code = b.bookingCode.toLowerCase();
-      final name = _bookingName(b).toLowerCase();
-      final airline = b.flight.airline.toLowerCase();
-      return id.contains(q) ||
-          code.contains(q) ||
-          name.contains(q) ||
-          airline.contains(q);
-    }).toList();
-
-    data.sort((x, y) {
-      switch (_sortBy) {
-        case 'id':
-          return x.id.compareTo(y.id);
-        case 'name':
-          return _bookingName(
-            x,
-          ).toLowerCase().compareTo(_bookingName(y).toLowerCase());
-        case 'oldest':
-          return _parseDate(x.createdAt).compareTo(_parseDate(y.createdAt));
-        case 'newest':
-        default:
-          return _parseDate(y.createdAt).compareTo(_parseDate(x.createdAt));
-      }
-    });
-
-    return data;
+  Future<void> _loadBookings() async {
+    await context.read<BookingProvider>().loadBookings(
+          page: _page,
+          limit: _perPage,
+          statusFilter: _statusFilter,
+          sortDirection: _sortDirection,
+        );
   }
 
   Future<void> _payBooking(Booking booking) async {
@@ -163,7 +97,7 @@ class _BookingsScreenState extends State<BookingsScreen>
     );
 
     if (mounted) {
-      await context.read<BookingProvider>().loadBookings();
+      await _loadBookings();
     }
   }
 
@@ -177,7 +111,7 @@ class _BookingsScreenState extends State<BookingsScreen>
       if (!mounted) return;
       if (status == 'PAID') {
         showSnackBar(context, 'Pembayaran berhasil dikonfirmasi!');
-        await context.read<BookingProvider>().loadBookings();
+        await _loadBookings();
       } else if (status == 'PENDING') {
         showSnackBar(
           context,
@@ -189,7 +123,7 @@ class _BookingsScreenState extends State<BookingsScreen>
           'Pembayaran gagal atau kadaluwarsa.',
           isError: true,
         );
-        await context.read<BookingProvider>().loadBookings();
+        await _loadBookings();
       }
     } catch (e) {
       if (mounted) {
@@ -243,6 +177,7 @@ class _BookingsScreenState extends State<BookingsScreen>
       try {
         await context.read<BookingProvider>().cancelBooking(bookingId);
         if (mounted) showSnackBar(context, 'Pemesanan berhasil dibatalkan');
+        await _loadBookings();
       } catch (e) {
         if (mounted) {
           showSnackBar(
@@ -323,19 +258,6 @@ class _BookingsScreenState extends State<BookingsScreen>
                 MobileSideMenu.show(context, activeItem: 'Bookings'),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          tabs: const [
-            Tab(text: 'Aktif'),
-            Tab(text: 'Selesai'),
-            Tab(text: 'Dibatalkan'),
-          ],
-        ),
       ),
       body: Consumer<BookingProvider>(
         builder: (context, provider, _) {
@@ -353,61 +275,17 @@ class _BookingsScreenState extends State<BookingsScreen>
           }
           return Column(
             children: [
-              ListQueryControls(
-                searchQuery: _searchQuery,
-                sortValue: _sortBy,
-                rowsPerPage: _perPage,
-                searchHint:
-                    'Cari booking berdasarkan kode, nama, maskapai, atau ID...',
-                onSearchChanged: (v) => setState(() {
-                  _searchQuery = v;
-                  _activePage = 1;
-                  _completedPage = 1;
-                  _cancelledPage = 1;
-                }),
-                onSortChanged: (v) => setState(() {
-                  _sortBy = v;
-                  _activePage = 1;
-                  _completedPage = 1;
-                  _cancelledPage = 1;
-                }),
-                onRowsPerPageChanged: (v) => setState(() {
-                  _perPage = v;
-                  _activePage = 1;
-                  _completedPage = 1;
-                  _cancelledPage = 1;
-                }),
-              ),
+              _buildFilterBar(context),
               const SizedBox(height: 10),
               Expanded(
                 child: RefreshIndicator(
                   color: AppColors.primary,
-                  onRefresh: () => provider.loadBookings(),
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildList(
-                        context,
-                        _applyQueryAndSort(
-                          _filter(provider.bookings, 'active'),
-                        ),
-                        tab: 'active',
-                      ),
-                      _buildList(
-                        context,
-                        _applyQueryAndSort(
-                          _filter(provider.bookings, 'completed'),
-                        ),
-                        tab: 'completed',
-                      ),
-                      _buildList(
-                        context,
-                        _applyQueryAndSort(
-                          _filter(provider.bookings, 'cancelled'),
-                        ),
-                        tab: 'cancelled',
-                      ),
-                    ],
+                  onRefresh: _loadBookings,
+                  child: _buildList(
+                    context,
+                    provider.bookings,
+                    paginationTotal:
+                        provider.pagination?.totalItems ?? provider.bookings.length,
                   ),
                 ),
               ),
@@ -421,7 +299,7 @@ class _BookingsScreenState extends State<BookingsScreen>
   Widget _buildList(
     BuildContext context,
     List<Booking> bookings, {
-    required String tab,
+    required int paginationTotal,
   }) {
     if (bookings.isEmpty) {
       return LayoutBuilder(
@@ -439,36 +317,12 @@ class _BookingsScreenState extends State<BookingsScreen>
       );
     }
 
-    final page = switch (tab) {
-      'active' => _activePage,
-      'completed' => _completedPage,
-      'cancelled' => _cancelledPage,
-      _ => 1,
-    };
-
-    final totalPages = (bookings.length / _perPage).ceil();
-    final safePage = page > totalPages ? totalPages : page;
-    final start = (safePage - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, bookings.length);
-    final paged = bookings.sublist(start, end);
-
-    if (safePage != page) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          if (tab == 'active') _activePage = safePage;
-          if (tab == 'completed') _completedPage = safePage;
-          if (tab == 'cancelled') _cancelledPage = safePage;
-        });
-      });
-    }
-
     return Column(
       children: [
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.all(16),
-            itemCount: paged.length,
+            itemCount: bookings.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (ctx, i) => TweenAnimationBuilder<double>(
               duration: Duration(milliseconds: 280 + i * 60),
@@ -481,27 +335,125 @@ class _BookingsScreenState extends State<BookingsScreen>
                   child: child,
                 ),
               ),
-              child: _buildCard(ctx, paged[i]),
+              child: _buildCard(ctx, bookings[i]),
             ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: ListPaginationBar(
-            currentPage: safePage,
-            totalItems: bookings.length,
+            currentPage: _page,
+            totalItems: paginationTotal,
             itemsPerPage: _perPage,
-            onPageChanged: (next) {
-              setState(() {
-                if (tab == 'active') _activePage = next;
-                if (tab == 'completed') _completedPage = next;
-                if (tab == 'cancelled') _cancelledPage = next;
-              });
-            },
+            onPageChanged: _handlePageChange,
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildFilterBar(BuildContext context) {
+    final fieldDecoration = InputDecoration(
+      border: const OutlineInputBorder(),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      filled: true,
+      fillColor: Colors.white,
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        children: [
+          DropdownButtonFormField<String>(
+            value: _statusFilter,
+            decoration: fieldDecoration.copyWith(labelText: 'Status'),
+            items: const [
+              DropdownMenuItem(value: 'All', child: Text('Semua')),
+              DropdownMenuItem(value: 'Pending', child: Text('Pending')),
+              DropdownMenuItem(value: 'Paid', child: Text('Dibayar')),
+              DropdownMenuItem(value: 'Issued', child: Text('Issued')),
+              DropdownMenuItem(value: 'Cancelled', child: Text('Dibatalkan')),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _statusFilter = v;
+                _page = 1;
+              });
+              _loadBookings();
+            },
+          ),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 420;
+
+              final sortField = DropdownButtonFormField<String>(
+                value: _sortDirection,
+                decoration: fieldDecoration.copyWith(labelText: 'Urutkan'),
+                items: const [
+                  DropdownMenuItem(value: 'desc', child: Text('Terbaru')),
+                  DropdownMenuItem(value: 'asc', child: Text('Terlama')),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() {
+                    _sortDirection = v;
+                    _page = 1;
+                  });
+                  _loadBookings();
+                },
+              );
+
+              final rowsField = DropdownButtonFormField<int>(
+                value: _perPage,
+                decoration: fieldDecoration.copyWith(labelText: 'Tampilkan'),
+                items: const [
+                  DropdownMenuItem(value: 10, child: Text('10')),
+                  DropdownMenuItem(value: 20, child: Text('20')),
+                  DropdownMenuItem(value: 50, child: Text('50')),
+                  DropdownMenuItem(value: 100, child: Text('100')),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() {
+                    _perPage = v;
+                    _page = 1;
+                  });
+                  _loadBookings();
+                },
+              );
+
+              if (isCompact) {
+                return Column(
+                  children: [sortField, const SizedBox(height: 10), rowsField],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(flex: 3, child: sortField),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 2, child: rowsField),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handlePageChange(int next) {
+    setState(() => _page = next);
+    _loadBookings();
   }
 
   Widget _buildCard(BuildContext context, Booking booking) {

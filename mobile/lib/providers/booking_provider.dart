@@ -1,23 +1,38 @@
 import 'package:flutter/material.dart';
 import '../models/booking_model.dart';
+import '../models/pagination_model.dart';
 import '../services/booking_service.dart';
 
 class BookingProvider extends ChangeNotifier {
   List<Booking> _bookings = [];
   bool _isLoading = false;
   String? _error;
+  PaginationMeta? _pagination;
 
   List<Booking> get bookings => _bookings;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  PaginationMeta? get pagination => _pagination;
 
-  Future<void> loadBookings() async {
+  Future<void> loadBookings({
+    int page = 1,
+    int limit = 20,
+    String statusFilter = 'All',
+    String sortDirection = 'desc',
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _bookings = await BookingService.getMyBookings();
+      final result = await BookingService.getMyBookings(
+        page: page,
+        limit: limit,
+        statusFilter: statusFilter,
+        sortDirection: sortDirection,
+      );
+      _bookings = result.items;
+      _pagination = result.pagination;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
