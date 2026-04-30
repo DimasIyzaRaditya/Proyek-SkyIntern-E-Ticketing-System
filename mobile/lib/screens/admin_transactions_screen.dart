@@ -6,6 +6,7 @@ import '../utils/ticket_download.dart';
 import '../widgets/common_widgets.dart';
 import '../services/admin_service.dart';
 import '../services/booking_service.dart';
+import '../models/pagination_model.dart';
 
 class AdminTransactionsScreen extends StatefulWidget {
   const AdminTransactionsScreen({super.key});
@@ -24,6 +25,7 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
   String _sortBy = 'newest';
   int _page = 1;
   int _perPage = 10;
+  PaginationMeta? _pagination;
 
   static const _statusFilters = [
     {'label': 'Semua', 'value': 'ALL'},
@@ -36,22 +38,7 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
       DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
 
   List<Map<String, dynamic>> get _processedBookings {
-    final q = _searchQuery.trim().toLowerCase();
-    var data = _bookings.where((b) {
-      if (q.isEmpty) return true;
-      final id = (b['id'] ?? '').toString().toLowerCase();
-      final code = (b['bookingCode'] ?? '').toString().toLowerCase();
-      final userName = ((b['user'] as Map?)?['name'] ?? '')
-          .toString()
-          .toLowerCase();
-      final userEmail = ((b['user'] as Map?)?['email'] ?? '')
-          .toString()
-          .toLowerCase();
-      return id.contains(q) ||
-          code.contains(q) ||
-          userName.contains(q) ||
-          userEmail.contains(q);
-    }).toList();
+    final data = [..._bookings];
 
     data.sort((x, y) {
       switch (_sortBy) {
@@ -82,17 +69,6 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
     return data;
   }
 
-  int get _totalPages => _processedBookings.isEmpty
-      ? 1
-      : (_processedBookings.length / _perPage).ceil();
-
-  List<Map<String, dynamic>> get _pagedBookings {
-    final data = _processedBookings;
-    final start = (_page - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
-  }
 
   @override
   void initState() {
@@ -107,11 +83,18 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
     });
     try {
       final status = _selectedStatus == 'ALL' ? null : _selectedStatus;
-      final bookings = await AdminService.getBookings(status: status);
+      final result = await AdminService.getBookings(
+        page: _page,
+        limit: _perPage,
+        status: status,
+        search: _searchQuery,
+      );
       if (mounted) {
         setState(() {
-          _bookings = bookings;
-          if (_page > _totalPages) _page = _totalPages;
+          _bookings = result.items;
+          _pagination = result.pagination;
+          final totalPages = _pagination?.totalPages ?? 1;
+          if (_page > totalPages) _page = totalPages;
           _isLoading = false;
         });
       }
@@ -719,6 +702,7 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
             onSearchChanged: (v) => setState(() {
               _searchQuery = v;
               _page = 1;
+              _loadBookings();
             }),
             onSortChanged: (v) => setState(() {
               _sortBy = v;
@@ -727,6 +711,7 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
             onRowsPerPageChanged: (v) => setState(() {
               _perPage = v;
               _page = 1;
+              _loadBookings();
             }),
           ),
           const SizedBox(height: 10),
@@ -776,11 +761,11 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
                           onRefresh: _loadBookings,
                           child: ListView.separated(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _pagedBookings.length,
+                            itemCount: _processedBookings.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (ctx, i) {
-                              final b = _pagedBookings[i];
+                              final b = _processedBookings[i];
                               final user = b['user'] as Map<String, dynamic>?;
                               final flight =
                                   b['flight'] as Map<String, dynamic>?;
@@ -984,9 +969,13 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: ListPaginationBar(
                           currentPage: _page,
-                          totalItems: _processedBookings.length,
+                          totalItems:
+                              _pagination?.totalItems ?? _bookings.length,
                           itemsPerPage: _perPage,
-                          onPageChanged: (next) => setState(() => _page = next),
+                          onPageChanged: (next) {
+                            setState(() => _page = next);
+                            _loadBookings();
+                          },
                         ),
                       ),
                     ],

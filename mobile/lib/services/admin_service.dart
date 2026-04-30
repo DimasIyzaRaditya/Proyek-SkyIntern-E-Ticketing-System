@@ -2,15 +2,49 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'api_client.dart';
+import '../models/pagination_model.dart';
 
 /// Service untuk semua endpoint admin (/api/admin/*)
 class AdminService {
+  static String _withQuery(String path, Map<String, dynamic> params) {
+    final filtered = <String, String>{};
+    params.forEach((key, value) {
+      if (value == null) return;
+      final str = value.toString().trim();
+      if (str.isEmpty) return;
+      filtered[key] = str;
+    });
+
+    if (filtered.isEmpty) return path;
+    return Uri(path: path, queryParameters: filtered).toString();
+  }
   // ─── Airlines ─────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getAirlines() async {
-    final res = await ApiClient.get('/api/admin/airlines', requireAuth: true);
+  static Future<PaginatedResult<Map<String, dynamic>>> getAirlines({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? sortBy,
+    String? sortDirection,
+  }) async {
+    final endpoint = _withQuery('/api/admin/airlines', {
+      'page': page,
+      'limit': limit,
+      'search': search,
+      'sortBy': sortBy,
+      'sortDirection': sortDirection,
+    });
+    final res = await ApiClient.get(endpoint, requireAuth: true);
     final list = res['airlines'] as List<dynamic>? ?? [];
-    return list.cast<Map<String, dynamic>>();
+    final pagination = res['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(res['pagination'] as Map),
+          )
+        : null;
+    return PaginatedResult(
+      items: list.cast<Map<String, dynamic>>(),
+      pagination: pagination,
+    );
   }
 
   /// Buat maskapai baru. Logo bersifat opsional — kirim multipart tanpa file.
@@ -113,10 +147,31 @@ class AdminService {
 
   // ─── Airports ─────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getAirports() async {
-    final res = await ApiClient.get('/api/admin/airports', requireAuth: true);
+  static Future<PaginatedResult<Map<String, dynamic>>> getAirports({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? sortBy,
+    String? sortDirection,
+  }) async {
+    final endpoint = _withQuery('/api/admin/airports', {
+      'page': page,
+      'limit': limit,
+      'search': search,
+      'sortBy': sortBy,
+      'sortDirection': sortDirection,
+    });
+    final res = await ApiClient.get(endpoint, requireAuth: true);
     final list = res['airports'] as List<dynamic>? ?? [];
-    return list.cast<Map<String, dynamic>>();
+    final pagination = res['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(res['pagination'] as Map),
+          )
+        : null;
+    return PaginatedResult(
+      items: list.cast<Map<String, dynamic>>(),
+      pagination: pagination,
+    );
   }
 
   static Future<void> createAirport({
@@ -150,10 +205,31 @@ class AdminService {
 
   // ─── Flights (Schedules) ──────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getFlights() async {
-    final res = await ApiClient.get('/api/admin/flights', requireAuth: true);
+  static Future<PaginatedResult<Map<String, dynamic>>> getFlights({
+    int? page,
+    int? limit,
+    String? search,
+    String? sortBy,
+    String? sortDirection,
+  }) async {
+    final endpoint = _withQuery('/api/admin/flights', {
+      if (page != null) 'page': page,
+      if (limit != null) 'limit': limit,
+      'search': search,
+      'sortBy': sortBy,
+      'sortDirection': sortDirection,
+    });
+    final res = await ApiClient.get(endpoint, requireAuth: true);
     final list = res['flights'] as List<dynamic>? ?? [];
-    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final pagination = res['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(res['pagination'] as Map),
+          )
+        : null;
+    return PaginatedResult(
+      items: list.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      pagination: pagination,
+    );
   }
 
   static Future<void> createFlight({
@@ -314,16 +390,29 @@ class AdminService {
 
   // ─── Bookings / Transactions ──────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getBookings({
+  static Future<PaginatedResult<Map<String, dynamic>>> getBookings({
+    int page = 1,
+    int limit = 20,
     String? status,
+    String? search,
   }) async {
-    final query = status != null ? '?status=$status' : '';
-    final res = await ApiClient.get(
-      '/api/admin/bookings$query',
-      requireAuth: true,
-    );
+    final endpoint = _withQuery('/api/admin/bookings', {
+      'page': page,
+      'limit': limit,
+      'status': status,
+      'search': search,
+    });
+    final res = await ApiClient.get(endpoint, requireAuth: true);
     final list = res['bookings'] as List<dynamic>? ?? [];
-    return list.cast<Map<String, dynamic>>();
+    final pagination = res['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(res['pagination'] as Map),
+          )
+        : null;
+    return PaginatedResult(
+      items: list.cast<Map<String, dynamic>>(),
+      pagination: pagination,
+    );
   }
 
   /// [action] bisa: cancel | markpaid | markpending | markissued
@@ -340,10 +429,29 @@ class AdminService {
 
   // ─── Users ────────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getUsers() async {
-    final res = await ApiClient.get('/api/admin/users', requireAuth: true);
+  static Future<PaginatedResult<Map<String, dynamic>>> getUsers({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? role,
+  }) async {
+    final endpoint = _withQuery('/api/admin/users', {
+      'page': page,
+      'limit': limit,
+      'search': search,
+      'role': role,
+    });
+    final res = await ApiClient.get(endpoint, requireAuth: true);
     final list = res['users'] as List<dynamic>? ?? [];
-    return list.cast<Map<String, dynamic>>();
+    final pagination = res['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(res['pagination'] as Map),
+          )
+        : null;
+    return PaginatedResult(
+      items: list.cast<Map<String, dynamic>>(),
+      pagination: pagination,
+    );
   }
 
   /// Toggle block/unblock. Backend PUT /api/admin/users/:id/block toggles state.
@@ -359,10 +467,33 @@ class AdminService {
 
   // ─── Promos ───────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getPromos() async {
-    final res = await ApiClient.get('/api/admin/promos', requireAuth: true);
+  static Future<PaginatedResult<Map<String, dynamic>>> getPromos({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? statusFilter,
+    String? sortBy,
+    String? sortDirection,
+  }) async {
+    final endpoint = _withQuery('/api/admin/promos', {
+      'page': page,
+      'limit': limit,
+      'search': search,
+      'statusFilter': statusFilter,
+      'sortBy': sortBy,
+      'sortDirection': sortDirection,
+    });
+    final res = await ApiClient.get(endpoint, requireAuth: true);
     final list = res['promos'] as List<dynamic>? ?? [];
-    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final pagination = res['pagination'] is Map
+        ? PaginationMeta.fromJson(
+            Map<String, dynamic>.from(res['pagination'] as Map),
+          )
+        : null;
+    return PaginatedResult(
+      items: list.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      pagination: pagination,
+    );
   }
 
   static Future<Map<String, dynamic>> createPromo({

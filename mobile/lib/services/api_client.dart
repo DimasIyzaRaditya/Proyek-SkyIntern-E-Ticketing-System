@@ -14,7 +14,7 @@ class ApiClient {
   // Default LAN host for physical devices when no override is provided.
   static const String _defaultLanApiHost = String.fromEnvironment(
     'API_LAN_HOST',
-    defaultValue: '192.168.18.39',
+    defaultValue: '192.168.18.38',
   );
 
   static const String _apiPort = '3000';

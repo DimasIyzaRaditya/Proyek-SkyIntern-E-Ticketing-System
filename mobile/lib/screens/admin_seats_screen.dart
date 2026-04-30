@@ -47,7 +47,8 @@ class _AdminSeatsScreenState extends State<AdminSeatsScreen> {
   Future<void> _loadFlights() async {
     setState(() { _loadingFlights = true; _flightLoadError = null; });
     try {
-      final list = await AdminService.getFlights();
+      final result = await AdminService.getFlights(page: 1, limit: 1000);
+      final list = result.items;
       if (!mounted) return;
       setState(() {
         _flights = list;

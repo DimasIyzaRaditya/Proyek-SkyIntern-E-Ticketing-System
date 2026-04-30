@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/flight_model.dart';
+import '../models/pagination_model.dart';
 import '../services/flight_service.dart';
 
 class FlightProvider extends ChangeNotifier {
@@ -8,12 +9,14 @@ class FlightProvider extends ChangeNotifier {
   bool _isLoadingAirports = false;
   bool _isLoadingFlights = false;
   String? _error;
+  PaginationMeta? _pagination;
 
   List<Airport> get airports => _airports;
   List<FlightCardItem> get flights => _flights;
   bool get isLoadingAirports => _isLoadingAirports;
   bool get isLoadingFlights => _isLoadingFlights;
   String? get error => _error;
+  PaginationMeta? get pagination => _pagination;
 
   Future<void> loadAirports() async {
     _isLoadingAirports = true;
@@ -39,14 +42,17 @@ class FlightProvider extends ChangeNotifier {
     String adult = '1',
     String child = '0',
     String? sortBy,
+    int page = 1,
+    int limit = 20,
   }) async {
     _isLoadingFlights = true;
     _error = null;
     _flights = [];
+    _pagination = null;
     notifyListeners();
 
     try {
-      _flights = await FlightService.searchFlights(
+      final result = await FlightService.searchFlights(
         originId: originId,
         destinationId: destinationId,
         departureDate: departureDate,
@@ -54,7 +60,11 @@ class FlightProvider extends ChangeNotifier {
         adult: adult,
         child: child,
         sortBy: sortBy,
+        page: page,
+        limit: limit,
       );
+      _flights = result.items;
+      _pagination = result.pagination;
       _isLoadingFlights = false;
       notifyListeners();
     } catch (e) {

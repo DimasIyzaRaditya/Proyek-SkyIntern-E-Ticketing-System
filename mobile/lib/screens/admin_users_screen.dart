@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/admin_service.dart';
+import '../models/pagination_model.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -19,28 +20,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   String _sortBy = 'newest';
   int _page = 1;
   int _perPage = 10;
+  PaginationMeta? _pagination;
+  int _totalAdminsCount = 0;
+  int _totalUsersCount = 0;
 
-  List<Map<String, dynamic>> get _filteredUsers {
-    final roleFiltered = _selectedRole == 'all'
-        ? _users
-        : _users
-              .where(
-                (u) => (u['role'] as String?)?.toLowerCase() == _selectedRole,
-              )
-              .toList();
-
-    final q = _searchQuery.trim().toLowerCase();
-    var data = roleFiltered.where((u) {
-      if (q.isEmpty) return true;
-      final id = (u['id'] ?? '').toString().toLowerCase();
-      final name = (u['name'] ?? '').toString().toLowerCase();
-      final email = (u['email'] ?? '').toString().toLowerCase();
-      final phone = (u['phone'] ?? '').toString().toLowerCase();
-      return id.contains(q) ||
-          name.contains(q) ||
-          email.contains(q) ||
-          phone.contains(q);
-    }).toList();
+  List<Map<String, dynamic>> get _sortedUsers {
+    final data = [..._users];
 
     data.sort((x, y) {
       switch (_sortBy) {
@@ -67,23 +52,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return data;
   }
 
-  int get _totalPages =>
-      _filteredUsers.isEmpty ? 1 : (_filteredUsers.length / _perPage).ceil();
-
-  List<Map<String, dynamic>> get _pagedFilteredUsers {
-    final data = _filteredUsers;
-    final start = (_page - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
-  }
-
-  int get _totalAdmins => _users
-      .where((u) => (u['role'] as String?)?.toLowerCase() == 'admin')
-      .length;
-  int get _totalUsers => _users
-      .where((u) => (u['role'] as String?)?.toLowerCase() == 'user')
-      .length;
+  int get _totalAdmins => _totalAdminsCount;
+  int get _totalUsers => _totalUsersCount;
 
   @override
   void initState() {
@@ -97,11 +67,25 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       _error = null;
     });
     try {
-      final data = await AdminService.getUsers();
+      final role = _selectedRole == 'all' ? null : _selectedRole;
+      final results = await Future.wait([
+        AdminService.getUsers(
+          page: _page,
+          limit: _perPage,
+          search: _searchQuery,
+          role: role,
+        ),
+        AdminService.getUsers(page: 1, limit: 1, role: 'admin'),
+        AdminService.getUsers(page: 1, limit: 1, role: 'user'),
+      ]);
       if (mounted) {
         setState(() {
-          _users = data;
-          if (_page > _totalPages) _page = _totalPages;
+          _users = results[0].items;
+          _pagination = results[0].pagination;
+          _totalAdminsCount = results[1].pagination?.totalItems ?? 0;
+          _totalUsersCount = results[2].pagination?.totalItems ?? 0;
+          final totalPages = _pagination?.totalPages ?? 1;
+          if (_page > totalPages) _page = totalPages;
           _isLoading = false;
         });
       }
@@ -253,6 +237,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   onSearchChanged: (v) => setState(() {
                     _searchQuery = v;
                     _page = 1;
+                    _loadUsers();
                   }),
                   onSortChanged: (v) => setState(() {
                     _sortBy = v;
@@ -261,13 +246,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   onRowsPerPageChanged: (v) => setState(() {
                     _perPage = v;
                     _page = 1;
+                    _loadUsers();
                   }),
                 ),
                 const SizedBox(height: 12),
 
                 // User list
                 Expanded(
-                  child: _filteredUsers.isEmpty
+                  child: _sortedUsers.isEmpty
                       ? const EmptyState(
                           icon: Icons.group_off_rounded,
                           title: 'Tidak ada pengguna',
@@ -277,11 +263,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           onRefresh: _loadUsers,
                           child: ListView.separated(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _pagedFilteredUsers.length,
+                            itemCount: _sortedUsers.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (ctx, i) {
-                              final u = _pagedFilteredUsers[i];
+                              final u = _sortedUsers[i];
                               final isBlocked = u['isBlocked'] == true;
                               return TweenAnimationBuilder<double>(
                                 duration: Duration(milliseconds: 280 + i * 55),
@@ -528,9 +514,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListPaginationBar(
                     currentPage: _page,
-                    totalItems: _filteredUsers.length,
+                    totalItems: _pagination?.totalItems ?? _users.length,
                     itemsPerPage: _perPage,
-                    onPageChanged: (next) => setState(() => _page = next),
+                    onPageChanged: (next) {
+                      setState(() => _page = next);
+                      _loadUsers();
+                    },
                   ),
                 ),
               ],
@@ -544,6 +533,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       onTap: () => setState(() {
         _selectedRole = value;
         _page = 1;
+        _loadUsers();
       }),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

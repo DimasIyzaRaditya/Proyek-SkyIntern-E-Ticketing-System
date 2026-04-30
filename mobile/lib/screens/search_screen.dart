@@ -147,6 +147,8 @@ class _SearchScreenState extends State<SearchScreen>
         returnDate: isRoundTrip ? DateFormatter.formatDate(returnDate) : null,
         adult: adults.toString(),
         child: childCount.toString(),
+        page: 1,
+        limit: 20,
       );
       if (mounted) {
         Navigator.pushNamed(
@@ -155,6 +157,8 @@ class _SearchScreenState extends State<SearchScreen>
           arguments: {
             'origin': originCode,
             'destination': destinationCode,
+            'originId': originId,
+            'destinationId': destinationId,
             'adults': adults,
             'children': childCount,
             'infants': infantCount,

@@ -17,6 +17,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Map<String, dynamic>? _args;
   bool _isLoadingPromos = false;
   List<PromoItem> _promos = const [];
+  int _page = 1;
+  final int _perPage = 20;
 
   @override
   void didChangeDependencies() {
@@ -25,6 +27,33 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     if (_promos.isEmpty && !_isLoadingPromos) {
       _loadPromos();
     }
+  }
+
+  Future<void> _requestPage(int page) async {
+    final args = _args;
+    if (args == null) return;
+    final originId = args['originId']?.toString();
+    final destinationId = args['destinationId']?.toString();
+    final departureDate = args['departureDate']?.toString();
+    if (originId == null || destinationId == null || departureDate == null) {
+      return;
+    }
+
+    final adult = (args['adults'] ?? 1).toString();
+    final child = (args['children'] ?? 0).toString();
+    final returnDate = args['returnDate']?.toString();
+
+    setState(() => _page = page);
+    await context.read<FlightProvider>().searchFlights(
+          originId: originId,
+          destinationId: destinationId,
+          departureDate: departureDate,
+          returnDate: returnDate,
+          adult: adult,
+          child: child,
+          page: page,
+          limit: _perPage,
+        );
   }
 
   Future<void> _loadPromos() async {
@@ -271,33 +300,48 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                 title: 'Tidak ada penerbangan',
                                 subtitle: 'Coba ubah tanggal atau pilihan rute Anda',
                               )
-                            : ListView.separated(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: prov.flights.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                                itemBuilder: (ctx, i) {
-                                  final f = prov.flights[i];
-                                  return TweenAnimationBuilder<double>(
-                                    duration: Duration(milliseconds: 250 + i * 50),
-                                    tween: Tween(begin: 0.0, end: 1.0),
-                                    curve: Curves.easeOut,
-                                    builder: (_, v, child) => Opacity(opacity: v,
-                                        child: Transform.translate(offset: Offset(0, 14 * (1 - v)), child: child)),
-                                    child: FlightCard(
-                                      flightNumber: f.flightNumber,
-                                      airline: f.airline,
-                                      airlineLogo: f.logo,
-                                      departureTime: f.departureTime,
-                                      arrivalTime: f.arrivalTime,
-                                      duration: f.duration,
-                                      origin: f.origin,
-                                      destination: f.destination,
-                                      price: f.price,
-                                      facilities: f.facilities,
-                                      onTap: () => _openFlightDetail(ctx, f.id),
+                            : Column(
+                                children: [
+                                  Expanded(
+                                    child: ListView.separated(
+                                      padding: const EdgeInsets.all(16),
+                                      itemCount: prov.flights.length,
+                                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                      itemBuilder: (ctx, i) {
+                                        final f = prov.flights[i];
+                                        return TweenAnimationBuilder<double>(
+                                          duration: Duration(milliseconds: 250 + i * 50),
+                                          tween: Tween(begin: 0.0, end: 1.0),
+                                          curve: Curves.easeOut,
+                                          builder: (_, v, child) => Opacity(opacity: v,
+                                              child: Transform.translate(offset: Offset(0, 14 * (1 - v)), child: child)),
+                                          child: FlightCard(
+                                            flightNumber: f.flightNumber,
+                                            airline: f.airline,
+                                            airlineLogo: f.logo,
+                                            departureTime: f.departureTime,
+                                            arrivalTime: f.arrivalTime,
+                                            duration: f.duration,
+                                            origin: f.origin,
+                                            destination: f.destination,
+                                            price: f.price,
+                                            facilities: f.facilities,
+                                            onTap: () => _openFlightDetail(ctx, f.id),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  );
-                                },
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                    child: ListPaginationBar(
+                                      currentPage: _page,
+                                      totalItems: prov.pagination?.totalItems ?? prov.flights.length,
+                                      itemsPerPage: _perPage,
+                                      onPageChanged: _requestPage,
+                                    ),
+                                  ),
+                                ],
                               ),
               ),
             ],

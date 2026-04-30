@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/admin_service.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../models/pagination_model.dart';
 
 class AdminPromosScreen extends StatefulWidget {
   const AdminPromosScreen({super.key});
@@ -17,9 +18,10 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
   String? _error;
   String _filter = 'all';
   String _searchQuery = '';
-  String _sortBy = 'newest';
+  String _sortBy = 'created-desc';
   int _page = 1;
   int _perPage = 10;
+  PaginationMeta? _pagination;
 
   @override
   void initState() {
@@ -35,17 +37,28 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
 
     try {
       final data = await Future.wait([
-        AdminService.getPromos(),
-        AdminService.getFlights(),
+        AdminService.getPromos(
+          page: _page,
+          limit: _perPage,
+          search: _searchQuery,
+          statusFilter: _filter == 'all'
+              ? 'All'
+              : (_filter == 'active' ? 'Active' : 'Inactive'),
+          sortBy: _resolveSortParams()['sortBy'],
+          sortDirection: _resolveSortParams()['sortDirection'],
+        ),
+        AdminService.getFlights(page: 1, limit: 1000),
       ]);
 
       if (!mounted) return;
       setState(() {
         _promos
           ..clear()
-          ..addAll(data[0]);
-        _flights = data[1];
-        if (_page > _totalPages) _page = _totalPages;
+          ..addAll(data[0].items);
+        _pagination = data[0].pagination;
+        _flights = data[1].items;
+        final totalPages = _pagination?.totalPages ?? 1;
+        if (_page > totalPages) _page = totalPages;
         _loading = false;
       });
     } catch (e) {
@@ -57,62 +70,34 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
     }
   }
 
-  DateTime _parseDate(String? raw) =>
-      DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-
-  List<Map<String, dynamic>> get _filteredPromos {
-    if (_filter == 'all') return _promos;
-    if (_filter == 'active') {
-      return _promos.where((p) => p['isActive'] == true).toList();
+  Map<String, String?> _resolveSortParams() {
+    switch (_sortBy) {
+      case 'id-asc':
+        return {'sortBy': 'id', 'sortDirection': 'asc'};
+      case 'id-desc':
+        return {'sortBy': 'id', 'sortDirection': 'desc'};
+      case 'title-asc':
+        return {'sortBy': 'title', 'sortDirection': 'asc'};
+      case 'title-desc':
+        return {'sortBy': 'title', 'sortDirection': 'desc'};
+      case 'start-asc':
+        return {'sortBy': 'startDate', 'sortDirection': 'asc'};
+      case 'start-desc':
+        return {'sortBy': 'startDate', 'sortDirection': 'desc'};
+      case 'end-asc':
+        return {'sortBy': 'endDate', 'sortDirection': 'asc'};
+      case 'end-desc':
+        return {'sortBy': 'endDate', 'sortDirection': 'desc'};
+      case 'discount-asc':
+        return {'sortBy': 'discount', 'sortDirection': 'asc'};
+      case 'discount-desc':
+        return {'sortBy': 'discount', 'sortDirection': 'desc'};
+      case 'created-asc':
+        return {'sortBy': 'createdAt', 'sortDirection': 'asc'};
+      case 'created-desc':
+      default:
+        return {'sortBy': 'createdAt', 'sortDirection': 'desc'};
     }
-    return _promos.where((p) => p['isActive'] != true).toList();
-  }
-
-  List<Map<String, dynamic>> get _processedPromos {
-    final q = _searchQuery.trim().toLowerCase();
-    var data = _filteredPromos.where((p) {
-      if (q.isEmpty) return true;
-      final id = (p['id'] ?? '').toString().toLowerCase();
-      final title = (p['title'] ?? '').toString().toLowerCase();
-      final description = (p['description'] ?? '').toString().toLowerCase();
-      return id.contains(q) || title.contains(q) || description.contains(q);
-    }).toList();
-
-    data.sort((x, y) {
-      switch (_sortBy) {
-        case 'id':
-          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
-            (y['id'] as num?)?.toInt() ?? 0,
-          );
-        case 'name':
-          return (x['title'] ?? '').toString().toLowerCase().compareTo(
-            (y['title'] ?? '').toString().toLowerCase(),
-          );
-        case 'oldest':
-          return _parseDate(
-            x['startDate']?.toString(),
-          ).compareTo(_parseDate(y['startDate']?.toString()));
-        case 'newest':
-        default:
-          return _parseDate(
-            y['startDate']?.toString(),
-          ).compareTo(_parseDate(x['startDate']?.toString()));
-      }
-    });
-
-    return data;
-  }
-
-  int get _totalPages => _processedPromos.isEmpty
-      ? 1
-      : (_processedPromos.length / _perPage).ceil();
-
-  List<Map<String, dynamic>> get _pagedPromos {
-    final data = _processedPromos;
-    final start = (_page - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
   }
 
   String _flightLabel(Map<String, dynamic> promo) {
@@ -508,6 +493,7 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
                             setState(() {
                               _filter = value.first;
                               _page = 1;
+                              _loadData();
                             });
                           },
                         ),
@@ -519,30 +505,47 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
                     searchQuery: _searchQuery,
                     sortValue: _sortBy,
                     rowsPerPage: _perPage,
+                    sortOptions: const [
+                      {'value': 'created-desc', 'label': 'Terbaru'},
+                      {'value': 'created-asc', 'label': 'Terlama'},
+                      {'value': 'title-asc', 'label': 'Judul A-Z'},
+                      {'value': 'title-desc', 'label': 'Judul Z-A'},
+                      {'value': 'discount-desc', 'label': 'Diskon Tertinggi'},
+                      {'value': 'discount-asc', 'label': 'Diskon Terendah'},
+                      {'value': 'start-desc', 'label': 'Mulai Terbaru'},
+                      {'value': 'start-asc', 'label': 'Mulai Terlama'},
+                      {'value': 'end-desc', 'label': 'Selesai Terbaru'},
+                      {'value': 'end-asc', 'label': 'Selesai Terlama'},
+                      {'value': 'id-asc', 'label': 'ID Asc'},
+                      {'value': 'id-desc', 'label': 'ID Desc'},
+                    ],
                     searchHint:
                         'Cari promo berdasarkan judul, deskripsi, atau ID...',
                     onSearchChanged: (v) => setState(() {
                       _searchQuery = v;
                       _page = 1;
+                      _loadData();
                     }),
                     onSortChanged: (v) => setState(() {
                       _sortBy = v;
                       _page = 1;
+                      _loadData();
                     }),
                     onRowsPerPageChanged: (v) => setState(() {
                       _perPage = v;
                       _page = 1;
+                      _loadData();
                     }),
                   ),
                   const SizedBox(height: 14),
-                  if (_processedPromos.isEmpty)
+                  if (_promos.isEmpty)
                     const EmptyState(
                       icon: Icons.local_offer_outlined,
                       title: 'Belum ada promo',
                       subtitle:
                           'Tambahkan promo untuk ditampilkan di aplikasi.',
                     ),
-                  ..._pagedPromos.map((promo) {
+                  ..._promos.map((promo) {
                     final active = promo['isActive'] == true;
                     final discount = ((promo['discount'] ?? 0) as num).toInt();
 
@@ -697,9 +700,12 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
                   }),
                   ListPaginationBar(
                     currentPage: _page,
-                    totalItems: _processedPromos.length,
+                    totalItems: _pagination?.totalItems ?? _promos.length,
                     itemsPerPage: _perPage,
-                    onPageChanged: (next) => setState(() => _page = next),
+                    onPageChanged: (next) {
+                      setState(() => _page = next);
+                      _loadData();
+                    },
                   ),
                 ],
               ),

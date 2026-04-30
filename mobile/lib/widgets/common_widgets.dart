@@ -1095,6 +1095,7 @@ class ListQueryControls extends StatelessWidget {
   final int rowsPerPage;
   final ValueChanged<int> onRowsPerPageChanged;
   final String searchHint;
+  final List<Map<String, String>>? sortOptions;
 
   const ListQueryControls({
     super.key,
@@ -1105,6 +1106,7 @@ class ListQueryControls extends StatelessWidget {
     required this.rowsPerPage,
     required this.onRowsPerPageChanged,
     this.searchHint = 'Cari data...',
+    this.sortOptions,
   });
 
   static const List<int> _rowOptions = [10, 20, 50, 100, 1000];
@@ -1159,7 +1161,7 @@ class ListQueryControls extends StatelessWidget {
               final sortField = DropdownButtonFormField<String>(
                 initialValue: sortValue,
                 decoration: fieldDecoration.copyWith(labelText: 'Sortir'),
-                items: _sortOptions
+                items: (sortOptions ?? _sortOptions)
                     .map(
                       (o) => DropdownMenuItem<String>(
                         value: o['value'],

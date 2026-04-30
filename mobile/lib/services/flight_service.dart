@@ -1,5 +1,6 @@
 import '../models/flight_model.dart';
 import 'api_client.dart';
+import '../models/pagination_model.dart';
 
 class FlightService {
   static Future<List<Airport>> getAirports() async {
@@ -13,7 +14,7 @@ class FlightService {
         .toList();
   }
 
-  static Future<List<FlightCardItem>> searchFlights({
+  static Future<PaginatedResult<FlightCardItem>> searchFlights({
     required String originId,
     required String destinationId,
     required String departureDate,
@@ -21,6 +22,8 @@ class FlightService {
     String adult = '1',
     String child = '0',
     String? sortBy,
+    int page = 1,
+    int limit = 20,
   }) async {
     final buffer = StringBuffer('/api/flights/search?');
     buffer.write('originId=$originId&');
@@ -30,16 +33,22 @@ class FlightService {
     buffer.write('adult=$adult&');
     buffer.write('child=$child');
     if (sortBy != null) buffer.write('&sortBy=$sortBy');
+    buffer.write('&page=$page&limit=$limit');
 
     try {
       final response = await ApiClient.get(buffer.toString());
       
       final flightsList = response['flights'] as List?;
-      if (flightsList == null) return [];
-
-      return flightsList
+      final items = (flightsList ?? [])
           .map((e) => FlightCardItem.fromJson(e as Map<String, dynamic>))
           .toList();
+      final pagination = response['pagination'] is Map
+          ? PaginationMeta.fromJson(
+              Map<String, dynamic>.from(response['pagination'] as Map),
+            )
+          : null;
+
+      return PaginatedResult(items: items, pagination: pagination);
     } catch (e) {
       rethrow;
     }

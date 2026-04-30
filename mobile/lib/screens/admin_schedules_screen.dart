@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/admin_service.dart';
+import '../models/pagination_model.dart';
 
 // Derives a 3-letter display code from city name
 String _deriveCode(String? city) {
@@ -26,70 +27,35 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
   bool _isLoading = true;
   String? _error;
   String _searchQuery = '';
-  String _sortBy = 'newest';
+  String _sortBy = 'departure-desc';
   int _page = 1;
   int _perPage = 10;
+  PaginationMeta? _pagination;
 
-  DateTime _parseDate(String? raw) =>
-      DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-
-  List<Map<String, dynamic>> get _processedFlights {
-    final q = _searchQuery.trim().toLowerCase();
-    var data = _flights.where((f) {
-      if (q.isEmpty) return true;
-      final id = (f['id'] ?? '').toString().toLowerCase();
-      final number = (f['flightNumber'] ?? '').toString().toLowerCase();
-      final airline = ((f['airline'] as Map?)?['name'] ?? '')
-          .toString()
-          .toLowerCase();
-      final origin = ((f['origin'] as Map?)?['city'] ?? '')
-          .toString()
-          .toLowerCase();
-      final destination = ((f['destination'] as Map?)?['city'] ?? '')
-          .toString()
-          .toLowerCase();
-      return id.contains(q) ||
-          number.contains(q) ||
-          airline.contains(q) ||
-          origin.contains(q) ||
-          destination.contains(q);
-    }).toList();
-
-    data.sort((x, y) {
-      switch (_sortBy) {
-        case 'id':
-          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
-            (y['id'] as num?)?.toInt() ?? 0,
-          );
-        case 'name':
-          return (x['flightNumber'] ?? '').toString().toLowerCase().compareTo(
-            (y['flightNumber'] ?? '').toString().toLowerCase(),
-          );
-        case 'oldest':
-          return _parseDate(
-            x['departureTime']?.toString(),
-          ).compareTo(_parseDate(y['departureTime']?.toString()));
-        case 'newest':
-        default:
-          return _parseDate(
-            y['departureTime']?.toString(),
-          ).compareTo(_parseDate(x['departureTime']?.toString()));
-      }
-    });
-
-    return data;
-  }
-
-  int get _totalPages => _processedFlights.isEmpty
-      ? 1
-      : (_processedFlights.length / _perPage).ceil();
-
-  List<Map<String, dynamic>> get _pagedFlights {
-    final data = _processedFlights;
-    final start = (_page - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
+  Map<String, String?> _resolveSortParams() {
+    switch (_sortBy) {
+      case 'departure-asc':
+        return {'sortBy': 'departureTime', 'sortDirection': 'asc'};
+      case 'departure-desc':
+        return {'sortBy': 'departureTime', 'sortDirection': 'desc'};
+      case 'arrival-asc':
+        return {'sortBy': 'arrivalTime', 'sortDirection': 'asc'};
+      case 'arrival-desc':
+        return {'sortBy': 'arrivalTime', 'sortDirection': 'desc'};
+      case 'price-asc':
+        return {'sortBy': 'basePrice', 'sortDirection': 'asc'};
+      case 'price-desc':
+        return {'sortBy': 'basePrice', 'sortDirection': 'desc'};
+      case 'number-desc':
+        return {'sortBy': 'flightNumber', 'sortDirection': 'desc'};
+      case 'route-asc':
+        return {'sortBy': 'route', 'sortDirection': 'asc'};
+      case 'route-desc':
+        return {'sortBy': 'route', 'sortDirection': 'desc'};
+      case 'number-asc':
+      default:
+        return {'sortBy': 'flightNumber', 'sortDirection': 'asc'};
+    }
   }
 
   @override
@@ -104,17 +70,26 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
       _error = null;
     });
     try {
+      final sortParams = _resolveSortParams();
       final results = await Future.wait([
-        AdminService.getFlights(),
-        AdminService.getAirlines(),
-        AdminService.getAirports(),
+        AdminService.getFlights(
+          page: _page,
+          limit: _perPage,
+          search: _searchQuery,
+          sortBy: sortParams['sortBy'],
+          sortDirection: sortParams['sortDirection'],
+        ),
+        AdminService.getAirlines(page: 1, limit: 1000),
+        AdminService.getAirports(page: 1, limit: 1000),
       ]);
       if (mounted) {
         setState(() {
-          _flights = results[0];
-          _airlines = results[1];
-          _airports = results[2];
-          if (_page > _totalPages) _page = _totalPages;
+          _flights = results[0].items;
+          _pagination = results[0].pagination;
+          _airlines = results[1].items;
+          _airports = results[2].items;
+          final totalPages = _pagination?.totalPages ?? 1;
+          if (_page > totalPages) _page = totalPages;
           _isLoading = false;
         });
       }
@@ -244,24 +219,39 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
                   searchQuery: _searchQuery,
                   sortValue: _sortBy,
                   rowsPerPage: _perPage,
+                  sortOptions: const [
+                    {'value': 'departure-desc', 'label': 'Berangkat Terbaru'},
+                    {'value': 'departure-asc', 'label': 'Berangkat Terlama'},
+                    {'value': 'arrival-desc', 'label': 'Tiba Terbaru'},
+                    {'value': 'arrival-asc', 'label': 'Tiba Terlama'},
+                    {'value': 'price-asc', 'label': 'Harga Terendah'},
+                    {'value': 'price-desc', 'label': 'Harga Tertinggi'},
+                    {'value': 'number-asc', 'label': 'Nomor A-Z'},
+                    {'value': 'number-desc', 'label': 'Nomor Z-A'},
+                    {'value': 'route-asc', 'label': 'Rute A-Z'},
+                    {'value': 'route-desc', 'label': 'Rute Z-A'},
+                  ],
                   searchHint: 'Cari nomor flight, maskapai, rute, atau ID...',
                   onSearchChanged: (v) => setState(() {
                     _searchQuery = v;
                     _page = 1;
+                    _loadAll();
                   }),
                   onSortChanged: (v) => setState(() {
                     _sortBy = v;
                     _page = 1;
+                    _loadAll();
                   }),
                   onRowsPerPageChanged: (v) => setState(() {
                     _perPage = v;
                     _page = 1;
+                    _loadAll();
                   }),
                 ),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _loadAll,
-                    child: _processedFlights.isEmpty
+                    child: _flights.isEmpty
                         ? ListView(
                             physics: AlwaysScrollableScrollPhysics(),
                             padding: EdgeInsets.all(16),
@@ -276,11 +266,11 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
                           )
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _pagedFlights.length,
+                          itemCount: _flights.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (ctx, i) {
-                              final f = _pagedFlights[i];
+                            final f = _flights[i];
                               final airline =
                                   f['airline'] as Map<String, dynamic>?;
                               final origin =
@@ -493,9 +483,12 @@ class _AdminSchedulesScreenState extends State<AdminSchedulesScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListPaginationBar(
                     currentPage: _page,
-                    totalItems: _processedFlights.length,
+                    totalItems: _pagination?.totalItems ?? _flights.length,
                     itemsPerPage: _perPage,
-                    onPageChanged: (next) => setState(() => _page = next),
+                    onPageChanged: (next) {
+                      setState(() => _page = next);
+                      _loadAll();
+                    },
                   ),
                 ),
               ],

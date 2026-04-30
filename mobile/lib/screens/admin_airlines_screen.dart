@@ -7,6 +7,7 @@ import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/api_client.dart';
 import '../services/admin_service.dart';
+import '../models/pagination_model.dart';
 
 class AdminAirlinesScreen extends StatefulWidget {
   const AdminAirlinesScreen({super.key});
@@ -24,56 +25,24 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
   String _sortBy = 'newest';
   int _page = 1;
   int _perPage = 10;
+  PaginationMeta? _pagination;
 
-  List<Map<String, dynamic>> get _processedAirlines {
-    final q = _searchQuery.trim().toLowerCase();
-    var data = _airlines.where((a) {
-      if (q.isEmpty) return true;
-      final id = (a['id'] ?? '').toString().toLowerCase();
-      final code = (a['code'] ?? '').toString().toLowerCase();
-      final name = (a['name'] ?? '').toString().toLowerCase();
-      final country = (a['country'] ?? '').toString().toLowerCase();
-      return id.contains(q) ||
-          code.contains(q) ||
-          name.contains(q) ||
-          country.contains(q);
-    }).toList();
-
-    data.sort((x, y) {
-      switch (_sortBy) {
-        case 'id':
-          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
-            (y['id'] as num?)?.toInt() ?? 0,
-          );
-        case 'name':
-          return (x['name'] ?? '').toString().toLowerCase().compareTo(
-            (y['name'] ?? '').toString().toLowerCase(),
-          );
-        case 'oldest':
-          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
-            (y['id'] as num?)?.toInt() ?? 0,
-          );
-        case 'newest':
-        default:
-          return ((y['id'] as num?)?.toInt() ?? 0).compareTo(
-            (x['id'] as num?)?.toInt() ?? 0,
-          );
-      }
-    });
-
-    return data;
-  }
-
-  int get _totalPages => _processedAirlines.isEmpty
-      ? 1
-      : (_processedAirlines.length / _perPage).ceil();
-
-  List<Map<String, dynamic>> get _pagedAirlines {
-    final data = _processedAirlines;
-    final start = (_page - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
+  Map<String, String?> _resolveSortParams() {
+    switch (_sortBy) {
+      case 'id':
+        return {'sortBy': 'id', 'sortDirection': 'asc'};
+      case 'code':
+        return {'sortBy': 'code', 'sortDirection': 'asc'};
+      case 'country':
+        return {'sortBy': 'country', 'sortDirection': 'asc'};
+      case 'oldest':
+        return {'sortBy': 'id', 'sortDirection': 'asc'};
+      case 'newest':
+        return {'sortBy': 'id', 'sortDirection': 'desc'};
+      case 'name':
+      default:
+        return {'sortBy': 'name', 'sortDirection': 'asc'};
+    }
   }
 
   String _inferMimeType(String fileName) {
@@ -136,11 +105,20 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
       _error = null;
     });
     try {
-      final data = await AdminService.getAirlines();
+      final sortParams = _resolveSortParams();
+      final result = await AdminService.getAirlines(
+        page: _page,
+        limit: _perPage,
+        search: _searchQuery,
+        sortBy: sortParams['sortBy'],
+        sortDirection: sortParams['sortDirection'],
+      );
       if (mounted) {
         setState(() {
-          _airlines = data;
-          if (_page > _totalPages) _page = _totalPages;
+          _airlines = result.items;
+          _pagination = result.pagination;
+          final totalPages = _pagination?.totalPages ?? 1;
+          if (_page > totalPages) _page = totalPages;
           _isLoading = false;
         });
       }
@@ -259,24 +237,35 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
                   searchQuery: _searchQuery,
                   sortValue: _sortBy,
                   rowsPerPage: _perPage,
+                  sortOptions: const [
+                    {'value': 'id', 'label': 'ID'},
+                    {'value': 'code', 'label': 'Kode'},
+                    {'value': 'name', 'label': 'Nama'},
+                    {'value': 'country', 'label': 'Negara'},
+                    {'value': 'oldest', 'label': 'Terlama'},
+                    {'value': 'newest', 'label': 'Terbaru'},
+                  ],
                   searchHint: 'Cari maskapai, kode, negara, atau ID...',
                   onSearchChanged: (v) => setState(() {
                     _searchQuery = v;
                     _page = 1;
+                    _loadAirlines();
                   }),
                   onSortChanged: (v) => setState(() {
                     _sortBy = v;
                     _page = 1;
+                    _loadAirlines();
                   }),
                   onRowsPerPageChanged: (v) => setState(() {
                     _perPage = v;
                     _page = 1;
+                    _loadAirlines();
                   }),
                 ),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _loadAirlines,
-                    child: _processedAirlines.isEmpty
+                    child: _airlines.isEmpty
                         ? ListView(
                             physics: AlwaysScrollableScrollPhysics(),
                             padding: EdgeInsets.all(16),
@@ -291,11 +280,11 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
                           )
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _pagedAirlines.length,
+                            itemCount: _airlines.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (ctx, i) {
-                              final a = _pagedAirlines[i];
+                              final a = _airlines[i];
                               return TweenAnimationBuilder<double>(
                                 duration: Duration(milliseconds: 300 + i * 60),
                                 tween: Tween(begin: 0.0, end: 1.0),
@@ -415,9 +404,12 @@ class _AdminAirlinesScreenState extends State<AdminAirlinesScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListPaginationBar(
                     currentPage: _page,
-                    totalItems: _processedAirlines.length,
+                    totalItems: _pagination?.totalItems ?? _airlines.length,
                     itemsPerPage: _perPage,
-                    onPageChanged: (next) => setState(() => _page = next),
+                    onPageChanged: (next) {
+                      setState(() => _page = next);
+                      _loadAirlines();
+                    },
                   ),
                 ),
               ],

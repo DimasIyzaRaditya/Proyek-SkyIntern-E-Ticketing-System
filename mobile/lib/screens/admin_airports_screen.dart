@@ -2,6 +2,7 @@
 import '../services/admin_service.dart';
 import '../utils/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../models/pagination_model.dart';
 
 // Derives a short 3-letter badge code from city name
 String _deriveCode(String? city) {
@@ -26,61 +27,26 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
   String _sortBy = 'newest';
   int _page = 1;
   int _perPage = 10;
+  PaginationMeta? _pagination;
 
-  List<Map<String, dynamic>> get _processedAirports {
-    final q = _searchQuery.trim().toLowerCase();
-    var data = _airports.where((a) {
-      if (q.isEmpty) return true;
-      final id = (a['id'] ?? '').toString().toLowerCase();
-      final name = (a['name'] ?? a['airportName'] ?? '')
-          .toString()
-          .toLowerCase();
-      final city = (a['city'] ?? '').toString().toLowerCase();
-      final country = (a['country'] ?? '').toString().toLowerCase();
-      return id.contains(q) ||
-          name.contains(q) ||
-          city.contains(q) ||
-          country.contains(q);
-    }).toList();
-
-    data.sort((x, y) {
-      switch (_sortBy) {
-        case 'id':
-          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
-            (y['id'] as num?)?.toInt() ?? 0,
-          );
-        case 'name':
-          return (x['name'] ?? x['airportName'] ?? '')
-              .toString()
-              .toLowerCase()
-              .compareTo(
-                (y['name'] ?? y['airportName'] ?? '').toString().toLowerCase(),
-              );
-        case 'oldest':
-          return ((x['id'] as num?)?.toInt() ?? 0).compareTo(
-            (y['id'] as num?)?.toInt() ?? 0,
-          );
-        case 'newest':
-        default:
-          return ((y['id'] as num?)?.toInt() ?? 0).compareTo(
-            (x['id'] as num?)?.toInt() ?? 0,
-          );
-      }
-    });
-
-    return data;
-  }
-
-  int get _totalPages => _processedAirports.isEmpty
-      ? 1
-      : (_processedAirports.length / _perPage).ceil();
-
-  List<Map<String, dynamic>> get _pagedAirports {
-    final data = _processedAirports;
-    final start = (_page - 1) * _perPage;
-    final end = (start + _perPage).clamp(0, data.length);
-    if (start >= data.length) return [];
-    return data.sublist(start, end);
+  Map<String, String?> _resolveSortParams() {
+    switch (_sortBy) {
+      case 'id':
+        return {'sortBy': 'id', 'sortDirection': 'asc'};
+      case 'city':
+        return {'sortBy': 'city', 'sortDirection': 'asc'};
+      case 'country':
+        return {'sortBy': 'country', 'sortDirection': 'asc'};
+      case 'timezone':
+        return {'sortBy': 'timezone', 'sortDirection': 'asc'};
+      case 'oldest':
+        return {'sortBy': 'id', 'sortDirection': 'asc'};
+      case 'newest':
+        return {'sortBy': 'id', 'sortDirection': 'desc'};
+      case 'name':
+      default:
+        return {'sortBy': 'name', 'sortDirection': 'asc'};
+    }
   }
 
   @override
@@ -95,11 +61,20 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
       _error = null;
     });
     try {
-      final data = await AdminService.getAirports();
+      final sortParams = _resolveSortParams();
+      final result = await AdminService.getAirports(
+        page: _page,
+        limit: _perPage,
+        search: _searchQuery,
+        sortBy: sortParams['sortBy'],
+        sortDirection: sortParams['sortDirection'],
+      );
       if (mounted) {
         setState(() {
-          _airports = data;
-          if (_page > _totalPages) _page = _totalPages;
+          _airports = result.items;
+          _pagination = result.pagination;
+          final totalPages = _pagination?.totalPages ?? 1;
+          if (_page > totalPages) _page = totalPages;
         });
       }
     } catch (e) {
@@ -208,22 +183,34 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                   searchQuery: _searchQuery,
                   sortValue: _sortBy,
                   rowsPerPage: _perPage,
+                  sortOptions: const [
+                    {'value': 'id', 'label': 'ID'},
+                    {'value': 'name', 'label': 'Nama'},
+                    {'value': 'city', 'label': 'Kota'},
+                    {'value': 'country', 'label': 'Negara'},
+                    {'value': 'timezone', 'label': 'Zona Waktu'},
+                    {'value': 'oldest', 'label': 'Terlama'},
+                    {'value': 'newest', 'label': 'Terbaru'},
+                  ],
                   searchHint: 'Cari bandara, kota, negara, atau ID...',
                   onSearchChanged: (v) => setState(() {
                     _searchQuery = v;
                     _page = 1;
+                    _loadAirports();
                   }),
                   onSortChanged: (v) => setState(() {
                     _sortBy = v;
                     _page = 1;
+                    _loadAirports();
                   }),
                   onRowsPerPageChanged: (v) => setState(() {
                     _perPage = v;
                     _page = 1;
+                    _loadAirports();
                   }),
                 ),
                 Expanded(
-                  child: _processedAirports.isEmpty
+                  child: _airports.isEmpty
                       ? const EmptyState(
                           icon: Icons.search_off_rounded,
                           title: 'Data tidak ditemukan',
@@ -232,11 +219,11 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.all(16),
-                          itemCount: _pagedAirports.length,
+                          itemCount: _airports.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 10),
                           itemBuilder: (ctx, i) {
-                            final a = _pagedAirports[i];
+                            final a = _airports[i];
                             return TweenAnimationBuilder<double>(
                               duration: Duration(milliseconds: 300 + i * 60),
                               tween: Tween(begin: 0.0, end: 1.0),
@@ -366,9 +353,12 @@ class _AdminAirportsScreenState extends State<AdminAirportsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListPaginationBar(
                     currentPage: _page,
-                    totalItems: _processedAirports.length,
+                    totalItems: _pagination?.totalItems ?? _airports.length,
                     itemsPerPage: _perPage,
-                    onPageChanged: (next) => setState(() => _page = next),
+                    onPageChanged: (next) {
+                      setState(() => _page = next);
+                      _loadAirports();
+                    },
                   ),
                 ),
               ],
