@@ -112,8 +112,20 @@ export default function AdminSeatsPage() {
       window.clearTimeout(searchTimeoutRef.current);
     }
 
+    const trimmedSearch = flightSearch.trim();
+    if (trimmedSearch.length > 0 && trimmedSearch.length < 3) {
+      setFlightHasNextPage(false);
+      setFlightTotalItems(0);
+      setFlightPage(1);
+      return () => {
+        if (searchTimeoutRef.current) {
+          window.clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    }
+
     searchTimeoutRef.current = window.setTimeout(() => {
-      void loadFlightsPage(1, false, flightSearch);
+      void loadFlightsPage(1, false, trimmedSearch);
     }, 300);
 
     return () => {
@@ -164,7 +176,12 @@ export default function AdminSeatsPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const filteredFlights = useMemo(() => flights, [flights]);
+  const filteredFlights = useMemo(() => {
+    const trimmedSearch = flightSearch.trim();
+    if (trimmedSearch.length === 0) return flights;
+    if (trimmedSearch.length < 3) return [];
+    return flights;
+  }, [flightSearch, flights]);
 
   const selectedFlight = useMemo(
     () => flights.find((f) => f.id === selectedFlightId) ?? null,
@@ -225,7 +242,9 @@ export default function AdminSeatsPage() {
                           className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
                         />
                         <p className="mt-1 text-[11px] text-slate-500">
-                          Menampilkan {flights.length} dari {flightTotalItems} penerbangan.
+                          {flightSearch.trim().length > 0 && flightSearch.trim().length < 3
+                            ? "Ketik minimal 3 karakter untuk mencari penerbangan."
+                            : `Menampilkan ${flights.length} dari ${flightTotalItems} penerbangan.`}
                         </p>
                       </div>
 

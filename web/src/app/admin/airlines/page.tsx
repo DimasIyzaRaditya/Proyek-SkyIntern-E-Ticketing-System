@@ -39,10 +39,10 @@ export default function AdminAirlinesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset ke halaman 1 saat filter/sort/pageSize berubah
+  // Reset ke halaman 1 saat filter/pageSize berubah
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortField, sortDirection, pageSize]);
+  }, [search, pageSize]);
 
   const loadAirlines = async () => {
     setLoading(true);

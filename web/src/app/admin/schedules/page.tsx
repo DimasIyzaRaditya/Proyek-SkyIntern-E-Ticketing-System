@@ -80,7 +80,7 @@ export default function AdminSchedulesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortField, sortDirection, rowsPerView]);
+  }, [search, rowsPerView]);
 
   return (
     <AdminShell title="Flight Schedule Management" description="Manage flight schedules from the list. Use Add Schedule to create new data.">

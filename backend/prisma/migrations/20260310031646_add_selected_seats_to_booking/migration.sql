@@ -1,0 +1,1 @@
+ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "selectedSeats" VARCHAR(255);

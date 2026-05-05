@@ -79,7 +79,7 @@ export default function AdminAirportsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortField, sortDirection, rowsPerView]);
+  }, [search, rowsPerView]);
 
   return (
     <AdminShell title="Airport Management" description="Manage airports from the list. Use Add Airport to create a new record.">
