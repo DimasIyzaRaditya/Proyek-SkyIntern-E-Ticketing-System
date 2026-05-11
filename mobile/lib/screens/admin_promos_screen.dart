@@ -516,8 +516,8 @@ class _AdminPromosScreenState extends State<AdminPromosScreen> {
                       {'value': 'start-asc', 'label': 'Mulai Terlama'},
                       {'value': 'end-desc', 'label': 'Selesai Terbaru'},
                       {'value': 'end-asc', 'label': 'Selesai Terlama'},
-                      {'value': 'id-asc', 'label': 'ID Asc'},
-                      {'value': 'id-desc', 'label': 'ID Desc'},
+                      {'value': 'id-asc', 'label': 'ID ASC'},
+                      {'value': 'id-desc', 'label': 'ID DESC'},
                     ],
                     searchHint:
                         'Cari promo berdasarkan judul, deskripsi, atau ID...',

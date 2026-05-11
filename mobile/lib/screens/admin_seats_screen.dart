@@ -133,8 +133,9 @@ class _AdminSeatsScreenState extends State<AdminSeatsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (bCtx, setSt) {
           final filtered = _flights.where((f) {
-            if (query.isEmpty) return true;
-            return _flightLabel(f).toLowerCase().contains(query.toLowerCase());
+            final q = query.trim();
+            if (q.isEmpty || q.length < 3) return true;
+            return _flightLabel(f).toLowerCase().contains(q.toLowerCase());
           }).toList();
 
           return Container(
