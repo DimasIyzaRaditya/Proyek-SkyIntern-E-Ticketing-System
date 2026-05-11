@@ -38,6 +38,9 @@ export default function AdminAirlinesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const trimmedSearch = search.trim();
+  const isSearchInvalid = trimmedSearch.length > 0 && trimmedSearch.length < 3;
+  const effectiveSearch = isSearchInvalid ? "" : trimmedSearch;
 
   // Reset ke halaman 1 saat filter/pageSize berubah
   useEffect(() => {
@@ -52,7 +55,7 @@ export default function AdminAirlinesPage() {
       const result = await getAdminAirlinesPage({
         page: currentPage,
         limit: pageSize,
-        search,
+        search: effectiveSearch,
         sortBy: sortField,
         sortDirection,
       });
@@ -106,12 +109,17 @@ export default function AdminAirlinesPage() {
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
         <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search code, name, country, or ID"
-            className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 lg:col-span-1"
-          />
+          <div className="w-full min-w-0 lg:col-span-1">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search code, name, country, or ID"
+              className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+            />
+            {isSearchInvalid && (
+              <p className="mt-1 text-xs text-slate-500">Ketik minimal 3 karakter untuk mencari.</p>
+            )}
+          </div>
           <ResponsiveSelect
             value={sortField}
             onChange={(nextValue) => setSortField(nextValue as SortField)}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCcw, ShieldOff, ShieldCheck } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { getAdminUsersPage, blockAdminUser, toggleAdminUserTwoFactor, type AdminUser } from "@/lib/admin-api";
 import { formatRupiah } from "@/lib/currency";
 
@@ -10,6 +11,20 @@ type UserView = AdminUser & {
   bookingCount: number;
   totalSpent: number;
 };
+
+type SortField = "id" | "name" | "email" | "createdAt";
+type SortDirection = "asc" | "desc";
+
+const SORT_FIELD_OPTIONS: Array<{ value: SortField; label: string }> = [
+  { value: "id", label: "ID" },
+  { value: "name", label: "Name" },
+  { value: "email", label: "Email" },
+];
+
+const SORT_DIRECTION_OPTIONS: Array<{ value: SortDirection; label: string }> = [
+  { value: "asc", label: "Ascending" },
+  { value: "desc", label: "Descending" },
+];
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserView[]>([]);
@@ -19,8 +34,14 @@ export default function AdminUsersPage() {
   const [message, setMessage] = useState("");
   const [blockingId, setBlockingId] = useState<number | null>(null);
   const [togglingTwoFactorId, setTogglingTwoFactorId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<SortField>("id");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const trimmedSearch = search.trim();
+  const isSearchInvalid = trimmedSearch.length > 0 && trimmedSearch.length < 3;
+  const effectiveSearch = isSearchInvalid ? "" : trimmedSearch;
 
   const loadData = async () => {
     setLoading(true);
@@ -31,6 +52,9 @@ export default function AdminUsersPage() {
         limit: rowsPerView,
         excludeRole: "ADMIN",
         includeStats: true,
+        search: effectiveSearch,
+        sortBy: sortField,
+        sortDirection,
       });
 
       const mapped: UserView[] = result.data.map((user) => ({
@@ -54,7 +78,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     void loadData();
-  }, [currentPage, rowsPerView]);
+  }, [currentPage, rowsPerView, search, sortField, sortDirection]);
 
   const handleToggleBlock = async (userId: number) => {
     setBlockingId(userId);
@@ -92,7 +116,9 @@ export default function AdminUsersPage() {
     return Array.from({ length: Math.min(5, totalPages) }, (_, i) => start + i);
   }, [currentPage, totalPages]);
 
-  useEffect(() => { setCurrentPage(1); }, [rowsPerView]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerView, search]);
 
   return (
     <AdminShell title="User Management" description="Daftar user terdaftar. Admin dapat memblokir/membuka blokir akun user.">
@@ -111,6 +137,35 @@ export default function AdminUsersPage() {
         </div>
 
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
+
+        <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
+          <div className="w-full min-w-0">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search ID, name, email, or phone"
+              className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+            />
+            {isSearchInvalid && (
+              <p className="mt-1 text-xs text-slate-500">Ketik minimal 3 karakter untuk mencari.</p>
+            )}
+          </div>
+          <ResponsiveSelect
+            value={sortField}
+            onChange={(nextValue) => setSortField(nextValue as SortField)}
+            options={SORT_FIELD_OPTIONS}
+            placeholder="Sort by"
+          />
+          <ResponsiveSelect
+            value={sortDirection}
+            onChange={(nextValue) => setSortDirection(nextValue as SortDirection)}
+            options={SORT_DIRECTION_OPTIONS}
+            placeholder="Direction"
+          />
+          <div className="flex items-center justify-start text-sm font-medium text-slate-600 sm:justify-end">
+            Total: {totalItems}
+          </div>
+        </div>
 
         <div className="max-w-full overflow-x-auto">
           <table className="min-w-180 w-full text-left text-sm">

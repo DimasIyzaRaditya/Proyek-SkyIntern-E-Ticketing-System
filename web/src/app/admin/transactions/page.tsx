@@ -249,7 +249,7 @@ export default function AdminTransactionsPage() {
       description="Tabel transaksi lengkap dengan filter status dan view detail."
     >
 
-      <section className="max-w-full overflow-hidden rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
+      <section className="max-w-full overflow-visible rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
 
         {/* Filter status transaksi */}
         <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">

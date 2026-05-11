@@ -645,6 +645,8 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
     const role = typeof req.query.role === "string" ? req.query.role : undefined
     const excludeRole = typeof req.query.excludeRole === "string" ? req.query.excludeRole : undefined
     const includeStats = req.query.includeStats === "true"
+    const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "createdAt"
+    const sortDirection = req.query.sortDirection === "asc" ? "asc" : "desc"
 
     const where: any = {}
     if (search) {
@@ -669,6 +671,9 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    const sortableFields = new Set(["id", "name", "email", "createdAt"])
+    const orderBy = sortableFields.has(sortBy) ? { [sortBy]: sortDirection } : { createdAt: "desc" }
+
     const queryOptions: any = {
       where,
       select: {
@@ -682,7 +687,7 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
         avatarUrl: true,
         createdAt: true
       },
-      orderBy: { createdAt: "desc" }
+      orderBy
     }
 
     const totalItems = hasPagination ? await prisma.user.count({ where }) : undefined

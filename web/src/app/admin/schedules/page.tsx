@@ -36,6 +36,9 @@ export default function AdminSchedulesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const trimmedSearch = search.trim();
+  const isSearchInvalid = trimmedSearch.length > 0 && trimmedSearch.length < 3;
+  const effectiveSearch = isSearchInvalid ? "" : trimmedSearch;
 
   const pageNumbers = useMemo(() => {
     if (totalPages <= 5) {
@@ -57,7 +60,7 @@ export default function AdminSchedulesPage() {
       const result = await getAdminFlightsPage({
         page: currentPage,
         limit: rowsPerView,
-        search,
+        search: effectiveSearch,
         sortBy: sortField,
         sortDirection,
       });
@@ -97,12 +100,17 @@ export default function AdminSchedulesPage() {
         {message && <p className="mb-3 text-sm text-rose-700">{message}</p>}
 
         <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search flight, airline, origin, or destination"
-            className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-          />
+          <div className="w-full min-w-0">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search flight, airline, origin, or destination"
+              className="w-full min-w-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
+            />
+            {isSearchInvalid && (
+              <p className="mt-1 text-xs text-slate-500">Ketik minimal 3 karakter untuk mencari.</p>
+            )}
+          </div>
           <ResponsiveSelect
             value={sortField}
             onChange={(nextValue) => setSortField(nextValue as SortField)}

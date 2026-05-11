@@ -569,6 +569,8 @@ export const getAdminUsersPage = async (params: {
   role?: "ADMIN" | "USER";
   excludeRole?: "ADMIN" | "USER";
   includeStats?: boolean;
+  sortBy?: "id" | "name" | "email" | "createdAt";
+  sortDirection?: "asc" | "desc";
 }): Promise<PaginatedResult<AdminUser>> => {
   const query = new URLSearchParams({
     page: String(params.page),
@@ -579,6 +581,8 @@ export const getAdminUsersPage = async (params: {
   if (params.role) query.set("role", params.role);
   if (params.excludeRole) query.set("excludeRole", params.excludeRole);
   if (params.includeStats) query.set("includeStats", "true");
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+  if (params.sortDirection) query.set("sortDirection", params.sortDirection);
 
   const response = await apiRequest<{ users: AdminUser[]; pagination: PaginationMeta }>(
     `/api/admin/users?${query.toString()}`,

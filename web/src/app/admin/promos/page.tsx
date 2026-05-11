@@ -77,11 +77,15 @@ export default function AdminPromosPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [showFlightPicker, setShowFlightPicker] = useState(false);
+  const trimmedSearch = search.trim();
+  const isSearchInvalid = trimmedSearch.length > 0 && trimmedSearch.length < 3;
+  const effectiveSearch = isSearchInvalid ? "" : trimmedSearch;
 
   // Filter flights for picker based on flight search text
   const filteredFlights = useMemo(() => {
     const kw = form.flightSearch.trim().toLowerCase();
     if (!kw) return flights.slice(0, 30); // show first 30 when empty
+    if (kw.length < 3) return [];
     return flights
       .filter((f) =>
         f.flightNumber.toLowerCase().includes(kw) ||
@@ -104,7 +108,7 @@ export default function AdminPromosPage() {
       const result = await getAdminPromosPage({
         page: currentPage,
         limit: pageSize,
-        search,
+        search: effectiveSearch,
       });
       setPromos(result.data);
       setTotalItems(result.pagination.totalItems);
@@ -251,7 +255,7 @@ export default function AdminPromosPage() {
       )}
 
       {/* Toolbar */}
-      <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div className="w-full sm:w-auto">
           <input
             value={search}
@@ -259,6 +263,9 @@ export default function AdminPromosPage() {
             placeholder="Cari judul, deskripsi, rute, atau ID promo"
             className="w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-300 sm:min-w-80"
           />
+          {isSearchInvalid && (
+            <p className="mt-1 text-xs text-slate-500">Ketik minimal 3 karakter untuk mencari.</p>
+          )}
           <p className="mt-1 text-xs text-slate-500">Total promo: {totalItems}</p>
         </div>
         <button
@@ -629,6 +636,9 @@ export default function AdminPromosPage() {
                         placeholder="Cari nomor penerbangan, kota, atau maskapai..."
                         className="w-full rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
                       />
+                      {form.flightSearch.trim().length > 0 && form.flightSearch.trim().length < 3 && (
+                        <p className="mt-1 text-[11px] text-slate-500">Ketik minimal 3 karakter untuk mencari penerbangan.</p>
+                      )}
                     </div>
                     <div className="max-h-52 overflow-y-auto">
                       {filteredFlights.length === 0 ? (

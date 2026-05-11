@@ -687,6 +687,16 @@ router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDe
  *         name: includeStats
  *         schema:
  *           type: boolean
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [id, name, email, createdAt]
+ *       - in: query
+ *         name: sortDirection
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
  *     responses:
  *       200:
  *         description: List of all users

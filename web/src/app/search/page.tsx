@@ -234,6 +234,9 @@ export default function SearchPage() {
     Record<string, number>
   >({});
   const [calendarPriceLoading, setCalendarPriceLoading] = useState(false);
+  const trimmedAirportKeyword = airportKeyword.trim();
+  const isAirportSearchInvalid =
+    trimmedAirportKeyword.length > 0 && trimmedAirportKeyword.length < 3;
 
   const { leftMonth, rightMonth, leftMonthCells, rightMonthCells } =
     useMemo(() => {
@@ -287,13 +290,14 @@ export default function SearchPage() {
   }, [airportMaster]);
 
   const airportOptions = useMemo(() => {
-    const keyword = airportKeyword.trim().toLowerCase();
+    const keyword = trimmedAirportKeyword.toLowerCase();
     if (!keyword) return popularAirportOptions;
+    if (isAirportSearchInvalid) return [];
 
     return airportMaster
       .filter((item) => item.searchText.includes(keyword))
       .slice(0, 150);
-  }, [airportKeyword, airportMaster, popularAirportOptions]);
+  }, [airportMaster, isAirportSearchInvalid, popularAirportOptions, trimmedAirportKeyword]);
 
   const recentAirportOptions = useMemo(() => {
     const options = recentSearches
@@ -303,10 +307,11 @@ export default function SearchPage() {
       .map((label) => airportByLabel.get(label))
       .filter((item): item is AirportOption => Boolean(item));
     const uniqueOptions = Array.from(new Set(options));
-    const keyword = airportKeyword.trim().toLowerCase();
+    const keyword = trimmedAirportKeyword.toLowerCase();
     if (!keyword) return uniqueOptions;
+    if (isAirportSearchInvalid) return [];
     return uniqueOptions.filter((item) => item.searchText.includes(keyword));
-  }, [airportByLabel, airportKeyword, airportMode, recentSearches]);
+  }, [airportByLabel, airportMode, isAirportSearchInvalid, recentSearches, trimmedAirportKeyword]);
 
   const originView = airportByLabel.get(origin);
   const destinationView = airportByLabel.get(destination);
@@ -835,6 +840,11 @@ export default function SearchPage() {
                         placeholder="Contoh: CGK, Jakarta, Bali"
                         className="mt-1 w-full text-sm font-semibold outline-none"
                       />
+                      {isAirportSearchInvalid && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Ketik minimal 3 karakter untuk mencari bandara.
+                        </p>
+                      )}
                     </div>
 
                     <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -893,7 +903,11 @@ export default function SearchPage() {
                           </button>
                         ))}
 
-                        {airportLoading && airportOptions.length === 0 ? (
+                        {isAirportSearchInvalid ? (
+                          <p className="px-3 py-3 text-sm text-slate-500">
+                            Ketik minimal 3 karakter untuk mencari bandara.
+                          </p>
+                        ) : airportLoading && airportOptions.length === 0 ? (
                           <p className="px-3 py-3 text-sm text-slate-500">
                             Sedang mengambil data bandara dari API...
                           </p>
