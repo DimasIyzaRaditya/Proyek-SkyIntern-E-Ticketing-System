@@ -1096,6 +1096,7 @@ class ListQueryControls extends StatelessWidget {
   final ValueChanged<int> onRowsPerPageChanged;
   final String searchHint;
   final List<Map<String, String>>? sortOptions;
+  static const int _minSearchLength = 3;
 
   const ListQueryControls({
     super.key,
@@ -1137,7 +1138,19 @@ class ListQueryControls extends StatelessWidget {
         children: [
           TextFormField(
             initialValue: searchQuery,
-            onChanged: onSearchChanged,
+            onChanged: (value) {
+              final trimmed = value.trim();
+              if (trimmed.isEmpty) {
+                onSearchChanged('');
+                return;
+              }
+
+              if (trimmed.length >= _minSearchLength) {
+                onSearchChanged(trimmed);
+              } else {
+                onSearchChanged('');
+              }
+            },
             decoration: InputDecoration(
               hintText: searchHint,
               prefixIcon: const Icon(Icons.search_rounded),

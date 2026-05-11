@@ -567,16 +567,19 @@ class _SearchScreenState extends State<SearchScreen>
             void onSearch(String query) {
               final q = query.toLowerCase().trim();
               setModalState(() {
-                filtered = q.isEmpty
-                    ? List.from(airports)
-                    : airports
-                          .where(
-                            (a) =>
-                                a.code.toLowerCase().contains(q) ||
-                                a.city.toLowerCase().contains(q) ||
-                                a.airportName.toLowerCase().contains(q),
-                          )
-                          .toList();
+                if (q.isEmpty || q.length < 3) {
+                  filtered = List.from(airports);
+                  return;
+                }
+
+                filtered = airports
+                    .where(
+                      (a) =>
+                          a.code.toLowerCase().contains(q) ||
+                          a.city.toLowerCase().contains(q) ||
+                          a.airportName.toLowerCase().contains(q),
+                    )
+                    .toList();
               });
             }
 
