@@ -13,7 +13,7 @@ const router = Router() // Router Express untuk semua route penerbangan publik
  * /api/flights/search:
  *   get:
  *     summary: Search flights
- *     tags: [Flights]
+ *     tags: [Public - Flights]
  *     parameters:
  *       - in: query
  *         name: originId
@@ -116,6 +116,45 @@ const router = Router() // Router Express untuk semua route penerbangan publik
  */
 router.get("/search", flightController.searchFlights)
 
+/**
+ * @swagger
+ * /api/flights/airports:
+ *   get:
+ *     summary: Get public airport options
+ *     tags: [Public - Flights]
+ *     responses:
+ *       200:
+ *         description: Airport options retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 airports:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       name:
+ *                         type: string
+ *                         example: Soekarno-Hatta International Airport
+ *                       city:
+ *                         type: string
+ *                         example: Jakarta
+ *                       country:
+ *                         type: string
+ *                         example: Indonesia
+ *                       timezone:
+ *                         type: string
+ *                         nullable: true
+ *                         example: Asia/Jakarta
+ *                       cityImageUrl:
+ *                         type: string
+ *                         nullable: true
+ */
 router.get("/airports", airportController.getPublicAirportOptions)
 
 /**
@@ -123,7 +162,7 @@ router.get("/airports", airportController.getPublicAirportOptions)
  * /api/flights/{id}:
  *   get:
  *     summary: Get flight detail
- *     tags: [Flights]
+ *     tags: [Public - Flights]
  *     parameters:
  *       - in: path
  *         name: id
@@ -143,7 +182,7 @@ router.get("/:id", flightController.getFlightDetail)
  * /api/flights/{flightId}/seats:
  *   get:
  *     summary: Get seat map for flight
- *     tags: [Flights]
+ *     tags: [Flight Seats]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -157,7 +196,73 @@ router.get("/:id", flightController.getFlightDetail)
  *         description: Seat map retrieved
  */
 router.get("/:flightId/seats", authenticate, seatController.getSeatMap)
+
+/**
+ * @swagger
+ * /api/flights/{flightId}/seats/hold:
+ *   post:
+ *     summary: Hold selected seats temporarily
+ *     tags: [Flight Seats]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: flightId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - seatIds
+ *             properties:
+ *               seatIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1, 2]
+ *     responses:
+ *       200:
+ *         description: Seats held successfully
+ */
 router.post("/:flightId/seats/hold", authenticate, seatController.holdSeats)
+
+/**
+ * @swagger
+ * /api/flights/{flightId}/seats/release:
+ *   post:
+ *     summary: Release previously held seats
+ *     tags: [Flight Seats]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: flightId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - seatIds
+ *             properties:
+ *               seatIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1, 2]
+ *     responses:
+ *       200:
+ *         description: Seats released successfully
+ */
 router.post("/:flightId/seats/release", authenticate, seatController.releaseSeats)
 
 export default router

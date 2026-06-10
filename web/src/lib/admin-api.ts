@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api-client";
+import { API_BASE_URL, apiFetchWithAuth, apiRequest } from "@/lib/api-client";
 
 export type AdminAirline = {
   id: number;
@@ -138,20 +138,14 @@ export const getAdminAirlineById = async (id: number) => {
 };
 
 export const createAdminAirline = async (payload: { code: string; name: string; country: string; logo?: File }) => {
-  const { getAuthToken } = await import("@/lib/auth");
-  const { API_BASE_URL } = await import("@/lib/api-client");
-  const token = getAuthToken();
-  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
-
   const formData = new FormData();
   formData.append("code", payload.code);
   formData.append("name", payload.name);
   formData.append("country", payload.country);
   if (payload.logo) formData.append("logo", payload.logo);
 
-  const response = await fetch(`${API_BASE_URL}/api/admin/airlines`, {
+  const response = await apiFetchWithAuth(`${API_BASE_URL}/api/admin/airlines`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 
@@ -168,20 +162,14 @@ export const createAdminAirline = async (payload: { code: string; name: string; 
 };
 
 export const updateAdminAirline = async (id: number, payload: { code: string; name: string; country: string; logo?: File }) => {
-  const { getAuthToken } = await import("@/lib/auth");
-  const { API_BASE_URL } = await import("@/lib/api-client");
-  const token = getAuthToken();
-  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
-
   const formData = new FormData();
   formData.append("code", payload.code);
   formData.append("name", payload.name);
   formData.append("country", payload.country);
   if (payload.logo) formData.append("logo", payload.logo);
 
-  const response = await fetch(`${API_BASE_URL}/api/admin/airlines/${id}`, {
+  const response = await apiFetchWithAuth(`${API_BASE_URL}/api/admin/airlines/${id}`, {
     method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 
@@ -293,17 +281,11 @@ export const deleteAdminAirport = async (id: number) => {
 };
 
 export const uploadAdminAirportCityImage = async (id: number, file: File): Promise<string> => {
-  const { getAuthToken } = await import("@/lib/auth");
-  const { API_BASE_URL } = await import("@/lib/api-client");
-  const token = getAuthToken();
-  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
-
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/admin/airports/${id}/city-image`, {
+  const response = await apiFetchWithAuth(`${API_BASE_URL}/api/admin/airports/${id}/city-image`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 

@@ -60,10 +60,37 @@ app.use("/api/admin", adminRoutes)
 app.use("/api/flights", flightRoutes)
 app.use("/api/bookings", bookingRoutes)
 app.use("/api/files", fileRoutes)
+
+/**
+ * @swagger
+ * /api/promos:
+ *   get:
+ *     summary: Get active public promos
+ *     tags: [Promos]
+ *     responses:
+ *       200:
+ *         description: Active promos retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 promos:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Promo'
+ */
 app.get("/api/promos", getActivePromos)
 
 // API Documentation
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  swaggerOptions: {
+    persistAuthorization: true,
+    docExpansion: "list",
+    operationsSorter: "method"
+  }
+}))
 
 app.get("/", (req, res) => {
   res.send("SkyIntern E-Ticketing API Running")

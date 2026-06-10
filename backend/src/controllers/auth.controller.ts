@@ -67,7 +67,7 @@ export const register = async (req: Request, res: Response) => {
     const hashed = await bcrypt.hash(password, 10) // Password di-hash dengan bcrypt (salt 10 round)
 
     const user = await prisma.user.create({ // Simpan user baru ke database
-      data: { email, name, password: hashed }
+      data: { email, name, password: hashed, twoFactorEnabled: true }
     })
 
     res.status(201).json({

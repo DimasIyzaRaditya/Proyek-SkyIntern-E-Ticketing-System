@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import AdminPagination from "@/components/admin/AdminPagination";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { formatRupiah } from "@/lib/currency";
 import { getAdminFlightsPage, deleteAdminFlight, type AdminFlight } from "@/lib/admin-api";
@@ -36,21 +38,10 @@ export default function AdminSchedulesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [rowsPerView, setRowsPerView] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pendingDelete, setPendingDelete] = useState<AdminFlight | null>(null);
   const trimmedSearch = search.trim();
   const isSearchInvalid = trimmedSearch.length > 0 && trimmedSearch.length < 3;
   const effectiveSearch = isSearchInvalid ? "" : trimmedSearch;
-
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
-
-    const start = Math.max(1, currentPage - 2);
-    const end = Math.min(totalPages, start + 4);
-    const normalizedStart = Math.max(1, end - 4);
-
-    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
-  }, [currentPage, totalPages]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -84,6 +75,26 @@ export default function AdminSchedulesPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, rowsPerView]);
+
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+
+    setDeletingId(pendingDelete.id);
+    try {
+      await deleteAdminFlight(pendingDelete.id);
+      if (flights.length === 1 && currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      } else {
+        setFlights((prev) => prev.filter((f) => f.id !== pendingDelete.id));
+        setTotalItems((prev) => Math.max(0, prev - 1));
+      }
+      setPendingDelete(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Gagal menghapus jadwal.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <AdminShell title="Flight Schedule Management" description="Manage flight schedules from the list. Use Add Schedule to create new data.">
@@ -171,23 +182,7 @@ export default function AdminSchedulesPage() {
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Link>
                       <button
-                        onClick={async () => {
-                          if (!confirm(`Hapus jadwal "${item.flightNumber}"?`)) return;
-                          setDeletingId(item.id);
-                          try {
-                            await deleteAdminFlight(item.id);
-                            if (flights.length === 1 && currentPage > 1) {
-                              setCurrentPage((prev) => prev - 1);
-                            } else {
-                              setFlights((prev) => prev.filter((f) => f.id !== item.id));
-                              setTotalItems((prev) => Math.max(0, prev - 1));
-                            }
-                          } catch (err) {
-                            setMessage(err instanceof Error ? err.message : "Gagal menghapus jadwal.");
-                          } finally {
-                            setDeletingId(null);
-                          }
-                        }}
+                        onClick={() => setPendingDelete(item)}
                         disabled={deletingId === item.id}
                         className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
                       >
@@ -202,64 +197,26 @@ export default function AdminSchedulesPage() {
         </div>
 
         {!loading && totalItems > 0 && (
-          <div className="mt-4 space-y-3 text-sm text-slate-600">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, totalItems)} dari {totalItems} data.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
-              <div className="inline-flex items-center gap-2">
-                <label htmlFor="rows-per-view-schedules" className="font-medium text-slate-700">Tampilkan</label>
-                <select
-                  id="rows-per-view-schedules"
-                  value={rowsPerView}
-                  onChange={(event) => setRowsPerView(Number(event.target.value))}
-                  className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-                >
-                  <option value={10}>10 data</option>
-                  <option value={20}>20 data</option>
-                  <option value={50}>50 data</option>
-                  <option value={100}>100 data</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Prev
-                </button>
-                {pageNumbers.map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                      page === currentPage
-                        ? "bg-blue-600 text-white"
-                        : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
+          <AdminPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={rowsPerView}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setRowsPerView}
+            pageSizeId="rows-per-view-schedules"
+          />
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Hapus Jadwal"
+        description={`Jadwal penerbangan "${pendingDelete?.flightNumber ?? ""}" akan dihapus dari sistem.`}
+        confirmLabel="Ya, Hapus"
+        loading={deletingId !== null}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </AdminShell>
   );
 }

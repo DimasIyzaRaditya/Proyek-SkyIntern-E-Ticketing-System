@@ -133,7 +133,61 @@ router.post("/register", register)
  *         description: Internal server error
  */
 router.post("/login", loginLimiter, login)
+
+/**
+ * @swagger
+ * /api/auth/login/2fa/verify:
+ *   post:
+ *     summary: Verify 2FA login code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - twoFactorToken
+ *               - code
+ *             properties:
+ *               twoFactorToken:
+ *                 type: string
+ *                 description: Temporary token returned from login when 2FA is required
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: 2FA verified and login successful
+ *       400:
+ *         description: Invalid or expired 2FA code
+ */
 router.post("/login/2fa/verify", verifyTwoFactorLogin)
+
+/**
+ * @swagger
+ * /api/auth/login/2fa/resend:
+ *   post:
+ *     summary: Resend 2FA login code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - twoFactorToken
+ *             properties:
+ *               twoFactorToken:
+ *                 type: string
+ *                 description: Temporary token returned from login when 2FA is required
+ *     responses:
+ *       200:
+ *         description: 2FA code resent successfully
+ *       400:
+ *         description: Invalid or expired 2FA token
+ */
 router.post("/login/2fa/resend", resendTwoFactorCode)
 
 /**
@@ -249,6 +303,31 @@ router.get("/profile", authenticate, getProfile)
  *         description: Profile updated successfully
  */
 router.put("/profile", authenticate, updateProfile)
+
+/**
+ * @swagger
+ * /api/auth/2fa:
+ *   put:
+ *     summary: Enable or disable 2FA for current user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - enabled
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: 2FA setting updated successfully
+ */
 router.put("/2fa", authenticate, updateTwoFactorSetting)
 
 /**

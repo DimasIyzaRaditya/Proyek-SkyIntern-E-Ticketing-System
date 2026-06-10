@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api-client";
+import { apiFetchWithAuth, apiRequest } from "@/lib/api-client";
 import type { UserSession } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api-client";
 
@@ -187,17 +187,11 @@ export const updateTwoFactorSettingFromApi = async (payload: { enabled: boolean 
 };
 
 export const uploadAvatarToApi = async (file: File): Promise<UserSession> => {
-  const { getAuthToken } = await import("@/lib/auth");
-  const { API_BASE_URL } = await import("@/lib/api-client");
-  const token = getAuthToken();
-  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
-
   const formData = new FormData();
   formData.append("avatar", file);
 
-  const res = await fetch(`${API_BASE_URL}/api/auth/avatar`, {
+  const res = await apiFetchWithAuth(`${API_BASE_URL}/api/auth/avatar`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 

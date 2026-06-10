@@ -28,14 +28,20 @@ test("[CREATE] register status 201 dan data user benar", async () => {
   const req: any = { body: { email: "user@test.com", name: "User", password: "secret123" } };
   const res = createMockResponse();
   const originalCreate = prisma.user.create;
+  let createData: any;
 
-  prisma.user.create = async ({ data }: any) => ({ id: 1, email: data.email, name: data.name });
+  prisma.user.create = async ({ data }: any) => {
+    createData = data;
+    return { id: 1, email: data.email, name: data.name, twoFactorEnabled: data.twoFactorEnabled };
+  };
 
   try {
     await controller.register(req, res);
 
     assert.equal(res.statusCode, 201);
     assert.equal(res.payload.user.email, "user@test.com");
+    assert.equal(createData.twoFactorEnabled, true);
+    assert.equal(res.payload.user.twoFactorEnabled, true);
   } finally {
     prisma.user.create = originalCreate;
   }

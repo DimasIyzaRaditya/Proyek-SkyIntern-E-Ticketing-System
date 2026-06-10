@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { ArrowDownUp, CalendarDays, CheckCircle2, Clock3, Plane, Ticket } from "lucide-react";
+import AppPagination from "@/components/AppPagination";
 import MainNav from "@/components/MainNav";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api-client";
@@ -23,7 +24,6 @@ type BookingView = {
   seat: string;
   passenger: string;
   flightNumber: string;
-  pdfUrl: string;
   tab: TabKey;
   // fields needed for edit links
   flightId: string;
@@ -96,7 +96,6 @@ const mapBookingToView = (item: Awaited<ReturnType<typeof getMyBookingsFromApi>>
     seat: item.selectedSeats ?? "-",
     passenger,
     flightNumber: item.flight.flightNumber,
-    pdfUrl: item.ticket?.pdfUrl ?? "",
     tab: getTabByStatus(status),
     flightId: String(item.flightId),
     origin: item.flight.origin.code ?? item.flight.origin.city,
@@ -167,7 +166,6 @@ function MyBookingsPageContent() {
       route: booking.route,
       date: booking.date,
       status: booking.status,
-      pdfUrl: booking.pdfUrl,
       bookingCode: booking.bookingCode,
       airline: booking.airline,
       airlineLogo: booking.airlineLogo ?? "",
@@ -377,7 +375,6 @@ function MyBookingsPageContent() {
             seat: item.selectedSeats ?? "-",
             passenger,
             flightNumber: item.flight.flightNumber,
-            pdfUrl: item.ticket?.pdfUrl ?? "",
             tab: getTabByStatus(status),
             flightId: String(item.flightId),
             origin: item.flight.origin.code ?? item.flight.origin.city,
@@ -478,12 +475,6 @@ function MyBookingsPageContent() {
   }, [authenticated, refreshBookings]);
 
   const bookingList = useMemo(() => liveBookings, [liveBookings]);
-
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
-    return Array.from({ length: 5 }, (_, i) => start + i);
-  }, [currentPage, totalPages]);
 
   const getStatusClass = (status: BookingStatus, isExpired: boolean) => {
     if (status === "Issued" && isExpired) return "bg-slate-200 text-slate-700";
@@ -679,62 +670,16 @@ function MyBookingsPageContent() {
           )}
 
           {!loading && totalItems > 0 && (
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p>
-                  Menampilkan {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} dari {totalItems} data.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
-                <div className="inline-flex items-center gap-2">
-                  <label htmlFor="rows-per-view-bookings" className="font-medium text-slate-700">Tampilkan</label>
-                  <select
-                    id="rows-per-view-bookings"
-                    value={pageSize}
-                    onChange={(event) => setPageSize(Number(event.target.value))}
-                    className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-                  >
-                    <option value={5}>5 data</option>
-                    <option value={10}>10 data</option>
-                    <option value={20}>20 data</option>
-                    <option value={50}>50 data</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  {pageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setCurrentPage(page)}
-                      className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                        page === currentPage
-                          ? "bg-blue-600 text-white"
-                          : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </div>
+            <AppPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[5, 10, 20, 50]}
+              pageSizeId="rows-per-view-bookings"
+            />
           )}
         </section>
       </main>

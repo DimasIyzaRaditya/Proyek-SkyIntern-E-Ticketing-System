@@ -71,7 +71,7 @@ model User {
   avatarUrl     String?   @db.Text
   role          Role      @default(USER)
   isBlocked     Boolean   @default(false)
-  twoFactorEnabled Boolean @default(false)
+  twoFactorEnabled Boolean @default(true)
   twoFactorCodeHash String? @db.VarChar(255)
   twoFactorCodeExpiresAt DateTime?
   resetToken    String?   @db.VarChar(255)
@@ -234,7 +234,6 @@ model Ticket {
   bookingId     Int      @unique
   ticketNumber  String   @unique @db.VarChar(30)
   qrCode        String   @db.VarChar(255)
-  pdfUrl        String?  @db.VarChar(255)
   issuedAt      DateTime @default(now())
 
   booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)

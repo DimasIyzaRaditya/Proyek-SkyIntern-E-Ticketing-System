@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import LogoutConfirmDialog from "@/components/LogoutConfirmDialog";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
@@ -37,6 +38,7 @@ export default function ProfilePage() {
   const identityTypeMenuRef = useRef<HTMLDivElement>(null);
   const showSkeleton = useMinDelay(loading);
   const [message, setMessage] = useState("");
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const authenticated = isAuthenticated();
 
   type UpcomingTrip = { route: string; airline: string; date: string; status: string } | null;
@@ -487,10 +489,7 @@ export default function ProfilePage() {
                 {saving ? "Menyimpan..." : "Save Profile"}
               </button>
               <button
-                onClick={() => {
-                  clearSession();
-                  router.push("/auth/login");
-                }}
+                onClick={() => setLogoutConfirmOpen(true)}
                 className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 sm:px-6 sm:py-3"
               >
                 Logout
@@ -546,6 +545,15 @@ export default function ProfilePage() {
         </LazySection>
 
       </main>
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          clearSession();
+          setLogoutConfirmOpen(false);
+          router.push("/auth/login");
+        }}
+      />
     </div>
   );
 }

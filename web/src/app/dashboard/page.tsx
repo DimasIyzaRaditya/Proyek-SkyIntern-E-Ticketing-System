@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Plane, Ticket } from "lucide-react";
+import AppPagination from "@/components/AppPagination";
 import MainNav from "@/components/MainNav";
 import LazySection from "@/components/LazySection";
 import { useMinDelay } from "@/lib/use-min-delay";
@@ -47,18 +48,6 @@ export default function DashboardPage() {
   const [historyTotalPages, setHistoryTotalPages] = useState(1);
 
   const showSkeleton = useMinDelay(loading);
-
-  const historyPageNumbers = (() => {
-    if (historyTotalPages <= 5) {
-      return Array.from({ length: historyTotalPages }, (_, index) => index + 1);
-    }
-
-    const start = Math.max(1, historyCurrentPage - 2);
-    const end = Math.min(historyTotalPages, start + 4);
-    const normalizedStart = Math.max(1, end - 4);
-
-    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
-  })();
 
   useEffect(() => {
     if (!authenticated) {
@@ -276,62 +265,16 @@ export default function DashboardPage() {
           </div>
 
           {historyTotalItems > 0 && (
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p>
-                  Menampilkan {(historyCurrentPage - 1) * historyRowsPerPage + 1} - {Math.min(historyCurrentPage * historyRowsPerPage, historyTotalItems)} dari {historyTotalItems} data.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
-                <div className="inline-flex items-center gap-2">
-                  <label htmlFor="rows-per-view-history" className="font-medium text-slate-700">Tampilkan</label>
-                  <select
-                    id="rows-per-view-history"
-                    value={historyRowsPerPage}
-                    onChange={(event) => setHistoryRowsPerPage(Number(event.target.value))}
-                    className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-                  >
-                    <option value={5}>5 data</option>
-                    <option value={10}>10 data</option>
-                    <option value={20}>20 data</option>
-                    <option value={50}>50 data</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setHistoryCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={historyCurrentPage === 1}
-                    className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  {historyPageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setHistoryCurrentPage(page)}
-                      className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                        page === historyCurrentPage
-                          ? "bg-blue-600 text-white"
-                          : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setHistoryCurrentPage((prev) => Math.min(historyTotalPages, prev + 1))}
-                    disabled={historyCurrentPage === historyTotalPages}
-                    className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </div>
+            <AppPagination
+              currentPage={historyCurrentPage}
+              totalPages={historyTotalPages}
+              totalItems={historyTotalItems}
+              pageSize={historyRowsPerPage}
+              onPageChange={setHistoryCurrentPage}
+              onPageSizeChange={setHistoryRowsPerPage}
+              pageSizeOptions={[5, 10, 20, 50]}
+              pageSizeId="rows-per-view-history"
+            />
           )}
         </section>
         </LazySection>

@@ -6,7 +6,7 @@ import { Response } from "express"
 import prisma from "../prisma/client"
 import { AuthRequest } from "../middleware/auth.middleware"
 import { generateBookingCode, generateTicketNumber, calculateTotalPrice, addMinutes } from "../utils/helpers"
-import { uploadFile, deleteFile, normalizeFileUrl, extractFileKeyFromUrl, MINIO_BUCKET_NAME, minioClient } from "../utils/minio"
+import { uploadFile, deleteFile } from "../utils/minio"
 import { sendBookingConfirmation, sendNewTransactionReminderEmail, sendTodayDepartureReminderEmail } from "../utils/email"
 import { createTransaction, checkTransactionStatus, verifySignature, mapMidtransStatus } from "../utils/midtrans"
 import { emitToUser } from "../utils/socket"
@@ -777,36 +777,6 @@ export const downloadTicket = async (req: AuthRequest, res: Response) => {
     }
 
     const safeBookingCode = ticket.booking.bookingCode.replace(/[^A-Za-z0-9_-]/g, "") || String(ticket.id)
-
-    if (ticket.pdfUrl) {
-      const normalizedPdfUrl = normalizeFileUrl(ticket.pdfUrl)
-      const fileKey = normalizedPdfUrl ? extractFileKeyFromUrl(normalizedPdfUrl) : null
-
-      if (fileKey) {
-        try {
-          const stat = await minioClient.statObject(MINIO_BUCKET_NAME, fileKey)
-          const contentType = stat.metaData?.["content-type"] || "application/pdf"
-          const objectStream = await minioClient.getObject(MINIO_BUCKET_NAME, fileKey)
-
-          res.setHeader("Content-Type", contentType)
-          res.setHeader("Content-Disposition", `attachment; filename=\"e-ticket-${safeBookingCode}.pdf\"`)
-          res.setHeader("Cache-Control", "private, no-store")
-          objectStream.pipe(res)
-          return
-        } catch (error: any) {
-          if (error?.code === "NoSuchKey") {
-            return res.status(404).json({ message: "File e-ticket tidak ditemukan" })
-          }
-
-          if (error?.code === "ECONNREFUSED") {
-            return res.status(503).json({ message: "Server penyimpanan file tidak tersedia" })
-          }
-
-          console.error("Download ticket PDF error:", error)
-          return res.status(500).json({ message: "Gagal mengunduh file e-ticket" })
-        }
-      }
-    }
 
     const textContent = buildTicketTextFile(ticket)
     res.setHeader("Content-Type", "text/plain; charset=utf-8")

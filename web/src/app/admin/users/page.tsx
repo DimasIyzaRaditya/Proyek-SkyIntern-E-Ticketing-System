@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { RefreshCcw, ShieldOff, ShieldCheck } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import AdminPagination from "@/components/admin/AdminPagination";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
 import { getAdminUsersPage, blockAdminUser, toggleAdminUserTwoFactor, type AdminUser } from "@/lib/admin-api";
 import { formatRupiah } from "@/lib/currency";
@@ -109,12 +110,6 @@ export default function AdminUsersPage() {
       setTogglingTwoFactorId(null);
     }
   };
-
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
-    return Array.from({ length: Math.min(5, totalPages) }, (_, i) => start + i);
-  }, [currentPage, totalPages]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -249,61 +244,15 @@ export default function AdminUsersPage() {
         </div>
 
         {!loading && totalItems > 0 && (
-          <div className="mt-4 space-y-3 text-sm text-slate-600">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p>
-                Menampilkan {(currentPage - 1) * rowsPerView + 1} - {Math.min(currentPage * rowsPerView, totalItems)} dari {totalItems} data.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
-              <div className="inline-flex items-center gap-2">
-                <label htmlFor="rows-per-view-users" className="font-medium text-slate-700">Tampilkan</label>
-                <select
-                  id="rows-per-view-users"
-                  value={rowsPerView}
-                  onChange={(event) => setRowsPerView(Number(event.target.value))}
-                  className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2"
-                >
-                  <option value={10}>10 data</option>
-                  <option value={20}>20 data</option>
-                  <option value={50}>50 data</option>
-                  <option value={100}>100 data</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Prev
-                </button>
-                {pageNumbers.map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                      page === currentPage
-                        ? "bg-blue-600 text-white"
-                        : "border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
+          <AdminPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={rowsPerView}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setRowsPerView}
+            pageSizeId="rows-per-view-users"
+          />
         )}
       </section>
     </AdminShell>

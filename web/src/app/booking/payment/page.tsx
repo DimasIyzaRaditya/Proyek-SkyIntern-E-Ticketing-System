@@ -4,6 +4,7 @@ import Script from "next/script";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
+import CompactPagination from "@/components/CompactPagination";
 import MainNav from "@/components/MainNav";
 import { formatRupiah } from "@/lib/currency";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
@@ -240,7 +241,6 @@ function PaymentSummaryPageContent() {
   const promoPageStart = (currentPromoPage - 1) * PROMOS_PER_PAGE;
   const visiblePromos = availablePromos.slice(promoPageStart, promoPageStart + PROMOS_PER_PAGE);
   const hasPromoPagination = availablePromos.length > PROMOS_PER_PAGE;
-  const pageNumbers = Array.from({ length: totalPromoPages }, (_, index) => index + 1);
   const hasPromoChanged = selectedPromoId !== initialPromoId;
   const canRecreateWithPromo = !existingBookingId || Boolean(searchParams.get("seatFlightIds"));
   const isPromoLockedBySeatData = Boolean(existingBookingId) && !canRecreateWithPromo;
@@ -754,41 +754,12 @@ function PaymentSummaryPageContent() {
                     </label>
                   ))}
                   {hasPromoPagination && (
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPromoPage((prev) => Math.max(1, prev - 1))}
-                        disabled={isPromoSelectionLocked || currentPromoPage === 1}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Prev
-                      </button>
-                      <div className="flex items-center gap-1">
-                        {pageNumbers.map((pageNumber) => (
-                          <button
-                            key={pageNumber}
-                            type="button"
-                            onClick={() => setCurrentPromoPage(pageNumber)}
-                            disabled={isPromoSelectionLocked}
-                            className={`h-7 min-w-7 rounded-md border px-2 text-[11px] font-semibold ${
-                              currentPromoPage === pageNumber
-                                ? "border-blue-600 bg-blue-600 text-white"
-                                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {pageNumber}
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPromoPage((prev) => Math.min(totalPromoPages, prev + 1))}
-                        disabled={isPromoSelectionLocked || currentPromoPage === totalPromoPages}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Next
-                      </button>
-                    </div>
+                    <CompactPagination
+                      currentPage={currentPromoPage}
+                      totalPages={totalPromoPages}
+                      onPageChange={setCurrentPromoPage}
+                      disabled={isPromoSelectionLocked}
+                    />
                   )}
                 </div>
                 {Boolean(existingBookingId) && hasPromoChanged && canRecreateWithPromo && (

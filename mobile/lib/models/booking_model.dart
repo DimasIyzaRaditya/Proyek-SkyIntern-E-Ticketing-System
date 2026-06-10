@@ -124,17 +124,14 @@ class PassengerInfo {
 
 class TicketInfo {
   final int id;
-  final String? pdfUrl;
 
   TicketInfo({
     required this.id,
-    this.pdfUrl,
   });
 
   factory TicketInfo.fromJson(Map<String, dynamic> json) {
     return TicketInfo(
       id: json['id'] as int,
-      pdfUrl: json['pdfUrl'],
     );
   }
 }

@@ -51,7 +51,6 @@ type BackendBooking = {
   }>;
   ticket: {
     id: number;
-    pdfUrl: string | null;
   } | null;
 };
 

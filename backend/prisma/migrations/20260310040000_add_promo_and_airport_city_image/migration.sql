@@ -1,6 +1,6 @@
-ALTER TABLE "Airport" ADD COLUMN "cityImageUrl" VARCHAR(500);
+ALTER TABLE "Airport" ADD COLUMN IF NOT EXISTS "cityImageUrl" VARCHAR(500);
 
-CREATE TABLE "Promo" (
+CREATE TABLE IF NOT EXISTS "Promo" (
     "id" SERIAL NOT NULL,
     "title" VARCHAR(200) NOT NULL,
     "description" TEXT,
@@ -15,4 +15,18 @@ CREATE TABLE "Promo" (
     CONSTRAINT "Promo_pkey" PRIMARY KEY ("id")
 );
 
-ALTER TABLE "Promo" ADD CONSTRAINT "Promo_flightId_fkey" FOREIGN KEY ("flightId") REFERENCES "Flight"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'Promo_flightId_fkey'
+    ) THEN
+        ALTER TABLE "Promo"
+        ADD CONSTRAINT "Promo_flightId_fkey"
+        FOREIGN KEY ("flightId")
+        REFERENCES "Flight"("id")
+        ON DELETE SET NULL
+        ON UPDATE CASCADE;
+    END IF;
+END $$;

@@ -1,0 +1,2 @@
+ALTER TABLE "Ticket"
+DROP COLUMN IF EXISTS "pdfUrl";

@@ -57,7 +57,6 @@ type ETicketData = {
   route: string;
   date: string;
   status: string;
-  pdfUrl: string;
   bookingCode: string;
   airline: string;
   airlineLogo?: string;
@@ -198,7 +197,6 @@ function ETicketContent() {
             route: `${booking.flight.origin.city} → ${booking.flight.destination.city}`,
             date: fmtDateEn(booking.flight.departureTime),
             status: booking.status,
-            pdfUrl: "",
             bookingCode: booking.bookingCode,
             airline: booking.flight.airline.name,
             airlineLogo: booking.flight.airline.logo ?? "",

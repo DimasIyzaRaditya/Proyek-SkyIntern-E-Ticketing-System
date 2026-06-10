@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import AdminPagination from "@/components/admin/AdminPagination";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ResponsiveSelect from "@/components/ResponsiveSelect";
 import {
   deleteAdminAirline,
@@ -38,6 +40,7 @@ export default function AdminAirlinesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [pendingDelete, setPendingDelete] = useState<AdminAirline | null>(null);
   const trimmedSearch = search.trim();
   const isSearchInvalid = trimmedSearch.length > 0 && trimmedSearch.length < 3;
   const effectiveSearch = isSearchInvalid ? "" : trimmedSearch;
@@ -77,9 +80,6 @@ export default function AdminAirlinesPage() {
   }, [currentPage, pageSize, search, sortField, sortDirection]);
 
   const handleDelete = async (id: number) => {
-    const confirmed = window.confirm("Delete this airline?");
-    if (!confirmed) return;
-
     setMessage("");
 
     try {
@@ -184,7 +184,7 @@ export default function AdminAirlinesPage() {
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Link>
                       <button
-                        onClick={() => void handleDelete(item.id)}
+                        onClick={() => setPendingDelete(item)}
                         className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -197,84 +197,30 @@ export default function AdminAirlinesPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         {!loading && totalItems > 0 && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <span>Baris per halaman:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1"
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-              <span className="ml-2 text-slate-500">
-                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} dari {totalItems}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-              >
-                «
-              </button>
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2)
-                .reduce<(number | "…")[]>((acc, page, idx, arr) => {
-                  if (idx > 0 && page - (arr[idx - 1] as number) > 1) acc.push("…");
-                  acc.push(page);
-                  return acc;
-                }, [])
-                .map((item, idx) =>
-                  item === "…" ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">…</span>
-                  ) : (
-                    <button
-                      key={item}
-                      onClick={() => setCurrentPage(item as number)}
-                      className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                        currentPage === item
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ),
-                )}
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-              >
-                »
-              </button>
-            </div>
-          </div>
+          <AdminPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            pageSizeId="rows-per-view-airlines"
+          />
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Hapus Maskapai"
+        description={`Data maskapai "${pendingDelete?.name ?? ""}" akan dihapus dari sistem.`}
+        confirmLabel="Ya, Hapus"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          void handleDelete(pendingDelete.id).finally(() => setPendingDelete(null));
+        }}
+      />
     </AdminShell>
   );
 }

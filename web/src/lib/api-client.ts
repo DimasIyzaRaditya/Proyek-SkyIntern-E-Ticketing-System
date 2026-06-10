@@ -52,6 +52,39 @@ const requestAccessTokenRefresh = async (): Promise<string | null> => {
   return refreshPromise;
 };
 
+export const getFreshAccessToken = async (): Promise<string | null> => {
+  const token = getAuthToken();
+  if (token) return token;
+  return requestAccessTokenRefresh();
+};
+
+export const apiFetchWithAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+  const send = (accessToken: string) => {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+
+    return fetch(input, {
+      ...init,
+      headers,
+    });
+  };
+
+  const token = await getFreshAccessToken();
+  if (!token) throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+
+  let response = await send(token);
+  if (response.status !== 401) return response;
+
+  const newToken = await requestAccessTokenRefresh();
+  if (!newToken) {
+    clearSession();
+    return response;
+  }
+
+  response = await send(newToken);
+  return response;
+};
+
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAuthToken();
   if (token) {
@@ -92,7 +125,7 @@ const readErrorMessage = (error: AxiosError<ApiErrorPayload>) => {
 
 export const apiRequest = async <T>(path: string, options: ApiRequestOptions = {}): Promise<T> => {
   if (options.auth) {
-    const token = getAuthToken();
+    const token = await getFreshAccessToken();
     if (!token) {
       throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
     }

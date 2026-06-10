@@ -1,3 +1,4 @@
 -- AlterTable
-ALTER TABLE "User" ADD COLUMN     "refreshTokenExpiresAt" TIMESTAMP(3),
-ADD COLUMN     "refreshTokenHash" VARCHAR(255);
+ALTER TABLE "User"
+ADD COLUMN IF NOT EXISTS "refreshTokenExpiresAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "refreshTokenHash" VARCHAR(255);

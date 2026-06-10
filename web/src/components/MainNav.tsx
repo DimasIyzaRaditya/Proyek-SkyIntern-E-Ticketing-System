@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Menu, Plane, X } from "lucide-react";
+import LogoutConfirmDialog from "@/components/LogoutConfirmDialog";
 import { clearSession, getUserSession, isAuthenticated } from "@/lib/auth";
 
 const publicMenus = [
@@ -27,6 +28,7 @@ export default function MainNav() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   // Scroll listener for navbar animation
   useEffect(() => {
@@ -87,8 +89,13 @@ export default function MainNav() {
     : userMenus;
 
   const handleLogout = () => {
+    setLogoutConfirmOpen(true);
+  };
+
+  const confirmLogout = () => {
     clearSession();
     setMenuOpen(false);
+    setLogoutConfirmOpen(false);
     router.push("/auth/login");
   };
 
@@ -260,6 +267,12 @@ export default function MainNav() {
           )}
         </div>
       </div>
+
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </>
   );
 }

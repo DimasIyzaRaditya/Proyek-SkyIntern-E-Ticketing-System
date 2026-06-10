@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, Tag, Trash2, ToggleLeft, ToggleRight, Plane, Globe, X } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Tag, Trash2, ToggleLeft, ToggleRight, Plane, Globe, X } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import AdminPagination from "@/components/admin/AdminPagination";
 import CompactDatePicker from "@/components/CompactDatePicker";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   getAdminPromosPage,
   getAdminFlights,
@@ -69,6 +71,8 @@ export default function AdminPromosPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Promo | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // modal state
   const [showModal, setShowModal] = useState(false);
@@ -226,10 +230,12 @@ export default function AdminPromosPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Hapus promo ini?")) return;
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+
+    setDeleteLoading(true);
     try {
-      await deleteAdminPromo(id);
+      await deleteAdminPromo(pendingDelete.id);
       if (promos.length === 1 && currentPage > 1) {
         setCurrentPage((prev) => prev - 1);
       } else {
@@ -237,10 +243,13 @@ export default function AdminPromosPage() {
       }
       setIsSuccess(true);
       setMessage("Promo berhasil dihapus.");
+      setPendingDelete(null);
       setTimeout(() => setMessage(""), 4000);
     } catch (err) {
       setIsSuccess(false);
       setMessage(err instanceof Error ? err.message : "Gagal menghapus promo.");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -375,7 +384,7 @@ export default function AdminPromosPage() {
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => void handleDelete(promo.id)}
+                            onClick={() => setPendingDelete(promo)}
                             className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100"
                             title="Hapus"
                           >
@@ -392,82 +401,17 @@ export default function AdminPromosPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {!loading && totalItems > 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span>Baris per halaman:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
-              className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1"
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
-            </select>
-            <span className="ml-2 text-slate-500">
-              {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalItems)} dari {totalItems}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-              className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-            >
-              «
-            </button>
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2)
-              .reduce<(number | "...")[]>((acc, page, idx, arr) => {
-                if (idx > 0 && page - (arr[idx - 1] as number) > 1) acc.push("...");
-                acc.push(page);
-                return acc;
-              }, [])
-              .map((item, idx) =>
-                item === "..." ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">...</span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => setCurrentPage(item as number)}
-                    className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                      currentPage === item
-                        ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ),
-              )}
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="rounded-lg border border-blue-100 bg-blue-50 p-1 text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-              className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-blue-100"
-            >
-              »
-            </button>
-          </div>
-        </div>
+        <AdminPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          pageSizeId="rows-per-view-promos"
+        />
       )}
 
       {/* ── Modal ── */}
@@ -688,6 +632,15 @@ export default function AdminPromosPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Hapus Promo"
+        description={`Promo "${pendingDelete?.title ?? ""}" akan dihapus dari sistem.`}
+        confirmLabel="Ya, Hapus"
+        loading={deleteLoading}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </AdminShell>
   );
 }

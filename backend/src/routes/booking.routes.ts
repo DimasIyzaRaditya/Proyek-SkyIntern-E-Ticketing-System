@@ -16,7 +16,7 @@ const router = Router() // Router Express untuk semua route pemesanan
  * /api/bookings/payment/notification:
  *   post:
  *     summary: Midtrans payment notification webhook (untuk testing manual)
- *     tags: [Bookings]
+ *     tags: [Payment Webhook]
  *     description: |
  *       Endpoint ini dipanggil oleh Midtrans saat status pembayaran berubah.
  *       Untuk testing manual, `signature_key` harus di-generate dengan rumus:
@@ -82,6 +82,28 @@ const router = Router() // Router Express untuk semua route pemesanan
 router.post("/payment/notification", bookingController.paymentNotification)
 
 // Public: verify booking by code (for QR code scanning — no auth required)
+/**
+ * @swagger
+ * /api/bookings/verify:
+ *   get:
+ *     summary: Verify booking by booking code
+ *     tags: [Ticket Verification]
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Kode booking dari QR/e-ticket
+ *         example: SKY123456
+ *     responses:
+ *       200:
+ *         description: Booking verification retrieved successfully
+ *       400:
+ *         description: Booking code is required
+ *       404:
+ *         description: Booking not found
+ */
 router.get("/verify", bookingController.verifyBookingByCode)
 
 // All other booking routes require authentication
@@ -92,7 +114,7 @@ router.use(authenticate)
  * /api/bookings:
  *   post:
  *     summary: Create new booking
- *     tags: [Bookings]
+ *     tags: [Booking Flow]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -149,61 +171,13 @@ router.use(authenticate)
  */
 router.post("/", bookingController.createBooking)
 
-/**
- * @swagger
- * /api/bookings/passengers/{passengerId}/document-image:
- *   post:
- *     summary: Upload gambar dokumen identitas penumpang (KTP/Paspor)
- *     tags: [Bookings]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: passengerId
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID penumpang (dari response createBooking → booking.passengers[].id)
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - document
- *             properties:
- *               document:
- *                 type: string
- *                 format: binary
- *                 description: File gambar KTP atau paspor (jpg, png, pdf)
- *     responses:
- *       200:
- *         description: Gambar berhasil diunggah
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 documentImageUrl:
- *                   type: string
- *       400:
- *         description: File tidak disertakan
- *       403:
- *         description: Bukan penumpang milik user ini
- *       404:
- *         description: Penumpang tidak ditemukan
- */
-router.post("/passengers/:passengerId/document-image", upload.single("document"), bookingController.uploadPassengerDocument)
 
 /**
  * @swagger
  * /api/bookings/{id}/payment:
  *   post:
  *     summary: Create payment transaction (Generate Midtrans Snap Token)
- *     tags: [Bookings]
+ *     tags: [Payment Webhook]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -230,13 +204,34 @@ router.post("/passengers/:passengerId/document-image", upload.single("document")
  */
 router.post("/:id/payment", bookingController.processPayment)
 
+/**
+ * @swagger
+ * /api/bookings/{id}/sync-payment:
+ *   post:
+ *     summary: Sync payment status from Midtrans
+ *     tags: [Payment Webhook]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     responses:
+ *       200:
+ *         description: Payment status synchronized successfully
+ *       404:
+ *         description: Booking or payment not found
+ */
 router.post("/:id/sync-payment", bookingController.syncPaymentStatus)
 /**
  * @swagger
  * /api/bookings:
  *   get:
  *     summary: Get user bookings
- *     tags: [Bookings]
+ *     tags: [Booking Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -312,7 +307,7 @@ router.get("/", bookingController.getMyBookings)
  * /api/bookings/{id}:
  *   get:
  *     summary: Get booking detail
- *     tags: [Bookings]
+ *     tags: [Booking Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -332,7 +327,7 @@ router.get("/:id", bookingController.getBookingDetail)
  * /api/bookings/{id}/cancel:
  *   post:
  *     summary: Cancel booking
- *     tags: [Bookings]
+ *     tags: [Booking Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -352,7 +347,7 @@ router.post("/:id/cancel", bookingController.cancelBooking)
  * /api/bookings/tickets/{id}/download:
  *   get:
  *     summary: Download e-ticket file (mobile in-app)
- *     tags: [Bookings]
+ *     tags: [Ticket Verification]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -376,7 +371,7 @@ router.get("/tickets/:id/download", bookingController.downloadTicket)
  * /api/bookings/tickets/{id}:
  *   get:
  *     summary: Get ticket detail
- *     tags: [Bookings]
+ *     tags: [Ticket Verification]
  *     security:
  *       - bearerAuth: []
  *     parameters:

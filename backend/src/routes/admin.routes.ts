@@ -34,14 +34,10 @@ router.use(authenticate, isAdmin)
  *           schema:
  *             type: object
  *             required:
- *               - code
  *               - name
  *               - city
  *               - country
  *             properties:
- *               code:
- *                 type: string
- *                 example: CGK
  *               name:
  *                 type: string
  *                 example: Soekarno-Hatta International Airport
@@ -136,9 +132,126 @@ router.post("/airports", airportController.createAirport)
  *                       type: boolean
  */
 router.get("/airports", airportController.getAllAirports)
+
+/**
+ * @swagger
+ * /api/admin/airports/{id}:
+ *   get:
+ *     summary: Get airport by ID
+ *     tags: [Admin - Airports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Airport retrieved successfully
+ *       404:
+ *         description: Airport not found
+ */
 router.get("/airports/:id", airportController.getAirport)
+
+/**
+ * @swagger
+ * /api/admin/airports/{id}:
+ *   put:
+ *     summary: Update airport
+ *     tags: [Admin - Airports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Soekarno-Hatta International Airport
+ *               city:
+ *                 type: string
+ *                 example: Jakarta
+ *               country:
+ *                 type: string
+ *                 example: Indonesia
+ *               timezone:
+ *                 type: string
+ *                 example: Asia/Jakarta
+ *               cityImageUrl:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Airport updated successfully
+ *       404:
+ *         description: Airport not found
+ */
 router.put("/airports/:id", airportController.updateAirport)
+
+/**
+ * @swagger
+ * /api/admin/airports/{id}:
+ *   delete:
+ *     summary: Delete airport
+ *     tags: [Admin - Airports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Airport deleted successfully
+ *       404:
+ *         description: Airport not found
+ */
 router.delete("/airports/:id", airportController.deleteAirport)
+
+/**
+ * @swagger
+ * /api/admin/airports/{id}/city-image:
+ *   post:
+ *     summary: Upload airport city image
+ *     tags: [Admin - Airports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - image
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: City image file
+ *     responses:
+ *       200:
+ *         description: City image uploaded successfully
+ */
 router.post("/airports/:id/city-image", upload.single("image"), airportController.uploadAirportCityImage)
 
 // Airline Management
@@ -506,7 +619,89 @@ router.post("/flights", flightController.createFlight)
  *                       type: boolean
  */
 router.get("/flights", flightController.getAllFlightsAdmin)
+
+/**
+ * @swagger
+ * /api/admin/flights/{id}:
+ *   put:
+ *     summary: Update flight
+ *     tags: [Admin - Flights]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               flightNumber:
+ *                 type: string
+ *                 example: GA123
+ *               airlineId:
+ *                 type: integer
+ *                 example: 1
+ *               originId:
+ *                 type: integer
+ *                 example: 1
+ *               destinationId:
+ *                 type: integer
+ *                 example: 2
+ *               departureTime:
+ *                 type: string
+ *                 format: date-time
+ *               arrivalTime:
+ *                 type: string
+ *                 format: date-time
+ *               basePrice:
+ *                 type: integer
+ *                 example: 1500000
+ *               tax:
+ *                 type: integer
+ *                 example: 150000
+ *               adminFee:
+ *                 type: integer
+ *                 example: 10000
+ *               aircraft:
+ *                 type: string
+ *                 example: Boeing 737-800
+ *               facilities:
+ *                 type: string
+ *               rules:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [SCHEDULED, DELAYED, CANCELLED]
+ *     responses:
+ *       200:
+ *         description: Flight updated successfully
+ */
 router.put("/flights/:id", flightController.updateFlight)
+
+/**
+ * @swagger
+ * /api/admin/flights/{id}:
+ *   delete:
+ *     summary: Delete flight
+ *     tags: [Admin - Flights]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Flight deleted successfully
+ */
 router.delete("/flights/:id", flightController.deleteFlight)
 
 // Seat Management
@@ -551,6 +746,38 @@ router.delete("/flights/:id", flightController.deleteFlight)
  *         description: Seats created
  */
 router.post("/seats", seatController.createFlightSeats)
+
+/**
+ * @swagger
+ * /api/admin/seats/{id}:
+ *   put:
+ *     summary: Update flight seat
+ *     tags: [Admin - Seats]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [AVAILABLE, BOOKED, RESERVED]
+ *               additionalPrice:
+ *                 type: integer
+ *                 example: 50000
+ *     responses:
+ *       200:
+ *         description: Seat updated successfully
+ */
 router.put("/seats/:id", seatController.updateFlightSeat)
 
 /**
@@ -645,7 +872,57 @@ router.post("/seats/generate", seatController.generateStandardSeats)
  *                       type: boolean
  */
 router.get("/bookings", bookingController.getAllBookingsAdmin)
+
+/**
+ * @swagger
+ * /api/admin/bookings/{id}/status:
+ *   put:
+ *     summary: Update booking status by admin
+ *     tags: [Admin - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, PAID, CANCELLED, EXPIRED]
+ *     responses:
+ *       200:
+ *         description: Booking status updated successfully
+ */
 router.put("/bookings/:id/status", bookingController.updateAdminBookingStatus)
+
+/**
+ * @swagger
+ * /api/admin/bookings/{id}/send-departure-reminder:
+ *   post:
+ *     summary: Send departure reminder email manually
+ *     tags: [Admin - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Departure reminder sent successfully
+ */
 router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDepartureReminderByAdmin)
 
 // User Management
@@ -742,7 +1019,69 @@ router.post("/bookings/:id/send-departure-reminder", bookingController.triggerDe
  *                       type: boolean
  */
 router.get("/users", getAllUsers)
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/block:
+ *   put:
+ *     summary: Block or unblock user
+ *     tags: [Admin - Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - isBlocked
+ *             properties:
+ *               isBlocked:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: User block status updated successfully
+ */
 router.put("/users/:id/block", blockUser)
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/2fa:
+ *   put:
+ *     summary: Enable or disable 2FA for user by admin
+ *     tags: [Admin - Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - enabled
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: User 2FA setting updated successfully
+ */
 router.put("/users/:id/2fa", toggleUserTwoFactorByAdmin)
 
 /**
@@ -846,8 +1185,99 @@ router.delete("/users/:email", deleteUser)
  *                       type: boolean
  */
 router.get("/promos", promoController.getAllPromos)
+
+/**
+ * @swagger
+ * /api/admin/promos:
+ *   post:
+ *     summary: Create promo
+ *     tags: [Admin - Promos]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - discount
+ *               - startDate
+ *               - endDate
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Diskon Akhir Pekan
+ *               description:
+ *                 type: string
+ *                 example: Promo tiket weekend
+ *               discount:
+ *                 type: integer
+ *                 example: 50000
+ *               startDate:
+ *                 type: string
+ *                 format: date-time
+ *               endDate:
+ *                 type: string
+ *                 format: date-time
+ *               isActive:
+ *                 type: boolean
+ *                 example: true
+ *               flightId:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: null
+ *     responses:
+ *       201:
+ *         description: Promo created successfully
+ */
 router.post("/promos", promoController.createPromo)
+
+/**
+ * @swagger
+ * /api/admin/promos/{id}:
+ *   put:
+ *     summary: Update promo
+ *     tags: [Admin - Promos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Promo'
+ *     responses:
+ *       200:
+ *         description: Promo updated successfully
+ */
 router.put("/promos/:id", promoController.updatePromo)
+
+/**
+ * @swagger
+ * /api/admin/promos/{id}:
+ *   delete:
+ *     summary: Delete promo
+ *     tags: [Admin - Promos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Promo deleted successfully
+ */
 router.delete("/promos/:id", promoController.deletePromo)
 
 export default router
